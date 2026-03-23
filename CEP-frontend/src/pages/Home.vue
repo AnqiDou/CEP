@@ -19,7 +19,7 @@
         <div class="search-suggest">
           <span class="search-suggest__label">大家都在搜：</span>
           <button
-            v-for="hot in hotKeywords"
+            v-for="hot in dynamicHotKeywords"
             :key="hot"
             class="search-suggest__item"
             @click="quickSearch(hot)"
@@ -33,7 +33,13 @@
           登录
         </button>
         <button class="primary-btn">发布闲置</button>
-        <button class="ghost-btn">我的订单</button>
+        <button
+          class="ghost-btn profile-btn"
+          @click="goToProfile"
+          aria-label="进入个人主页"
+        >
+          <el-icon><UserFilled /></el-icon>
+        </button>
       </div>
     </header>
 
@@ -89,10 +95,13 @@
         </div>
 
         <!-- 热门推荐区 -->
-        <section class="block">
+        <section class="block block--featured">
           <div class="block__header">
-            <h3 class="section-title">热门推荐</h3>
-            <div class="block__tabs">
+            <div>
+              <h3 class="section-title">{{ blockTitle }}</h3>
+              <p v-if="blockDesc" class="block__desc">{{ blockDesc }}</p>
+            </div>
+            <div v-if="isHotMode" class="block__tabs">
               <button
                 v-for="tab in hotTabs"
                 :key="tab.id"
@@ -106,9 +115,22 @@
               </button>
             </div>
           </div>
-          <div class="card-grid">
+
+          <div v-if="activeCategory" class="display-words">
+            <span class="display-words__label">显示词：</span>
+            <button
+              v-for="word in activeCategory.tags"
+              :key="word"
+              class="tag-btn"
+              @click="quickSearch(word)"
+            >
+              {{ word }}
+            </button>
+          </div>
+
+          <div :class="['card-grid', isHotMode ? 'card-grid--featured' : '']">
             <article
-              v-for="item in filteredHotItems"
+              v-for="item in displayedItems"
               :key="item.id"
               class="item-card"
             >
@@ -135,34 +157,9 @@
               </div>
             </article>
           </div>
-        </section>
 
-        <!-- 分类浏览区 -->
-        <section class="block">
-          <div class="block__header">
-            <h3 class="section-title">分类浏览</h3>
-          </div>
-          <div class="category-section-grid">
-            <div
-              v-for="cat in categories"
-              :key="cat.id"
-              class="category-section"
-            >
-              <div class="category-section__header">
-                <h4>{{ cat.name }}</h4>
-                <span class="category-section__more">查看该分类 &gt;</span>
-              </div>
-              <div class="category-section__tags">
-                <button
-                  v-for="tag in cat.tags"
-                  :key="tag"
-                  class="tag-btn"
-                  @click="quickSearch(tag)"
-                >
-                  {{ tag }}
-                </button>
-              </div>
-            </div>
+          <div v-if="displayedItems.length === 0" class="empty-state">
+            暂无匹配物品，请尝试其他关键词或分类。
           </div>
         </section>
       </section>
@@ -189,28 +186,34 @@
       </aside>
     </main>
 
-    <div
-      v-if="isLoginModalVisible"
-      class="login-modal-mask"
-      @click="closeLoginModal"
-    >
+    <div v-if="isAuthModalVisible" class="login-modal-mask">
       <section class="login-modal" @click.stop>
         <div class="login-modal__header">
           <div>
-            <h3 class="login-modal__title">用户登录</h3>
-            <p class="login-modal__subtitle">欢迎回到校园易物</p>
+            <h3 class="login-modal__title">
+              {{ authModalType === "login" ? "用户登录" : "用户注册" }}
+            </h3>
+            <p class="login-modal__subtitle">
+              {{
+                authModalType === "login"
+                  ? "欢迎回到校园易物"
+                  : authModalType === "register-verify"
+                  ? "请先填写邮箱与验证码"
+                  : "请继续填写个人资料"
+              }}
+            </p>
           </div>
-          <button class="login-modal__close" @click="closeLoginModal">×</button>
+          <button class="login-modal__close" @click="closeAuthModal">×</button>
         </div>
 
-        <form class="login-form">
+        <form v-if="authModalType === 'login'" class="login-form">
           <label class="login-form__field">
-            <span class="login-form__label">用户名</span>
+            <span class="login-form__label">邮箱</span>
             <input
-              v-model="loginForm.username"
+              v-model="loginForm.email"
               class="login-form__input"
-              type="text"
-              placeholder="请输入用户名"
+              type="email"
+              placeholder="请输入邮箱"
             />
           </label>
 
@@ -224,14 +227,156 @@
             />
           </label>
 
-          <label class="login-form__agreement">
-            <input v-model="loginForm.agreement" type="checkbox" />
-            <span>我已阅读并同意平台服务条款与隐私政策</span>
-          </label>
+          <p v-if="loginError" class="login-form__error">{{ loginError }}</p>
 
-          <button type="button" class="primary-btn login-form__submit">
+          <button
+            type="button"
+            class="primary-btn login-form__submit"
+            @click="submitLogin"
+          >
             登录
           </button>
+
+          <p class="login-form__hint">
+            还未注册？
+            <button
+              type="button"
+              class="login-form__switch"
+              @click="switchToRegister"
+            >
+              去注册
+            </button>
+          </p>
+        </form>
+
+        <form
+          v-else-if="authModalType === 'register-verify'"
+          class="login-form"
+        >
+          <label class="login-form__field">
+            <span class="login-form__label">邮箱</span>
+            <div class="login-form__code-row">
+              <input
+                v-model="registerForm.email"
+                class="login-form__input"
+                type="email"
+                placeholder="请输入邮箱"
+                @input="onRegisterEmailInput"
+              />
+              <button
+                type="button"
+                class="ghost-btn login-form__code-btn"
+                :disabled="isSendingCode || codeCountdown > 0"
+                @click="sendRegisterCode"
+              >
+                {{ sendCodeButtonText }}
+              </button>
+            </div>
+          </label>
+
+          <label class="login-form__field">
+            <span class="login-form__label">验证码</span>
+            <div class="login-form__code-row">
+              <input
+                v-model="registerForm.code"
+                class="login-form__input"
+                type="text"
+                placeholder="请输入6位数字验证码"
+                maxlength="6"
+                @input="onRegisterCodeInput"
+              />
+              <button
+                type="button"
+                class="ghost-btn login-form__code-btn"
+                @click="goRegisterProfileStep"
+              >
+                校验验证码
+              </button>
+            </div>
+          </label>
+
+          <p v-if="registerError" class="login-form__error">
+            {{ registerError }}
+          </p>
+
+          <p class="login-form__hint">
+            已有账号？
+            <button
+              type="button"
+              class="login-form__switch"
+              @click="switchToLogin"
+            >
+              去登录
+            </button>
+          </p>
+        </form>
+
+        <form v-else class="login-form">
+          <label class="login-form__field">
+            <span class="login-form__label">用户名（选填）</span>
+            <input
+              v-model="registerForm.username"
+              class="login-form__input"
+              type="text"
+              placeholder="请输入用户名（可留空）"
+            />
+          </label>
+
+          <label class="login-form__field">
+            <span class="login-form__label">密码</span>
+            <input
+              v-model="registerForm.password"
+              class="login-form__input"
+              type="password"
+              placeholder="8-20位，需包含数字和字母"
+            />
+          </label>
+
+          <label class="login-form__field">
+            <span class="login-form__label">确认密码</span>
+            <input
+              v-model="registerForm.confirmPassword"
+              class="login-form__input"
+              type="password"
+              placeholder="请再次输入密码"
+            />
+          </label>
+
+          <p v-if="registerError" class="login-form__error">
+            {{ registerError }}
+          </p>
+          <p v-if="registerSuccess" class="login-form__success">
+            {{ registerSuccess }}
+          </p>
+
+          <button
+            type="button"
+            class="primary-btn login-form__submit"
+            @click="submitRegister"
+          >
+            注册
+          </button>
+
+          <p class="login-form__hint">
+            <button
+              type="button"
+              class="login-form__switch"
+              @click="backToRegisterVerify"
+            >
+              返回上一步
+            </button>
+          </p>
+
+          <p class="login-form__hint">
+            已有账号？
+            <button
+              type="button"
+              class="login-form__switch"
+              @click="switchToLogin"
+            >
+              去登录
+            </button>
+          </p>
         </form>
       </section>
     </div>
@@ -239,17 +384,59 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
+import { UserFilled } from "@element-plus/icons-vue";
+
+const AUTH_API_BASE = "/api/auth";
+const router = useRouter();
 
 const keyword = ref("");
-const isLoginModalVisible = ref(false);
+const searchedKeyword = ref("");
+const authModalType = ref("");
+const isAuthModalVisible = computed(() => Boolean(authModalType.value));
 const loginForm = ref({
+  email: "",
+  password: "",
+});
+const registerForm = ref({
+  email: "",
+  code: "",
   username: "",
   password: "",
-  agreement: false,
+  confirmPassword: "",
+});
+const loginError = ref("");
+const registerError = ref("");
+const registerSuccess = ref("");
+const isSendingCode = ref(false);
+const codeCountdown = ref(0);
+let codeCountdownTimer = null;
+
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const codePattern = /^\d{6}$/;
+const passwordPattern = /^(?=.*[A-Za-z])(?=.*\d).{8,20}$/;
+
+const sendCodeButtonText = computed(() => {
+  if (isSendingCode.value) return "发送中...";
+  if (codeCountdown.value > 0) return `${codeCountdown.value}s后重发`;
+  return "发送验证码";
 });
 
-const hotKeywords = ["考研资料", "四六级", "平板", "耳机", "代步车"];
+const hotKeywordPool = [
+  "考研资料",
+  "四六级",
+  "平板",
+  "耳机",
+  "代步车",
+  "自行车",
+  "羽毛球拍",
+  "台灯",
+  "收纳盒",
+  "二手手机",
+];
+const keywordCursor = ref(0);
+let keywordTimer = null;
 
 const stats = {
   items: "1.2k+",
@@ -300,6 +487,7 @@ const hotItems = [
   {
     id: 1,
     tabId: "today",
+    categoryId: "book",
     title: "22级高数教材+辅导书全套",
     price: 35,
     campus: "东校区",
@@ -310,6 +498,7 @@ const hotItems = [
   {
     id: 2,
     tabId: "today",
+    categoryId: "digital",
     title: "iPad 9 64G + 原装笔",
     price: 1200,
     campus: "本部",
@@ -320,6 +509,7 @@ const hotItems = [
   {
     id: 3,
     tabId: "book",
+    categoryId: "book",
     title: "考研政治核心考点精讲",
     price: 20,
     campus: "南校区",
@@ -330,6 +520,7 @@ const hotItems = [
   {
     id: 4,
     tabId: "digital",
+    categoryId: "digital",
     title: "降噪无线蓝牙耳机",
     price: 80,
     campus: "本部",
@@ -337,17 +528,114 @@ const hotItems = [
     time: "半小时前",
     badge: "精选",
   },
+  {
+    id: 5,
+    tabId: "today",
+    categoryId: "life",
+    title: "宿舍护眼台灯（可调色温）",
+    price: 28,
+    campus: "东校区",
+    desc: "灯光柔和，支持三档调节，自习必备。",
+    time: "刚刚",
+    badge: "新品",
+  },
+  {
+    id: 6,
+    tabId: "today",
+    categoryId: "sport",
+    title: "九成新山地自行车",
+    price: 360,
+    campus: "本部",
+    desc: "通勤代步稳定，车况良好，可当面试骑。",
+    time: "45分钟前",
+    badge: "热销",
+  },
+  {
+    id: 7,
+    tabId: "digital",
+    categoryId: "digital",
+    title: "机械键盘青轴 87键",
+    price: 99,
+    campus: "南校区",
+    desc: "手感清脆，带灯效，送拔键器。",
+    time: "2小时前",
+    badge: "精选",
+  },
+  {
+    id: 8,
+    tabId: "book",
+    categoryId: "other",
+    title: "吉他入门教程 + 民谣谱合集",
+    price: 26,
+    campus: "本部",
+    desc: "包含多本教材，适合零基础上手。",
+    time: "1天前",
+    badge: "超值",
+  },
 ];
 
-const activeCategoryId = ref(categories[0]?.id || "");
+const activeCategoryId = ref("");
 const activeHotTabId = ref(hotTabs[0]?.id || "today");
 
 const filteredHotItems = computed(() =>
   hotItems.filter((item) => item.tabId === activeHotTabId.value)
 );
 
+const activeCategory = computed(() =>
+  categories.find((cat) => cat.id === activeCategoryId.value)
+);
+
+const isHotMode = computed(
+  () => !activeCategoryId.value && !searchedKeyword.value.trim()
+);
+
+const blockTitle = computed(() => {
+  if (activeCategory.value) return `${activeCategory.value.name} · 分类物品`;
+  if (searchedKeyword.value.trim())
+    return `搜索结果：${searchedKeyword.value.trim()}`;
+  return "热门推荐";
+});
+
+const blockDesc = computed(() => {
+  if (activeCategory.value) return "已按所选分类展示对应物品与显示词";
+  if (searchedKeyword.value.trim()) return "已根据关键词筛选相关物品";
+  return "未搜索或未选择分类时，默认展示热门推荐";
+});
+
+const dynamicHotKeywords = computed(() => {
+  const size = 5;
+  const start = keywordCursor.value % hotKeywordPool.length;
+  return Array.from({ length: size }, (_, idx) => {
+    const offset = (start + idx) % hotKeywordPool.length;
+    return hotKeywordPool[offset];
+  });
+});
+
+const displayedItems = computed(() => {
+  let source = isHotMode.value
+    ? filteredHotItems.value
+    : activeCategoryId.value
+    ? hotItems.filter((item) => item.categoryId === activeCategoryId.value)
+    : hotItems;
+
+  const word = searchedKeyword.value.trim().toLowerCase();
+  if (!word) return source;
+
+  source = source.filter((item) => {
+    const catName =
+      categories.find((cat) => cat.id === item.categoryId)?.name || "";
+    return [item.title, item.desc, catName]
+      .join(" ")
+      .toLowerCase()
+      .includes(word);
+  });
+
+  return source;
+});
+
 const handleSearch = () => {
   const value = keyword.value.trim();
+  searchedKeyword.value = value;
   if (!value) return;
   // 目前先简单控制台输出，后续可对接搜索结果页
   // eslint-disable-next-line no-console
@@ -356,20 +644,233 @@ const handleSearch = () => {
 
 const quickSearch = (word) => {
   keyword.value = word;
+  searchedKeyword.value = word;
   handleSearch();
 };
 
 const selectCategory = (id) => {
-  activeCategoryId.value = id;
+  activeCategoryId.value = activeCategoryId.value === id ? "" : id;
+  searchedKeyword.value = "";
+  keyword.value = "";
 };
 
 const openLoginModal = () => {
-  isLoginModalVisible.value = true;
+  authModalType.value = "login";
+  loginError.value = "";
 };
 
-const closeLoginModal = () => {
-  isLoginModalVisible.value = false;
+const openRegisterModal = () => {
+  authModalType.value = "register-verify";
+  registerError.value = "";
+  registerSuccess.value = "";
 };
+
+const closeAuthModal = () => {
+  authModalType.value = "";
+};
+
+const switchToRegister = () => {
+  openRegisterModal();
+};
+
+const switchToLogin = () => {
+  openLoginModal();
+};
+
+const goToProfile = () => {
+  router.push("/profile");
+};
+
+const onRegisterEmailInput = () => {
+  registerError.value = "";
+  registerSuccess.value = "";
+};
+
+const onRegisterCodeInput = () => {
+  registerError.value = "";
+  registerSuccess.value = "";
+};
+
+const postJson = async (url, payload) => {
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const body = await response.json();
+    if (!response.ok || body.success === false) {
+      throw new Error(body.message || "请求失败");
+    }
+    return body;
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error("无法连接后端服务，请确认后端已启动且前端通过 Vite 访问");
+    }
+    throw error;
+  }
+};
+
+const startCodeCountdown = () => {
+  codeCountdown.value = 60;
+  if (codeCountdownTimer) {
+    clearInterval(codeCountdownTimer);
+  }
+  codeCountdownTimer = window.setInterval(() => {
+    if (codeCountdown.value <= 1) {
+      clearInterval(codeCountdownTimer);
+      codeCountdownTimer = null;
+      codeCountdown.value = 0;
+      return;
+    }
+    codeCountdown.value -= 1;
+  }, 1000);
+};
+
+const sendRegisterCode = async () => {
+  registerError.value = "";
+  registerSuccess.value = "";
+  const email = registerForm.value.email.trim();
+
+  if (!emailPattern.test(email)) {
+    registerError.value = "邮箱格式不正确";
+    return;
+  }
+
+  if (isSendingCode.value || codeCountdown.value > 0) {
+    return;
+  }
+
+  isSendingCode.value = true;
+  try {
+    await postJson(`${AUTH_API_BASE}/send-register-code`, { email });
+    registerSuccess.value = "验证码已发送，请查收邮箱";
+    startCodeCountdown();
+  } catch (error) {
+    registerError.value = error.message || "发送验证码失败";
+  } finally {
+    isSendingCode.value = false;
+  }
+};
+
+const goRegisterProfileStep = async () => {
+  registerError.value = "";
+  registerSuccess.value = "";
+  const email = registerForm.value.email.trim();
+  const code = registerForm.value.code.trim();
+
+  if (!emailPattern.test(email)) {
+    registerError.value = "邮箱格式不正确";
+    return;
+  }
+
+  if (!codePattern.test(code)) {
+    registerError.value = "验证码格式不正确，请输入6位数字";
+    return;
+  }
+
+  try {
+    await postJson(`${AUTH_API_BASE}/verify-register-code`, { email, code });
+    authModalType.value = "register-profile";
+  } catch (error) {
+    registerError.value = error.message || "验证码校验失败";
+  }
+};
+
+const backToRegisterVerify = () => {
+  registerError.value = "";
+  registerSuccess.value = "";
+  authModalType.value = "register-verify";
+};
+
+const submitLogin = async () => {
+  loginError.value = "";
+  const email = loginForm.value.email.trim();
+  const password = loginForm.value.password;
+
+  if (!emailPattern.test(email)) {
+    loginError.value = "邮箱格式不正确";
+    return;
+  }
+
+  if (!password) {
+    loginError.value = "请输入密码";
+    return;
+  }
+
+  try {
+    await postJson(`${AUTH_API_BASE}/login`, { email, password });
+    closeAuthModal();
+  } catch (error) {
+    loginError.value = error.message || "登录失败";
+  }
+};
+
+const submitRegister = async () => {
+  registerError.value = "";
+  registerSuccess.value = "";
+  const { email, code, username, password, confirmPassword } =
+    registerForm.value;
+
+  if (!emailPattern.test(email.trim())) {
+    registerError.value = "邮箱格式不正确";
+    return;
+  }
+
+  if (!codePattern.test(code.trim())) {
+    registerError.value = "验证码格式不正确，请输入6位数字";
+    return;
+  }
+
+  if (!passwordPattern.test(password)) {
+    registerError.value = "密码需为8-20位，且同时包含字母和数字";
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    registerError.value = "两次输入的密码不一致";
+    return;
+  }
+
+  try {
+    await postJson(`${AUTH_API_BASE}/register`, {
+      email: email.trim(),
+      code: code.trim(),
+      username: username.trim(),
+      password,
+    });
+
+    await postJson(`${AUTH_API_BASE}/login`, {
+      email: email.trim(),
+      password,
+    });
+
+    registerSuccess.value = "注册并登录成功";
+    closeAuthModal();
+  } catch (error) {
+    registerError.value = error.message || "注册失败";
+  }
+};
+
+onMounted(() => {
+  keywordTimer = window.setInterval(() => {
+    keywordCursor.value += 1;
+  }, 2600);
+});
+
+onBeforeUnmount(() => {
+  if (keywordTimer) {
+    clearInterval(keywordTimer);
+    keywordTimer = null;
+  }
+  if (codeCountdownTimer) {
+    clearInterval(codeCountdownTimer);
+    codeCountdownTimer = null;
+  }
+});
 </script>
 
 <style scoped>
@@ -411,10 +912,16 @@ const closeLoginModal = () => {
 }
 
 .home-header__center {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   padding: 0 24px;
 }
 
 .search-bar {
+  width: min(100%, 680px);
+  max-width: 680px;
+  margin: 0 auto;
   display: flex;
   border-radius: 999px;
   background: #f3f4f6;
@@ -453,7 +960,8 @@ const closeLoginModal = () => {
 }
 
 .search-suggest {
-  margin-top: 6px;
+  width: min(100%, 680px);
+  margin: 6px auto 0;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -479,6 +987,22 @@ const closeLoginModal = () => {
   justify-content: flex-end;
   align-items: center;
   gap: 10px;
+}
+
+.home-header__right .ghost-btn,
+.home-header__right .primary-btn {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.profile-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
 }
 
 .login-btn {
@@ -626,11 +1150,21 @@ const closeLoginModal = () => {
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
 }
 
+.block--featured {
+  min-height: 420px;
+}
+
 .block__header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 10px;
+}
+
+.block__desc {
+  margin: -2px 0 0;
+  font-size: 12px;
+  color: #6b7280;
 }
 
 .block__tabs {
@@ -660,17 +1194,22 @@ const closeLoginModal = () => {
   gap: 10px;
 }
 
+.card-grid--featured {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .item-card {
   display: flex;
   gap: 10px;
-  padding: 10px;
+  padding: 12px;
   border-radius: 12px;
   border: 1px solid #e5e7eb;
   background: #f9fafb;
 }
 
 .item-card__thumb {
-  width: 90px;
+  width: 104px;
   border-radius: 10px;
   background: linear-gradient(135deg, #bfdbfe, #e5e7eb);
   position: relative;
@@ -743,38 +1282,18 @@ const closeLoginModal = () => {
   font-size: 12px;
 }
 
-.category-section-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.category-section {
-  padding: 10px;
-  border-radius: 10px;
-  background: #f9fafb;
-}
-
-.category-section__header {
+.display-words {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
-}
-
-.category-section__header h4 {
-  font-size: 13px;
-}
-
-.category-section__more {
-  font-size: 11px;
-  color: #2563eb;
-}
-
-.category-section__tags {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  margin-bottom: 10px;
+}
+
+.display-words__label {
+  font-size: 12px;
+  color: #6b7280;
 }
 
 .tag-btn {
@@ -785,6 +1304,16 @@ const closeLoginModal = () => {
   background: #e5edff;
   color: #2563eb;
   cursor: pointer;
+}
+
+.empty-state {
+  margin-top: 12px;
+  padding: 24px 12px;
+  border-radius: 12px;
+  text-align: center;
+  color: #6b7280;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
 }
 
 .side-panel {
@@ -905,23 +1434,51 @@ const closeLoginModal = () => {
   box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.16);
 }
 
-.login-form__agreement {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 13px;
-  color: #4b5563;
-}
-
-.login-form__agreement input {
-  margin-top: 2px;
-  accent-color: #2563eb;
-}
-
 .login-form__submit {
   width: 100%;
   margin-top: 4px;
   padding: 11px 18px;
+}
+
+.login-form__hint {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.login-form__switch {
+  border: none;
+  background: transparent;
+  color: #2563eb;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.login-form__error {
+  margin: -4px 0 0;
+  font-size: 12px;
+  color: #dc2626;
+}
+
+.login-form__success {
+  margin: -4px 0 0;
+  font-size: 12px;
+  color: #16a34a;
+}
+
+.login-form__code-row {
+  display: flex;
+  gap: 8px;
+}
+
+.login-form__code-row .login-form__input {
+  flex: 1;
+}
+
+.login-form__code-btn {
+  min-width: 84px;
+  padding: 0 14px;
 }
 
 @media (max-width: 1024px) {
