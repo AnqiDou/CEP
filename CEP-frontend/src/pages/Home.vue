@@ -29,11 +29,16 @@
         </div>
       </div>
       <div class="home-header__right">
-        <button class="ghost-btn login-btn" @click="openLoginModal">
+        <button
+          v-if="!isUserLoggedIn"
+          class="ghost-btn login-btn"
+          @click="openLoginModal"
+        >
           登录
         </button>
         <button class="primary-btn">发布闲置</button>
         <button
+          v-if="isUserLoggedIn"
           class="ghost-btn profile-btn"
           @click="goToProfile"
           aria-label="进入个人主页"
@@ -190,18 +195,8 @@
       <section class="login-modal" @click.stop>
         <div class="login-modal__header">
           <div>
-            <h3 class="login-modal__title">
-              {{ authModalType === "login" ? "用户登录" : "用户注册" }}
-            </h3>
-            <p class="login-modal__subtitle">
-              {{
-                authModalType === "login"
-                  ? "欢迎回到校园易物"
-                  : authModalType === "register-verify"
-                  ? "请先填写邮箱与验证码"
-                  : "请继续填写个人资料"
-              }}
-            </p>
+            <h3 class="login-modal__title">{{ authModalTitle }}</h3>
+            <p class="login-modal__subtitle">{{ authModalSubtitle }}</p>
           </div>
           <button class="login-modal__close" @click="closeAuthModal">×</button>
         </div>
@@ -228,6 +223,23 @@
           </label>
 
           <p v-if="loginError" class="login-form__error">{{ loginError }}</p>
+          <p v-if="loginSuccess" class="login-form__success">
+            {{ loginSuccess }}
+          </p>
+
+          <label class="agreement-check">
+            <input v-model="loginAgree" type="checkbox" />
+            <span>
+              我已阅读并同意
+              <a href="/terms" target="_blank" rel="noopener noreferrer"
+                >《用户条款》</a
+              >
+              与
+              <a href="/privacy" target="_blank" rel="noopener noreferrer"
+                >《隐私协议》</a
+              >
+            </span>
+          </label>
 
           <button
             type="button"
@@ -236,6 +248,16 @@
           >
             登录
           </button>
+
+          <p class="login-form__hint">
+            <button
+              type="button"
+              class="login-form__switch"
+              @click="switchToForgotPassword"
+            >
+              忘记密码
+            </button>
+          </p>
 
           <p class="login-form__hint">
             还未注册？
@@ -311,7 +333,10 @@
           </p>
         </form>
 
-        <form v-else class="login-form">
+        <form
+          v-else-if="authModalType === 'register-profile'"
+          class="login-form"
+        >
           <label class="login-form__field">
             <span class="login-form__label">用户名（选填）</span>
             <input
@@ -349,6 +374,20 @@
             {{ registerSuccess }}
           </p>
 
+          <label class="agreement-check">
+            <input v-model="registerAgree" type="checkbox" />
+            <span>
+              我已阅读并同意
+              <a href="/terms" target="_blank" rel="noopener noreferrer"
+                >《用户条款》</a
+              >
+              与
+              <a href="/privacy" target="_blank" rel="noopener noreferrer"
+                >《隐私协议》</a
+              >
+            </span>
+          </label>
+
           <button
             type="button"
             class="primary-btn login-form__submit"
@@ -378,6 +417,111 @@
             </button>
           </p>
         </form>
+
+        <form v-else-if="authModalType === 'forgot-verify'" class="login-form">
+          <label class="login-form__field">
+            <span class="login-form__label">邮箱</span>
+            <div class="login-form__code-row">
+              <input
+                v-model="forgotForm.email"
+                class="login-form__input"
+                type="email"
+                placeholder="请输入已注册邮箱"
+                @input="onForgotEmailInput"
+              />
+              <button
+                type="button"
+                class="ghost-btn login-form__code-btn"
+                :disabled="isSendingForgotCode || forgotCodeCountdown > 0"
+                @click="sendForgotCode"
+              >
+                {{ sendForgotCodeButtonText }}
+              </button>
+            </div>
+          </label>
+
+          <label class="login-form__field">
+            <span class="login-form__label">验证码</span>
+            <div class="login-form__code-row">
+              <input
+                v-model="forgotForm.code"
+                class="login-form__input"
+                type="text"
+                placeholder="请输入6位数字验证码"
+                maxlength="6"
+                @input="onForgotCodeInput"
+              />
+              <button
+                type="button"
+                class="ghost-btn login-form__code-btn"
+                @click="goForgotResetStep"
+              >
+                校验验证码
+              </button>
+            </div>
+          </label>
+
+          <p v-if="forgotError" class="login-form__error">{{ forgotError }}</p>
+          <p v-if="forgotSuccess" class="login-form__success">
+            {{ forgotSuccess }}
+          </p>
+
+          <p class="login-form__hint">
+            已想起密码？
+            <button
+              type="button"
+              class="login-form__switch"
+              @click="switchToLogin"
+            >
+              返回登录
+            </button>
+          </p>
+        </form>
+
+        <form v-else-if="authModalType === 'forgot-reset'" class="login-form">
+          <label class="login-form__field">
+            <span class="login-form__label">新密码</span>
+            <input
+              v-model="forgotForm.password"
+              class="login-form__input"
+              type="password"
+              placeholder="8-20位，需包含数字和字母"
+            />
+          </label>
+
+          <label class="login-form__field">
+            <span class="login-form__label">确认新密码</span>
+            <input
+              v-model="forgotForm.confirmPassword"
+              class="login-form__input"
+              type="password"
+              placeholder="请再次输入新密码"
+            />
+          </label>
+
+          <p v-if="forgotError" class="login-form__error">{{ forgotError }}</p>
+          <p v-if="forgotSuccess" class="login-form__success">
+            {{ forgotSuccess }}
+          </p>
+
+          <button
+            type="button"
+            class="primary-btn login-form__submit"
+            @click="submitResetPassword"
+          >
+            重置密码
+          </button>
+
+          <p class="login-form__hint">
+            <button
+              type="button"
+              class="login-form__switch"
+              @click="backToForgotVerify"
+            >
+              返回上一步
+            </button>
+          </p>
+        </form>
       </section>
     </div>
   </div>
@@ -387,6 +531,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { UserFilled } from "@element-plus/icons-vue";
+import { authState, initAuthSession, saveAuthSession } from "../auth/session";
 
 const AUTH_API_BASE = "/api/auth";
 const router = useRouter();
@@ -395,9 +540,19 @@ const keyword = ref("");
 const searchedKeyword = ref("");
 const authModalType = ref("");
 const isAuthModalVisible = computed(() => Boolean(authModalType.value));
+const isUserLoggedIn = computed(() =>
+  Boolean(authState.user && authState.refreshToken)
+);
 const loginForm = ref({
   email: "",
   password: "",
+});
+const loginAgree = ref(false);
+const forgotForm = ref({
+  email: "",
+  code: "",
+  password: "",
+  confirmPassword: "",
 });
 const registerForm = ref({
   email: "",
@@ -406,12 +561,19 @@ const registerForm = ref({
   password: "",
   confirmPassword: "",
 });
+const registerAgree = ref(false);
 const loginError = ref("");
+const loginSuccess = ref("");
 const registerError = ref("");
 const registerSuccess = ref("");
+const forgotError = ref("");
+const forgotSuccess = ref("");
 const isSendingCode = ref(false);
 const codeCountdown = ref(0);
 let codeCountdownTimer = null;
+const isSendingForgotCode = ref(false);
+const forgotCodeCountdown = ref(0);
+let forgotCodeCountdownTimer = null;
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const codePattern = /^\d{6}$/;
@@ -421,6 +583,31 @@ const sendCodeButtonText = computed(() => {
   if (isSendingCode.value) return "发送中...";
   if (codeCountdown.value > 0) return `${codeCountdown.value}s后重发`;
   return "发送验证码";
+});
+
+const sendForgotCodeButtonText = computed(() => {
+  if (isSendingForgotCode.value) return "发送中...";
+  if (forgotCodeCountdown.value > 0)
+    return `${forgotCodeCountdown.value}s后重发`;
+  return "发送验证码";
+});
+
+const authModalTitle = computed(() => {
+  if (authModalType.value === "login") return "用户登录";
+  if (authModalType.value === "register-verify") return "用户注册";
+  if (authModalType.value === "register-profile") return "完善注册信息";
+  if (authModalType.value === "forgot-verify") return "找回密码";
+  if (authModalType.value === "forgot-reset") return "重置密码";
+  return "账号中心";
+});
+
+const authModalSubtitle = computed(() => {
+  if (authModalType.value === "login") return "欢迎回到校园易物";
+  if (authModalType.value === "register-verify") return "请先填写邮箱与验证码";
+  if (authModalType.value === "register-profile") return "请继续填写个人资料";
+  if (authModalType.value === "forgot-verify") return "请输入邮箱并校验验证码";
+  if (authModalType.value === "forgot-reset") return "请设置新的登录密码";
+  return "";
 });
 
 const hotKeywordPool = [
@@ -657,12 +844,14 @@ const selectCategory = (id) => {
 const openLoginModal = () => {
   authModalType.value = "login";
   loginError.value = "";
+  loginSuccess.value = "";
 };
 
 const openRegisterModal = () => {
   authModalType.value = "register-verify";
   registerError.value = "";
   registerSuccess.value = "";
+  registerAgree.value = false;
 };
 
 const closeAuthModal = () => {
@@ -677,7 +866,17 @@ const switchToLogin = () => {
   openLoginModal();
 };
 
+const switchToForgotPassword = () => {
+  authModalType.value = "forgot-verify";
+  forgotError.value = "";
+  forgotSuccess.value = "";
+};
+
 const goToProfile = () => {
+  if (!isUserLoggedIn.value) {
+    openLoginModal();
+    return;
+  }
   router.push("/profile");
 };
 
@@ -689,6 +888,16 @@ const onRegisterEmailInput = () => {
 const onRegisterCodeInput = () => {
   registerError.value = "";
   registerSuccess.value = "";
+};
+
+const onForgotEmailInput = () => {
+  forgotError.value = "";
+  forgotSuccess.value = "";
+};
+
+const onForgotCodeInput = () => {
+  forgotError.value = "";
+  forgotSuccess.value = "";
 };
 
 const postJson = async (url, payload) => {
@@ -727,6 +936,22 @@ const startCodeCountdown = () => {
       return;
     }
     codeCountdown.value -= 1;
+  }, 1000);
+};
+
+const startForgotCodeCountdown = () => {
+  forgotCodeCountdown.value = 60;
+  if (forgotCodeCountdownTimer) {
+    clearInterval(forgotCodeCountdownTimer);
+  }
+  forgotCodeCountdownTimer = window.setInterval(() => {
+    if (forgotCodeCountdown.value <= 1) {
+      clearInterval(forgotCodeCountdownTimer);
+      forgotCodeCountdownTimer = null;
+      forgotCodeCountdown.value = 0;
+      return;
+    }
+    forgotCodeCountdown.value -= 1;
   }, 1000);
 };
 
@@ -780,6 +1005,65 @@ const goRegisterProfileStep = async () => {
   }
 };
 
+const sendForgotCode = async () => {
+  forgotError.value = "";
+  forgotSuccess.value = "";
+  const email = forgotForm.value.email.trim();
+
+  if (!emailPattern.test(email)) {
+    forgotError.value = "邮箱格式不正确";
+    return;
+  }
+
+  if (isSendingForgotCode.value || forgotCodeCountdown.value > 0) {
+    return;
+  }
+
+  isSendingForgotCode.value = true;
+  try {
+    await postJson(`${AUTH_API_BASE}/send-reset-password-code`, { email });
+    forgotSuccess.value = "验证码已发送，请查收邮箱";
+    startForgotCodeCountdown();
+  } catch (error) {
+    forgotError.value = error.message || "发送验证码失败";
+  } finally {
+    isSendingForgotCode.value = false;
+  }
+};
+
+const goForgotResetStep = async () => {
+  forgotError.value = "";
+  forgotSuccess.value = "";
+  const email = forgotForm.value.email.trim();
+  const code = forgotForm.value.code.trim();
+
+  if (!emailPattern.test(email)) {
+    forgotError.value = "邮箱格式不正确";
+    return;
+  }
+
+  if (!codePattern.test(code)) {
+    forgotError.value = "验证码格式不正确，请输入6位数字";
+    return;
+  }
+
+  try {
+    await postJson(`${AUTH_API_BASE}/verify-reset-password-code`, {
+      email,
+      code,
+    });
+    authModalType.value = "forgot-reset";
+  } catch (error) {
+    forgotError.value = error.message || "验证码校验失败";
+  }
+};
+
+const backToForgotVerify = () => {
+  forgotError.value = "";
+  forgotSuccess.value = "";
+  authModalType.value = "forgot-verify";
+};
+
 const backToRegisterVerify = () => {
   registerError.value = "";
   registerSuccess.value = "";
@@ -788,6 +1072,7 @@ const backToRegisterVerify = () => {
 
 const submitLogin = async () => {
   loginError.value = "";
+  loginSuccess.value = "";
   const email = loginForm.value.email.trim();
   const password = loginForm.value.password;
 
@@ -801,11 +1086,60 @@ const submitLogin = async () => {
     return;
   }
 
+  if (!loginAgree.value) {
+    loginError.value = "请先同意用户条款与隐私协议";
+    return;
+  }
+
   try {
-    await postJson(`${AUTH_API_BASE}/login`, { email, password });
+    const responseBody = await postJson(`${AUTH_API_BASE}/login`, {
+      email,
+      password,
+    });
+    saveAuthSession(responseBody);
     closeAuthModal();
   } catch (error) {
     loginError.value = error.message || "登录失败";
+  }
+};
+
+const submitResetPassword = async () => {
+  forgotError.value = "";
+  forgotSuccess.value = "";
+  const { email, code, password, confirmPassword } = forgotForm.value;
+
+  if (!emailPattern.test(email.trim())) {
+    forgotError.value = "邮箱格式不正确";
+    return;
+  }
+
+  if (!codePattern.test(code.trim())) {
+    forgotError.value = "验证码格式不正确，请输入6位数字";
+    return;
+  }
+
+  if (!passwordPattern.test(password)) {
+    forgotError.value = "密码需为8-20位，且同时包含字母和数字";
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    forgotError.value = "两次输入的密码不一致";
+    return;
+  }
+
+  try {
+    await postJson(`${AUTH_API_BASE}/reset-password`, {
+      email: email.trim(),
+      code: code.trim(),
+      password,
+    });
+    loginForm.value.email = email.trim();
+    loginForm.value.password = "";
+    openLoginModal();
+    loginSuccess.value = "密码重置成功，请使用新密码登录";
+  } catch (error) {
+    forgotError.value = error.message || "重置密码失败";
   }
 };
 
@@ -835,6 +1169,11 @@ const submitRegister = async () => {
     return;
   }
 
+  if (!registerAgree.value) {
+    registerError.value = "请先同意用户条款与隐私协议";
+    return;
+  }
+
   try {
     await postJson(`${AUTH_API_BASE}/register`, {
       email: email.trim(),
@@ -843,10 +1182,11 @@ const submitRegister = async () => {
       password,
     });
 
-    await postJson(`${AUTH_API_BASE}/login`, {
+    const loginResponse = await postJson(`${AUTH_API_BASE}/login`, {
       email: email.trim(),
       password,
     });
+    saveAuthSession(loginResponse);
 
     registerSuccess.value = "注册并登录成功";
     closeAuthModal();
@@ -855,7 +1195,8 @@ const submitRegister = async () => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
+  await initAuthSession();
   keywordTimer = window.setInterval(() => {
     keywordCursor.value += 1;
   }, 2600);
@@ -869,6 +1210,10 @@ onBeforeUnmount(() => {
   if (codeCountdownTimer) {
     clearInterval(codeCountdownTimer);
     codeCountdownTimer = null;
+  }
+  if (forgotCodeCountdownTimer) {
+    clearInterval(forgotCodeCountdownTimer);
+    forgotCodeCountdownTimer = null;
   }
 });
 </script>
@@ -1479,6 +1824,23 @@ onBeforeUnmount(() => {
 .login-form__code-btn {
   min-width: 84px;
   padding: 0 14px;
+}
+
+.agreement-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  color: #4b5563;
+}
+
+.agreement-check input {
+  margin-top: 2px;
+}
+
+.agreement-check a {
+  color: #2563eb;
+  text-decoration: none;
 }
 
 @media (max-width: 1024px) {

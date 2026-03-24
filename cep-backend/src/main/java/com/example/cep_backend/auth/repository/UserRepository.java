@@ -51,4 +51,9 @@ public class UserRepository {
         String sql = "UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?";
         jdbcTemplate.update(sql, loginAt, loginAt, userId);
     }
+
+    public void updatePasswordByEmail(String email, String passwordHash, LocalDateTime now) {
+        String sql = "UPDATE users SET password_hash = ?, updated_at = ? WHERE email = ?";
+        jdbcTemplate.update(sql, passwordHash, now, email);
+    }
 }

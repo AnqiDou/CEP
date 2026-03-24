@@ -1,373 +1,586 @@
 <template>
   <div class="profile-page">
-    <header class="profile-header">
-      <div class="profile-header__left">
-        <el-avatar :size="72" class="profile-avatar">
-          <el-icon :size="36"><UserFilled /></el-icon>
-        </el-avatar>
-        <div>
-          <h2 class="profile-name">{{ userInfo.username }}</h2>
-          <p class="profile-credit">
-            信用等级：
-            <el-tag type="success" effect="light">{{
-              userInfo.creditLevel
-            }}</el-tag>
-          </p>
-          <el-rate
-            v-model="userInfo.creditScore"
-            disabled
-            show-score
-            text-color="#f59e0b"
-            score-template="{value} 分"
-          />
+    <div class="profile-layout">
+      <aside class="profile-sidebar card">
+        <button
+          :class="[
+            'menu-item',
+            selectedMenu === 'idle' ? 'menu-item--active' : '',
+          ]"
+          type="button"
+          @click="selectMenu('idle')"
+        >
+          <el-icon><User /></el-icon>
+          <span>我的闲置</span>
+        </button>
+
+        <div class="menu-group">
+          <button
+            class="menu-title"
+            type="button"
+            @click="tradeOpen = !tradeOpen"
+          >
+            <span class="menu-title__left"
+              ><el-icon><Goods /></el-icon>我的交易</span
+            >
+            <el-icon
+              ><ArrowDown v-if="tradeOpen" /><ArrowRight v-else
+            /></el-icon>
+          </button>
+          <div v-if="tradeOpen" class="menu-sublist">
+            <button
+              v-for="item in tradeMenus"
+              :key="item.key"
+              :class="[
+                'sub-item',
+                selectedMenu === item.key ? 'sub-item--active' : '',
+              ]"
+              type="button"
+              @click="selectMenu(item.key)"
+            >
+              {{ item.label }}
+            </button>
+          </div>
         </div>
-      </div>
-      <el-button type="primary" plain @click="goHome">
-        <el-icon><House /></el-icon>
-        返回首页
-      </el-button>
-    </header>
 
-    <section class="panel">
-      <div class="panel__title">
-        <el-icon><Goods /></el-icon>
-        <span>发布的物品</span>
-      </div>
+        <button
+          :class="[
+            'menu-item',
+            selectedMenu === 'favorite' ? 'menu-item--active' : '',
+          ]"
+          type="button"
+          @click="selectMenu('favorite')"
+        >
+          <el-icon><Star /></el-icon>
+          <span>我的收藏</span>
+        </button>
+      </aside>
 
-      <el-table :data="publishedItems" stripe>
-        <el-table-column prop="title" label="物品名称" min-width="180" />
-        <el-table-column prop="price" label="价格" width="120">
-          <template #default="scope">￥{{ scope.row.price }}</template>
-        </el-table-column>
-        <el-table-column prop="status" label="状态" width="140" />
-        <el-table-column prop="updatedAt" label="更新时间" width="170" />
-        <el-table-column label="操作" width="140">
-          <template #default="scope">
-            <el-button
-              size="small"
-              type="primary"
-              link
-              @click="openEditDialog(scope.row)"
+      <main class="profile-main card">
+        <section class="profile-banner">
+          <div class="profile-user">
+            <el-avatar :size="74" :src="userInfo.avatar" class="profile-avatar">
+              <el-icon :size="34"><UserFilled /></el-icon>
+            </el-avatar>
+            <div>
+              <h2 class="user-name">{{ userInfo.username }}</h2>
+              <div class="user-stats">
+                <span>{{ userInfo.fans }}粉丝</span><span>|</span>
+                <span>{{ userInfo.following }}关注</span>
+              </div>
+            </div>
+          </div>
+          <div class="banner-actions">
+            <button class="action-btn" type="button" @click="openEditDialog">
+              编辑资料
+            </button>
+            <button
+              class="action-btn action-btn--danger"
+              type="button"
+              @click="handleLogout"
             >
-              编辑
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </section>
+              退出登录
+            </button>
+            <el-button class="home-btn" plain @click="goHome"
+              ><el-icon><House /></el-icon>返回首页</el-button
+            >
+          </div>
+        </section>
 
-    <section class="panel">
-      <div class="panel__title">
-        <el-icon><Tickets /></el-icon>
-        <span>个人信息与记录</span>
-      </div>
+        <section class="profile-content">
+          <div v-if="selectedMenu === 'idle'" class="credit-head">
+            <h3 class="credit-title">信用及评价</h3>
+            <span class="credit-count">{{ reviewTotal }}</span>
+          </div>
 
-      <el-tabs v-model="activeTab">
-        <el-tab-pane name="pending" label="待确认交易">
-          <el-table :data="pendingTrades" stripe>
-            <el-table-column prop="item" label="物品" min-width="180" />
-            <el-table-column prop="buyer" label="买家" width="120" />
-            <el-table-column prop="price" label="金额" width="120">
-              <template #default="scope">￥{{ scope.row.price }}</template>
-            </el-table-column>
-            <el-table-column prop="time" label="申请时间" width="170" />
-          </el-table>
-        </el-tab-pane>
+          <div v-if="selectedMenu === 'idle'" class="review-tabs">
+            <button
+              v-for="tab in reviewTabs"
+              :key="tab.key"
+              :class="[
+                'review-tab',
+                activeReviewTab === tab.key ? 'review-tab--active' : '',
+              ]"
+              type="button"
+              @click="activeReviewTab = tab.key"
+            >
+              {{ tab.label }}
+            </button>
+          </div>
 
-        <el-tab-pane name="bought" label="买过的物品（交易记录）">
-          <el-table :data="boughtItems" stripe>
-            <el-table-column prop="item" label="物品" min-width="200" />
-            <el-table-column prop="seller" label="卖家" width="120" />
-            <el-table-column prop="price" label="成交价" width="120">
-              <template #default="scope">￥{{ scope.row.price }}</template>
-            </el-table-column>
-            <el-table-column prop="time" label="成交时间" width="170" />
-          </el-table>
-        </el-tab-pane>
-
-        <el-tab-pane name="favorites" label="收藏">
-          <div class="card-list">
-            <el-card
-              v-for="item in favorites"
+          <div v-if="selectedMenu === 'idle'" class="review-list">
+            <div
+              v-for="item in filteredReviewList"
               :key="item.id"
-              shadow="hover"
-              class="record-card"
+              class="review-item"
             >
-              <h4>{{ item.title }}</h4>
-              <p>价格：￥{{ item.price }}</p>
-              <p>发布者：{{ item.owner }}</p>
-            </el-card>
+              <div class="review-item__top">
+                <span class="review-user">{{ item.user }}</span>
+                <span class="review-time">{{ item.time }}</span>
+              </div>
+              <p class="review-content">{{ item.content }}</p>
+            </div>
           </div>
-        </el-tab-pane>
 
-        <el-tab-pane name="history" label="浏览">
-          <el-timeline>
-            <el-timeline-item
-              v-for="entry in browsingHistory"
-              :key="entry.id"
-              :timestamp="entry.time"
-              placement="top"
-            >
-              {{ entry.content }}
-            </el-timeline-item>
-          </el-timeline>
-        </el-tab-pane>
-
-        <el-tab-pane name="following" label="关注">
-          <div class="card-list">
-            <el-card
-              v-for="follow in followingUsers"
-              :key="follow.id"
-              shadow="never"
-              class="record-card"
-            >
-              <h4>{{ follow.name }}</h4>
-              <p>近期发布：{{ follow.recentPost }}</p>
-            </el-card>
+          <div v-else class="section-head">
+            <h3 class="section-title">{{ currentSection.title }}</h3>
           </div>
-        </el-tab-pane>
-      </el-tabs>
-    </section>
+        </section>
+      </main>
+    </div>
 
     <el-dialog
-      v-model="isEditDialogVisible"
-      title="编辑已发布物品"
-      width="460px"
+      v-model="editDialogVisible"
+      title="编辑资料"
+      width="420px"
+      destroy-on-close
     >
-      <el-form :model="editingItem" label-width="90px">
-        <el-form-item label="物品名称">
-          <el-input v-model="editingItem.title" />
-        </el-form-item>
-        <el-form-item label="价格">
-          <el-input-number v-model="editingItem.price" :min="1" :step="5" />
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="editingItem.status" placeholder="请选择状态">
-            <el-option label="在售" value="在售" />
-            <el-option label="待确认" value="待确认" />
-            <el-option label="已下架" value="已下架" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="描述">
-          <el-input
-            v-model="editingItem.description"
-            type="textarea"
-            :rows="3"
-          />
-        </el-form-item>
+      <div class="edit-avatar-row">
+        <el-avatar :size="64" :src="editForm.avatar || userInfo.avatar"
+          ><el-icon><UserFilled /></el-icon
+        ></el-avatar>
+        <input
+          ref="avatarInputRef"
+          class="avatar-input"
+          type="file"
+          accept="image/*"
+          @change="handleAvatarChange"
+        />
+        <el-button size="small" @click="triggerAvatarSelect"
+          >更换头像</el-button
+        >
+      </div>
+      <el-form label-width="86px">
+        <el-form-item label="用户名"
+          ><el-input v-model="editForm.username" maxlength="20" show-word-limit
+        /></el-form-item>
+        <el-form-item label="新密码"
+          ><el-input
+            v-model="editForm.password"
+            type="password"
+            show-password
+            placeholder="不修改可留空"
+        /></el-form-item>
       </el-form>
+      <p v-if="editError" class="edit-error">{{ editError }}</p>
       <template #footer>
-        <el-button @click="isEditDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveItemEdit">保存修改</el-button>
+        <el-button @click="editDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveProfile">保存</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { reactive, ref } from "vue";
-import { useRouter } from "vue-router";
+import { computed, onMounted, reactive, ref } from "vue";
 import { ElMessage } from "element-plus";
-import { Goods, House, Tickets, UserFilled } from "@element-plus/icons-vue";
+import { useRouter } from "vue-router";
+import {
+  ArrowDown,
+  ArrowRight,
+  Goods,
+  House,
+  Star,
+  User,
+  UserFilled,
+} from "@element-plus/icons-vue";
+import { authState, initAuthSession, logout } from "../auth/session";
 
 const router = useRouter();
 
 const userInfo = reactive({
-  username: "校园用户_小易",
-  creditLevel: "优秀",
-  creditScore: 4.8,
+  avatar: "",
+  username: "金星焦糖味的柑桔",
+  fans: 0,
+  following: 0,
+  passwordUpdatedAt: "2026-03-01",
+});
+const tradeMenus = [
+  { key: "trade-published", label: "我发布的" },
+  { key: "trade-sold", label: "我卖出的" },
+  { key: "trade-bought", label: "我买到的" },
+];
+
+const tradeOpen = ref(true);
+const selectedMenu = ref("idle");
+const editDialogVisible = ref(false);
+const avatarInputRef = ref(null);
+const editError = ref("");
+const activeReviewTab = ref("all");
+const editForm = reactive({ avatar: "", username: "", password: "" });
+
+const sectionMap = {
+  idle: { title: "我的闲置" },
+  "trade-published": { title: "我发布的" },
+  "trade-sold": { title: "我卖出的" },
+  "trade-bought": { title: "我买到的" },
+  favorite: { title: "我的收藏" },
+};
+
+const reviewList = [
+  {
+    id: 1,
+    user: "计算机学院-王同学",
+    time: "2026-03-20",
+    source: "buyer",
+    content: "卖家回复很快，商品描述一致，交易顺利。",
+  },
+  {
+    id: 2,
+    user: "外语学院-李同学",
+    time: "2026-03-15",
+    source: "seller",
+    content: "沟通友好，见面交易很准时，体验不错。",
+  },
+  {
+    id: 3,
+    user: "经管学院-周同学",
+    time: "2026-03-10",
+    source: "seller",
+    content: "物品成色很好，和图片一致，推荐。",
+  },
+];
+const reviewTotal = 34;
+const reviewTabs = [
+  { key: "all", label: "全部" },
+  { key: "good", label: "好评 32" },
+  { key: "buyer", label: "来自买家 5" },
+  { key: "seller", label: "来自卖家 29" },
+];
+
+const filteredReviewList = computed(() => {
+  if (activeReviewTab.value === "buyer") {
+    return reviewList.filter((item) => item.source === "buyer");
+  }
+  if (activeReviewTab.value === "seller") {
+    return reviewList.filter((item) => item.source === "seller");
+  }
+  return reviewList;
 });
 
-const activeTab = ref("pending");
-const isEditDialogVisible = ref(false);
-const editingItem = reactive({
-  id: null,
-  title: "",
-  price: 1,
-  status: "在售",
-  description: "",
-});
+const currentSection = computed(
+  () => sectionMap[selectedMenu.value] || sectionMap.idle
+);
 
-const publishedItems = ref([
-  {
-    id: 1,
-    title: "考研数学复习全书",
-    price: 45,
-    status: "在售",
-    updatedAt: "2026-03-21 18:30",
-    description: "九成新，附笔记。",
-  },
-  {
-    id: 2,
-    title: "机械键盘 87键",
-    price: 120,
-    status: "待确认",
-    updatedAt: "2026-03-20 09:12",
-    description: "轴体手感良好，附拔键器。",
-  },
-]);
-
-const pendingTrades = ref([
-  {
-    id: 1,
-    item: "机械键盘 87键",
-    buyer: "张同学",
-    price: 120,
-    time: "2026-03-23 14:10",
-  },
-  {
-    id: 2,
-    item: "考研数学复习全书",
-    buyer: "李同学",
-    price: 45,
-    time: "2026-03-23 11:05",
-  },
-]);
-
-const boughtItems = ref([
-  {
-    id: 1,
-    item: "宿舍护眼台灯",
-    seller: "王同学",
-    price: 35,
-    time: "2026-03-10 16:40",
-  },
-  {
-    id: 2,
-    item: "耳机收纳盒",
-    seller: "陈同学",
-    price: 20,
-    time: "2026-03-08 19:30",
-  },
-]);
-
-const favorites = ref([
-  { id: 1, title: "iPad 9 64G", price: 1250, owner: "数码小铺" },
-  { id: 2, title: "羽毛球拍双拍套装", price: 80, owner: "运动专区" },
-]);
-
-const browsingHistory = ref([
-  { id: 1, content: "浏览了：二手自行车（九成新）", time: "今天 13:22" },
-  { id: 2, content: "浏览了：英语六级真题资料", time: "今天 09:16" },
-  { id: 3, content: "浏览了：宿舍小风扇", time: "昨天 21:05" },
-]);
-
-const followingUsers = ref([
-  { id: 1, name: "教材转让铺", recentPost: "高数教材（下册）" },
-  { id: 2, name: "数码闲置站", recentPost: "蓝牙耳机（降噪）" },
-]);
-
+const selectMenu = (key) => {
+  selectedMenu.value = key;
+};
 const goHome = () => {
   router.push("/");
 };
-
-const openEditDialog = (item) => {
-  editingItem.id = item.id;
-  editingItem.title = item.title;
-  editingItem.price = item.price;
-  editingItem.status = item.status;
-  editingItem.description = item.description;
-  isEditDialogVisible.value = true;
+const openEditDialog = () => {
+  editForm.avatar = userInfo.avatar;
+  editForm.username = userInfo.username;
+  editForm.password = "";
+  editError.value = "";
+  editDialogVisible.value = true;
+};
+const triggerAvatarSelect = () => {
+  avatarInputRef.value?.click();
+};
+const handleAvatarChange = (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    editForm.avatar = typeof reader.result === "string" ? reader.result : "";
+  };
+  reader.readAsDataURL(file);
+  event.target.value = "";
+};
+const saveProfile = () => {
+  const username = editForm.username.trim();
+  if (!username) {
+    editError.value = "用户名不能为空";
+    return;
+  }
+  if (editForm.password && editForm.password.length < 6) {
+    editError.value = "新密码至少 6 位";
+    return;
+  }
+  userInfo.username = username;
+  if (editForm.avatar) userInfo.avatar = editForm.avatar;
+  if (editForm.password)
+    userInfo.passwordUpdatedAt = new Date().toISOString().slice(0, 10);
+  editDialogVisible.value = false;
+  ElMessage.success("资料已更新");
 };
 
-const saveItemEdit = () => {
-  const target = publishedItems.value.find(
-    (item) => item.id === editingItem.id
-  );
-  if (!target) return;
-  target.title = editingItem.title;
-  target.price = editingItem.price;
-  target.status = editingItem.status;
-  target.description = editingItem.description;
-  target.updatedAt = new Date().toLocaleString("zh-CN", { hour12: false });
-  isEditDialogVisible.value = false;
-  ElMessage.success("物品信息已更新");
+const syncUserInfo = () => {
+  if (!authState.user) return;
+  userInfo.username = authState.user.username || "校园用户";
 };
+
+const handleLogout = async () => {
+  try {
+    await logout();
+    ElMessage.success("已退出登录");
+  } catch (error) {
+    ElMessage.warning(error.message || "退出登录异常");
+  } finally {
+    router.push("/");
+  }
+};
+
+onMounted(async () => {
+  await initAuthSession();
+  if (!authState.user) {
+    router.push("/");
+    return;
+  }
+  syncUserInfo();
+});
 </script>
 
 <style scoped>
 .profile-page {
   min-height: 100vh;
-  padding: 24px;
   background: #f5f7fb;
 }
-
-.profile-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.profile-layout {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
   gap: 16px;
-  padding: 20px;
-  border-radius: 16px;
-  margin-bottom: 16px;
-  background: #ffffff;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  padding: 16px 16px 16px 0;
 }
-
-.profile-header__left {
+.card {
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+}
+.profile-sidebar {
+  border-radius: 0 14px 14px 0;
+  padding: 14px;
   display: flex;
-  align-items: center;
-  gap: 16px;
+  flex-direction: column;
+  gap: 10px;
 }
-
-.profile-avatar {
-  background: #e0e7ff;
-  color: #2563eb;
+.menu-item,
+.menu-title,
+.sub-item {
+  width: 100%;
+  border: none;
+  text-align: left;
+  background: transparent;
+  color: #1f2937;
+  cursor: pointer;
 }
-
-.profile-name {
-  margin: 0;
-  font-size: 24px;
-  color: #1e293b;
-}
-
-.profile-credit {
-  margin: 8px 0;
-  color: #475569;
-}
-
-.panel {
-  border-radius: 16px;
-  padding: 18px;
-  margin-bottom: 16px;
-  background: #ffffff;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-}
-
-.panel__title {
+.menu-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 14px;
-  font-size: 18px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 15px;
   font-weight: 600;
-  color: #1e3a8a;
 }
-
-.card-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
+.menu-item--active {
+  background: #eef4ff;
+  color: #1d4ed8;
 }
-
-.record-card h4 {
-  margin: 0 0 8px;
+.menu-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  font-size: 15px;
+  font-weight: 600;
 }
-
-.record-card p {
-  margin: 0 0 6px;
-  color: #475569;
+.menu-title__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.menu-sublist {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+}
+.sub-item {
+  padding: 9px 36px;
+  color: #4b5563;
   font-size: 14px;
+  border-radius: 8px;
 }
-
-@media (max-width: 768px) {
-  .profile-page {
+.sub-item:hover,
+.sub-item--active {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+.profile-main {
+  overflow: hidden;
+}
+.profile-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, #e0f2fe 0%, #eff6ff 100%);
+}
+.profile-user {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.profile-avatar {
+  background: linear-gradient(135deg, #bfdbfe, #93c5fd);
+  color: #1d4ed8;
+}
+.user-name {
+  margin: 0;
+  font-size: 30px;
+  color: #111827;
+}
+.user-stats {
+  margin-top: 6px;
+  display: flex;
+  gap: 8px;
+  font-size: 16px;
+  color: #4b5563;
+}
+.banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.action-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 9px 16px;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.action-btn--danger {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.home-btn {
+  border-radius: 999px;
+}
+.profile-content {
+  padding: 16px 22px 22px;
+  min-height: 380px;
+}
+.credit-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.credit-title {
+  margin: 0;
+  font-size: 24px;
+  color: #111827;
+}
+.credit-count {
+  font-size: 20px;
+  color: #6b7280;
+}
+.review-tabs {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.review-tab {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 8px 14px;
+  background: #f1f5f9;
+  color: #111827;
+  font-size: 15px;
+  cursor: pointer;
+}
+.review-tab--active {
+  border-color: #bfdbfe;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+.review-list {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.review-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.review-item__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.review-user {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+.review-time {
+  font-size: 12px;
+  color: #6b7280;
+}
+.review-content {
+  margin: 0;
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.5;
+}
+.section-head {
+  display: flex;
+  align-items: center;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.section-title {
+  margin: 0;
+  font-size: 24px;
+  color: #111827;
+}
+.edit-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.avatar-input {
+  display: none;
+}
+.edit-error {
+  margin: 0;
+  color: #dc2626;
+  font-size: 13px;
+}
+@media (max-width: 980px) {
+  .profile-layout {
+    grid-template-columns: minmax(0, 1fr);
     padding: 12px;
   }
-
-  .profile-header {
+  .profile-sidebar {
+    border-radius: 14px;
+  }
+  .profile-banner {
     flex-direction: column;
     align-items: flex-start;
+  }
+  .banner-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .user-name {
+    font-size: 24px;
   }
 }
 </style>

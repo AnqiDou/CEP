@@ -1,4 +1,4 @@
-package com.example.cep_backend.auth;
+package com.example.cep_backend.common.api;
 
 public record ApiResponse<T>(boolean success, String message, T data) {
     public static <T> ApiResponse<T> ok(String message, T data) {
