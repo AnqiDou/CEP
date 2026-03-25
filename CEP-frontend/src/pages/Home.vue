@@ -36,7 +36,7 @@
         >
           登录
         </button>
-        <button class="primary-btn">发布闲置</button>
+        <button class="primary-btn" @click="goToPublish">发布闲置</button>
         <button
           v-if="isUserLoggedIn"
           class="ghost-btn profile-btn"
@@ -79,7 +79,7 @@
             <h2>让校园闲置物品重新流动起来</h2>
             <p>支持当面交易 · 校园认证 · 信息真实可靠</p>
             <div class="banner__actions">
-              <button class="primary-btn">立即发布</button>
+              <button class="primary-btn" @click="goToPublish">立即发布</button>
               <button class="ghost-btn">浏览更多</button>
             </div>
           </div>
@@ -157,7 +157,9 @@
                 </p>
                 <div class="item-card__footer">
                   <span class="item-card__time">{{ item.time }}</span>
-                  <button class="text-btn">去看看</button>
+                  <button class="text-btn" @click="goToItemDetail(item.id)">
+                    去看看
+                  </button>
                 </div>
               </div>
             </article>
@@ -531,9 +533,21 @@
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { UserFilled } from "@element-plus/icons-vue";
-import { authState, initAuthSession, saveAuthSession } from "../auth/session";
+import {
+  loginUser,
+  registerUser,
+  resetPassword,
+  sendRegisterCode as sendRegisterCodeRequest,
+  sendResetPasswordCode,
+  verifyRegisterCode,
+  verifyResetPasswordCode,
+} from "../service/login/loginApiService";
+import {
+  authState,
+  initAuthSession,
+  saveAuthSession,
+} from "../service/common/authSessionService";
 
-const AUTH_API_BASE = "/api/auth";
 const router = useRouter();
 
 const keyword = ref("");
@@ -880,6 +894,15 @@ const goToProfile = () => {
   router.push("/profile");
 };
 
+const goToPublish = () => {
+  router.push("/publish");
+};
+
+const goToItemDetail = (id) => {
+  const resolved = router.resolve(`/item/${id}`);
+  window.open(resolved.href, "_blank");
+};
+
 const onRegisterEmailInput = () => {
   registerError.value = "";
   registerSuccess.value = "";
@@ -898,29 +921,6 @@ const onForgotEmailInput = () => {
 const onForgotCodeInput = () => {
   forgotError.value = "";
   forgotSuccess.value = "";
-};
-
-const postJson = async (url, payload) => {
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const body = await response.json();
-    if (!response.ok || body.success === false) {
-      throw new Error(body.message || "请求失败");
-    }
-    return body;
-  } catch (error) {
-    if (error instanceof TypeError) {
-      throw new Error("无法连接后端服务，请确认后端已启动且前端通过 Vite 访问");
-    }
-    throw error;
-  }
 };
 
 const startCodeCountdown = () => {
@@ -971,7 +971,7 @@ const sendRegisterCode = async () => {
 
   isSendingCode.value = true;
   try {
-    await postJson(`${AUTH_API_BASE}/send-register-code`, { email });
+    await sendRegisterCodeRequest(email);
     registerSuccess.value = "验证码已发送，请查收邮箱";
     startCodeCountdown();
   } catch (error) {
@@ -998,7 +998,7 @@ const goRegisterProfileStep = async () => {
   }
 
   try {
-    await postJson(`${AUTH_API_BASE}/verify-register-code`, { email, code });
+    await verifyRegisterCode(email, code);
     authModalType.value = "register-profile";
   } catch (error) {
     registerError.value = error.message || "验证码校验失败";
@@ -1021,7 +1021,7 @@ const sendForgotCode = async () => {
 
   isSendingForgotCode.value = true;
   try {
-    await postJson(`${AUTH_API_BASE}/send-reset-password-code`, { email });
+    await sendResetPasswordCode(email);
     forgotSuccess.value = "验证码已发送，请查收邮箱";
     startForgotCodeCountdown();
   } catch (error) {
@@ -1048,10 +1048,7 @@ const goForgotResetStep = async () => {
   }
 
   try {
-    await postJson(`${AUTH_API_BASE}/verify-reset-password-code`, {
-      email,
-      code,
-    });
+    await verifyResetPasswordCode(email, code);
     authModalType.value = "forgot-reset";
   } catch (error) {
     forgotError.value = error.message || "验证码校验失败";
@@ -1092,10 +1089,7 @@ const submitLogin = async () => {
   }
 
   try {
-    const responseBody = await postJson(`${AUTH_API_BASE}/login`, {
-      email,
-      password,
-    });
+    const responseBody = await loginUser(email, password);
     saveAuthSession(responseBody);
     closeAuthModal();
   } catch (error) {
@@ -1129,11 +1123,7 @@ const submitResetPassword = async () => {
   }
 
   try {
-    await postJson(`${AUTH_API_BASE}/reset-password`, {
-      email: email.trim(),
-      code: code.trim(),
-      password,
-    });
+    await resetPassword(email.trim(), code.trim(), password);
     loginForm.value.email = email.trim();
     loginForm.value.password = "";
     openLoginModal();
@@ -1175,17 +1165,14 @@ const submitRegister = async () => {
   }
 
   try {
-    await postJson(`${AUTH_API_BASE}/register`, {
+    await registerUser({
       email: email.trim(),
       code: code.trim(),
       username: username.trim(),
       password,
     });
 
-    const loginResponse = await postJson(`${AUTH_API_BASE}/login`, {
-      email: email.trim(),
-      password,
-    });
+    const loginResponse = await loginUser(email.trim(), password);
     saveAuthSession(loginResponse);
 
     registerSuccess.value = "注册并登录成功";

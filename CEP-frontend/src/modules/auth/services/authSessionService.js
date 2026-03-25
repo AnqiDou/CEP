@@ -1,6 +1,11 @@
 import { reactive } from "vue";
+import { parseAuthSessionResponse } from "../../interfaces/session/sessionInterfaces";
+import {
+  fetchCurrentUser as fetchCurrentUserApi,
+  logoutSession,
+  refreshSession,
+} from "./sessionAuthApiService";
 
-const AUTH_API_BASE = "/api/auth";
 const AUTH_STORAGE_KEY = "cep.auth.session";
 const REFRESH_AHEAD_MS = 60 * 1000;
 
@@ -77,61 +82,6 @@ const applyAuthSession = ({
   scheduleRefresh();
 };
 
-const parseAuthResponse = (payload) => {
-  const data = payload?.data;
-  if (!data?.accessToken || !data?.refreshToken || !data?.userId) {
-    throw new Error("登录响应缺少令牌信息");
-  }
-
-  return {
-    user: {
-      userId: data.userId,
-      email: data.email,
-      username: data.username || "校园用户",
-    },
-    accessToken: data.accessToken,
-    refreshToken: data.refreshToken,
-    accessTokenExpiresAt:
-      Date.now() + Number(data.accessTokenExpiresInSeconds || 0) * 1000,
-  };
-};
-
-const postJson = async (url, payload, headers = {}) => {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...headers,
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok || body.success === false) {
-    const message = body?.message || "请求失败";
-    const error = new Error(message);
-    error.status = response.status;
-    throw error;
-  }
-  return body;
-};
-
-const getJson = async (url, headers = {}) => {
-  const response = await fetch(url, {
-    method: "GET",
-    headers,
-  });
-
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok || body.success === false) {
-    const message = body?.message || "请求失败";
-    const error = new Error(message);
-    error.status = response.status;
-    throw error;
-  }
-  return body;
-};
-
 const restoreFromStorage = () => {
   const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
   if (!raw) return;
@@ -174,7 +124,7 @@ export const initAuthSession = async () => {
 };
 
 export const saveAuthSession = (responseBody) => {
-  const session = parseAuthResponse(responseBody);
+  const session = parseAuthSessionResponse(responseBody);
   applyAuthSession(session);
 };
 
@@ -193,11 +143,9 @@ export const refreshAccessToken = async () => {
   }
 
   if (!refreshPromise) {
-    refreshPromise = postJson(`${AUTH_API_BASE}/refresh`, {
-      refreshToken: authState.refreshToken,
-    })
+    refreshPromise = refreshSession(authState.refreshToken)
       .then((responseBody) => {
-        const session = parseAuthResponse(responseBody);
+        const session = parseAuthSessionResponse(responseBody);
         applyAuthSession(session);
         return session;
       })
@@ -213,9 +161,7 @@ export const fetchCurrentUser = async () => {
   if (!authState.accessToken) {
     throw new Error("尚未登录");
   }
-  const responseBody = await getJson(`${AUTH_API_BASE}/me`, {
-    Authorization: `Bearer ${authState.accessToken}`,
-  });
+  const responseBody = await fetchCurrentUserApi(authState.accessToken);
   return responseBody.data;
 };
 
@@ -244,7 +190,7 @@ export const logout = async () => {
   if (!token) return;
 
   try {
-    await postJson(`${AUTH_API_BASE}/logout`, { refreshToken: token });
+    await logoutSession(token);
   } catch (error) {
     const message = normalizeError(error, "退出登录失败");
     throw new Error(message);

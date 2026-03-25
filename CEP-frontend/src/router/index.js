@@ -1,9 +1,15 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Home from "../pages/Home.vue";
 import Profile from "../pages/Profile.vue";
+import Publish from "../pages/Publish.vue";
+import ItemDetail from "../pages/ItemDetail.vue";
+import Chat from "../pages/Chat.vue";
 import Terms from "../pages/Terms.vue";
 import Privacy from "../pages/Privacy.vue";
-import { authState, initAuthSession } from "../auth/session";
+import {
+  authState,
+  initAuthSession,
+} from "../service/common/authSessionService";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -17,6 +23,21 @@ const router = createRouter({
       path: "/profile",
       name: "profile",
       component: Profile,
+    },
+    {
+      path: "/publish",
+      name: "publish",
+      component: Publish,
+    },
+    {
+      path: "/item/:id",
+      name: "item-detail",
+      component: ItemDetail,
+    },
+    {
+      path: "/chat",
+      name: "chat",
+      component: Chat,
     },
     {
       path: "/terms",
