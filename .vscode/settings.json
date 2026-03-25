@@ -1,0 +1,13 @@
+{
+  "java.jdt.ls.java.home": "D:/jdk21/21",
+  "java.configuration.runtimes": [
+    {
+      "name": "JavaSE-21",
+      "path": "D:/jdk21/21",
+      "default": true
+    }
+  ],
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "java.import.maven.enabled": true,
+  "java.debug.settings.onBuildFailureProceed": true
+}

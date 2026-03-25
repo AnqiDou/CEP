@@ -1,0 +1,158 @@
+package com.example.cep_backend.home.repository;
+
+import com.example.cep_backend.home.model.HomeCategoryRecord;
+import com.example.cep_backend.home.model.HomeItemRecord;
+import com.example.cep_backend.home.model.HotKeywordRecord;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+@Repository
+public class HomeRepository {
+    private final JdbcTemplate jdbcTemplate;
+
+    private final RowMapper<HomeCategoryRecord> categoryRowMapper = (rs, rowNum) -> new HomeCategoryRecord(
+            rs.getLong("id"),
+            rs.getString("code"),
+            rs.getString("name"),
+            rs.getString("description"),
+            rs.getString("tags"));
+
+    private final RowMapper<HomeItemRecord> itemRowMapper = (rs, rowNum) -> new HomeItemRecord(
+            rs.getLong("id"),
+            rs.getLong("category_id"),
+            rs.getString("category_code"),
+            rs.getString("category_name"),
+            rs.getString("title"),
+            rs.getString("description"),
+            rs.getBigDecimal("price"),
+            rs.getString("campus"),
+            rs.getString("badge"),
+            rs.getTimestamp("created_at").toLocalDateTime());
+
+    private final RowMapper<HotKeywordRecord> hotKeywordRowMapper = (rs, rowNum) -> new HotKeywordRecord(
+            rs.getString("keyword"),
+            rs.getLong("search_count"));
+
+    public HomeRepository(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    public List<HomeCategoryRecord> findAllCategories() {
+        String sql = """
+                SELECT id, code, name, description, tags
+                FROM item_categories
+                ORDER BY sort_order ASC, id ASC
+                """;
+        return jdbcTemplate.query(sql, categoryRowMapper);
+    }
+
+    public long countItems(String keyword, Long categoryId) {
+        List<Object> args = new ArrayList<>();
+        String sql = buildBaseItemSql(keyword, categoryId, args, true);
+        Long total = jdbcTemplate.queryForObject(sql, Long.class, args.toArray());
+        return total == null ? 0 : total;
+    }
+
+    public List<HomeItemRecord> findItems(String keyword,
+            Long categoryId,
+            String orderBy,
+            String order,
+            int offset,
+            int limit) {
+        List<Object> args = new ArrayList<>();
+        String sql = buildBaseItemSql(keyword, categoryId, args, false) + " ORDER BY " + orderBy + " " + order
+                + " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+        args.add(offset);
+        args.add(limit);
+        return jdbcTemplate.query(sql, itemRowMapper, args.toArray());
+    }
+
+    public List<HomeItemRecord> findHotItems(int limit) {
+        String sql = """
+                SELECT
+                    i.id,
+                    i.category_id,
+                    c.code AS category_code,
+                    c.name AS category_name,
+                    i.title,
+                    i.description,
+                    i.price,
+                    i.campus,
+                    i.badge,
+                    i.created_at
+                FROM items i
+                INNER JOIN item_categories c ON c.id = i.category_id
+                WHERE i.status = 'PUBLISHED'
+                ORDER BY (i.favorite_count * 6 + i.view_count) DESC, i.created_at DESC
+                OFFSET 0 ROWS FETCH NEXT ? ROWS ONLY
+                """;
+        return jdbcTemplate.query(sql, itemRowMapper, limit);
+    }
+
+    public List<HotKeywordRecord> findHotKeywords(int limit) {
+        String sql = """
+                SELECT keyword, search_count
+                FROM search_keywords
+                ORDER BY search_count DESC, updated_at DESC
+                OFFSET 0 ROWS FETCH NEXT ? ROWS ONLY
+                """;
+        return jdbcTemplate.query(sql, hotKeywordRowMapper, limit);
+    }
+
+    public void recordSearchKeyword(String keyword, LocalDateTime now) {
+        String updateSql = "UPDATE search_keywords SET search_count = search_count + 1, last_searched_at = ?, updated_at = ? WHERE keyword = ?";
+        int updatedRows = jdbcTemplate.update(updateSql, now, now, keyword);
+        if (updatedRows > 0) {
+            return;
+        }
+
+        String insertSql = "INSERT INTO search_keywords (keyword, search_count, last_searched_at, created_at, updated_at) VALUES (?, 1, ?, ?, ?)";
+        jdbcTemplate.update(insertSql, keyword, now, now, now);
+    }
+
+    private String buildBaseItemSql(String keyword, Long categoryId, List<Object> args, boolean countOnly) {
+        StringBuilder sql = new StringBuilder();
+        if (countOnly) {
+            sql.append("SELECT COUNT(1) ");
+        } else {
+            sql.append("""
+                    SELECT
+                        i.id,
+                        i.category_id,
+                        c.code AS category_code,
+                        c.name AS category_name,
+                        i.title,
+                        i.description,
+                        i.price,
+                        i.campus,
+                        i.badge,
+                        i.created_at
+                    """);
+        }
+
+        sql.append("""
+                FROM items i
+                INNER JOIN item_categories c ON c.id = i.category_id
+                WHERE i.status = 'PUBLISHED'
+                """);
+
+        if (categoryId != null) {
+            sql.append(" AND i.category_id = ?");
+            args.add(categoryId);
+        }
+
+        if (keyword != null && !keyword.isBlank()) {
+            sql.append(" AND (i.title LIKE ? OR i.description LIKE ? OR c.name LIKE ?)");
+            String likeValue = "%" + keyword + "%";
+            args.add(likeValue);
+            args.add(likeValue);
+            args.add(likeValue);
+        }
+        return sql.toString();
+    }
+}

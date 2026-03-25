@@ -75,7 +75,58 @@
               <el-icon :size="34"><UserFilled /></el-icon>
             </el-avatar>
             <div>
-              <h2 class="user-name">{{ userInfo.username }}</h2>
+              <div class="user-name-row">
+                <h2 class="user-name">{{ userInfo.username }}</h2>
+                <div class="user-credit-badges">
+                  <span class="credit-badge">
+                    <span class="credit-badge__icon">⭐</span>
+                    卖家信用{{ userInfo.sellerCredit }}
+                  </span>
+                  <span class="credit-badge">
+                    <span class="credit-badge__icon">⭐</span>
+                    买家信用{{ userInfo.buyerCredit }}
+                  </span>
+                  <div class="credit-help">
+                    <button
+                      class="credit-help__btn"
+                      type="button"
+                      aria-label="查看信用等级规划"
+                    >
+                      ?
+                    </button>
+                    <div class="credit-help__popover">
+                      <p class="credit-help__line">初始信用分：100 分</p>
+                      <p class="credit-help__line">好评 +1 分，差评 -1 分</p>
+                      <table class="credit-help__table">
+                        <thead>
+                          <tr>
+                            <th>信用分数</th>
+                            <th>信用等级</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td>&lt; 90 分</td>
+                            <td>信用较差</td>
+                          </tr>
+                          <tr>
+                            <td>90 ~ 109 分</td>
+                            <td>信用良好</td>
+                          </tr>
+                          <tr>
+                            <td>110 ~ 139 分</td>
+                            <td>信用优秀</td>
+                          </tr>
+                          <tr>
+                            <td>≥ 140 分</td>
+                            <td>信用极好</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <div class="user-stats">
                 <span>{{ userInfo.fans }}粉丝</span><span>|</span>
                 <span>{{ userInfo.following }}关注</span>
@@ -127,10 +178,24 @@
               class="review-item"
             >
               <div class="review-item__top">
-                <span class="review-user">{{ item.user }}</span>
-                <span class="review-time">{{ item.time }}</span>
+                <img
+                  class="review-avatar"
+                  :src="item.avatar"
+                  :alt="item.user"
+                />
+                <div class="review-main">
+                  <div class="review-user-row">
+                    <span class="review-user">{{ item.user }}</span>
+                  </div>
+                  <p class="review-content">
+                    <span class="review-tag">
+                      {{ item.rating === "good" ? "🥰 好评" : "😞 差评" }}
+                    </span>
+                    {{ item.content }}
+                  </p>
+                  <span class="review-time">{{ item.time }}</span>
+                </div>
               </div>
-              <p class="review-content">{{ item.content }}</p>
             </div>
           </div>
 
@@ -286,6 +351,8 @@ const userInfo = reactive({
   username: "金星焦糖味的柑桔",
   fans: 0,
   following: 0,
+  sellerCredit: "极好",
+  buyerCredit: "极好",
   passwordUpdatedAt: "2026-03-01",
 });
 const tradeMenus = [
@@ -378,38 +445,46 @@ const reviewList = [
     id: 1,
     user: "计算机学院-王同学",
     time: "2026-03-20",
-    source: "buyer",
+    rating: "good",
+    avatar: `data:image/svg+xml;utf8,${encodeURIComponent(
+      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><rect width='80' height='80' rx='40' fill='#93c5fd'/><text x='40' y='47' text-anchor='middle' fill='#1e3a8a' font-size='26'>王</text></svg>"
+    )}`,
     content: "卖家回复很快，商品描述一致，交易顺利。",
   },
   {
     id: 2,
     user: "外语学院-李同学",
     time: "2026-03-15",
-    source: "seller",
+    rating: "good",
+    avatar: `data:image/svg+xml;utf8,${encodeURIComponent(
+      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><rect width='80' height='80' rx='40' fill='#bfdbfe'/><text x='40' y='47' text-anchor='middle' fill='#1e3a8a' font-size='26'>李</text></svg>"
+    )}`,
     content: "沟通友好，见面交易很准时，体验不错。",
   },
   {
     id: 3,
     user: "经管学院-周同学",
     time: "2026-03-10",
-    source: "seller",
-    content: "物品成色很好，和图片一致，推荐。",
+    rating: "bad",
+    avatar: `data:image/svg+xml;utf8,${encodeURIComponent(
+      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><rect width='80' height='80' rx='40' fill='#a5b4fc'/><text x='40' y='47' text-anchor='middle' fill='#1e3a8a' font-size='26'>周</text></svg>"
+    )}`,
+    content: "沟通一般，交易时间有变更，建议提前确认。",
   },
 ];
 const reviewTotal = 34;
 const reviewTabs = [
   { key: "all", label: "全部" },
   { key: "good", label: "好评 32" },
-  { key: "buyer", label: "来自买家 5" },
-  { key: "seller", label: "来自卖家 29" },
+  { key: "bad", label: "差评 2" },
 ];
 
 const filteredReviewList = computed(() => {
-  if (activeReviewTab.value === "buyer") {
-    return reviewList.filter((item) => item.source === "buyer");
+  if (activeReviewTab.value === "good") {
+    return reviewList.filter((item) => item.rating === "good");
   }
-  if (activeReviewTab.value === "seller") {
-    return reviewList.filter((item) => item.source === "seller");
+  if (activeReviewTab.value === "bad") {
+    return reviewList.filter((item) => item.rating === "bad");
   }
   return reviewList;
 });
@@ -605,6 +680,93 @@ onMounted(async () => {
   font-size: 30px;
   color: #111827;
 }
+.user-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.user-credit-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.credit-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.credit-badge__icon {
+  font-size: 12px;
+}
+.credit-help {
+  position: relative;
+}
+.credit-help__btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  cursor: pointer;
+}
+.credit-help__popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 290px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #bfdbfe;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(30, 64, 175, 0.16);
+  color: #1f2937;
+  z-index: 20;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: all 0.15s ease;
+}
+.credit-help:hover .credit-help__popover,
+.credit-help:focus-within .credit-help__popover {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+.credit-help__line {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: #334155;
+}
+.credit-help__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.credit-help__table th,
+.credit-help__table td {
+  border: 1px solid #dbeafe;
+  padding: 4px 6px;
+  text-align: left;
+}
+.credit-help__table th {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
 .user-stats {
   margin-top: 6px;
   display: flex;
@@ -680,26 +842,62 @@ onMounted(async () => {
   margin-top: 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0;
 }
 .review-item {
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 12px 0;
+}
+
+.review-item:last-child {
+  border-bottom: none;
 }
 .review-item__top {
   display: flex;
-  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.review-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.review-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.review-user-row {
+  display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 6px;
 }
+
 .review-user {
   font-size: 14px;
   font-weight: 600;
   color: #111827;
 }
+
+.review-tag {
+  margin-right: 8px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: #e5edff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+}
 .review-time {
+  display: block;
+  margin-top: 2px;
   font-size: 12px;
   color: #6b7280;
 }

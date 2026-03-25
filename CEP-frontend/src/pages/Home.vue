@@ -37,6 +37,10 @@
           登录
         </button>
         <button class="primary-btn" @click="goToPublish">发布闲置</button>
+        <button class="ghost-btn message-btn" @click="goToChat">
+          <el-icon><ChatDotRound /></el-icon>
+          <span>消息</span>
+        </button>
         <button
           v-if="isUserLoggedIn"
           class="ghost-btn profile-btn"
@@ -72,33 +76,8 @@
         </ul>
       </aside>
 
-      <!-- 中间推荐区：banner + 热门推荐 -->
+      <!-- 中间推荐区：热门推荐 -->
       <section class="content">
-        <div class="banner">
-          <div class="banner__text">
-            <h2>让校园闲置物品重新流动起来</h2>
-            <p>支持当面交易 · 校园认证 · 信息真实可靠</p>
-            <div class="banner__actions">
-              <button class="primary-btn" @click="goToPublish">立即发布</button>
-              <button class="ghost-btn">浏览更多</button>
-            </div>
-          </div>
-          <div class="banner__stats">
-            <div class="stats-item">
-              <div class="stats-item__num">{{ stats.items }}</div>
-              <div class="stats-item__label">在售闲置</div>
-            </div>
-            <div class="stats-item">
-              <div class="stats-item__num">{{ stats.users }}</div>
-              <div class="stats-item__label">活跃同学</div>
-            </div>
-            <div class="stats-item">
-              <div class="stats-item__num">{{ stats.deals }}</div>
-              <div class="stats-item__label">成交订单</div>
-            </div>
-          </div>
-        </div>
-
         <!-- 热门推荐区 -->
         <section class="block block--featured">
           <div class="block__header">
@@ -106,17 +85,17 @@
               <h3 class="section-title">{{ blockTitle }}</h3>
               <p v-if="blockDesc" class="block__desc">{{ blockDesc }}</p>
             </div>
-            <div v-if="isHotMode" class="block__tabs">
+            <div v-if="!isHotMode" class="block__tabs">
               <button
-                v-for="tab in hotTabs"
-                :key="tab.id"
+                v-for="option in sortOptions"
+                :key="option.id"
                 :class="[
                   'tab-btn',
-                  activeHotTabId === tab.id ? 'tab-btn--active' : '',
+                  isSortActive(option) ? 'tab-btn--active' : '',
                 ]"
-                @click="activeHotTabId = tab.id"
+                @click="applySort(option)"
               >
-                {{ tab.label }}
+                {{ option.label }}
               </button>
             </div>
           </div>
@@ -138,6 +117,7 @@
               v-for="item in displayedItems"
               :key="item.id"
               class="item-card"
+              @click="goToItemDetail(item.id)"
             >
               <div class="item-card__thumb">
                 <span class="item-card__badge" v-if="item.badge">
@@ -157,40 +137,21 @@
                 </p>
                 <div class="item-card__footer">
                   <span class="item-card__time">{{ item.time }}</span>
-                  <button class="text-btn" @click="goToItemDetail(item.id)">
-                    去看看
-                  </button>
                 </div>
               </div>
             </article>
           </div>
 
-          <div v-if="displayedItems.length === 0" class="empty-state">
+          <div v-if="homeError" class="empty-state">{{ homeError }}</div>
+
+          <div
+            v-if="!homeError && displayedItems.length === 0"
+            class="empty-state"
+          >
             暂无匹配物品，请尝试其他关键词或分类。
           </div>
         </section>
       </section>
-
-      <!-- 右侧辅助区：公告 / 安全提示等 -->
-      <aside class="side-panel">
-        <section class="side-card">
-          <h3 class="side-card__title">平台公告</h3>
-          <ul class="side-card__list">
-            <li>支持校园一卡通 / 校园邮箱认证</li>
-            <li>建议当面交易，注意财物安全</li>
-            <li>严禁发布违法违规、虚假信息</li>
-          </ul>
-        </section>
-
-        <section class="side-card">
-          <h3 class="side-card__title">安全交易小贴士</h3>
-          <ul class="side-card__list side-card__list--ordered">
-            <li>优先选择线下当面验货、当面交易</li>
-            <li>勿轻信低价诱惑，警惕私下转账</li>
-            <li>保留聊天记录与交易凭证</li>
-          </ul>
-        </section>
-      </aside>
     </main>
 
     <div v-if="isAuthModalVisible" class="login-modal-mask">
@@ -203,14 +164,22 @@
           <button class="login-modal__close" @click="closeAuthModal">×</button>
         </div>
 
-        <form v-if="authModalType === 'login'" class="login-form">
+        <form
+          v-if="authModalType === 'login'"
+          class="login-form"
+          method="post"
+          autocomplete="on"
+          @submit.prevent="submitLogin"
+        >
           <label class="login-form__field">
             <span class="login-form__label">邮箱</span>
             <input
               v-model="loginForm.email"
               class="login-form__input"
+              name="username"
               type="email"
               placeholder="请输入邮箱"
+              autocomplete="username"
             />
           </label>
 
@@ -219,8 +188,10 @@
             <input
               v-model="loginForm.password"
               class="login-form__input"
+              name="password"
               type="password"
               placeholder="请输入密码"
+              autocomplete="current-password"
             />
           </label>
 
@@ -243,11 +214,7 @@
             </span>
           </label>
 
-          <button
-            type="button"
-            class="primary-btn login-form__submit"
-            @click="submitLogin"
-          >
+          <button type="submit" class="primary-btn login-form__submit">
             登录
           </button>
 
@@ -532,7 +499,8 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { UserFilled } from "@element-plus/icons-vue";
+import { ElMessage } from "element-plus";
+import { ChatDotRound, UserFilled } from "@element-plus/icons-vue";
 import {
   loginUser,
   registerUser,
@@ -547,9 +515,14 @@ import {
   initAuthSession,
   saveAuthSession,
 } from "../service/common/authSessionService";
+import {
+  fetchHomeCategories,
+  fetchHomeItems,
+  fetchHotItems,
+  fetchHotKeywords,
+} from "../service/home/homeApiService";
 
 const router = useRouter();
-
 const keyword = ref("");
 const searchedKeyword = ref("");
 const authModalType = ref("");
@@ -624,166 +597,28 @@ const authModalSubtitle = computed(() => {
   return "";
 });
 
-const hotKeywordPool = [
-  "考研资料",
-  "四六级",
-  "平板",
-  "耳机",
-  "代步车",
-  "自行车",
-  "羽毛球拍",
-  "台灯",
-  "收纳盒",
-  "二手手机",
-];
-const keywordCursor = ref(0);
-let keywordTimer = null;
+const categories = ref([]);
+const hotItems = ref([]);
+const hotKeywords = ref([]);
+const listItems = ref([]);
+const homeError = ref("");
+const activeCategoryId = ref(null);
+const sortBy = ref("time");
+const sortOrder = ref("desc");
 
-const stats = {
-  items: "1.2k+",
-  users: "3.5k+",
-  deals: "980+",
-};
-
-const categories = [
+const sortOptions = [
+  { id: "time-desc", sortBy: "time", sortOrder: "desc", label: "最新发布" },
+  { id: "price-asc", sortBy: "price", sortOrder: "asc", label: "价格从低到高" },
   {
-    id: "book",
-    name: "学习教材 / 书籍",
-    desc: "教材、考研资料、课外读物",
-    tags: ["高数教材", "英语四级", "考研政治", "专业书籍"],
-  },
-  {
-    id: "digital",
-    name: "数码电子",
-    desc: "手机、电脑、平板、耳机",
-    tags: ["平板", "二手手机", "无线耳机", "键盘鼠标"],
-  },
-  {
-    id: "life",
-    name: "生活用品",
-    desc: "宿舍、电器、日用百货",
-    tags: ["台灯", "收纳盒", "水杯", "小风扇"],
-  },
-  {
-    id: "sport",
-    name: "运动出行",
-    desc: "球类、健身、代步工具",
-    tags: ["篮球", "自行车", "滑板", "瑜伽垫"],
-  },
-  {
-    id: "other",
-    name: "其他闲置",
-    desc: "手办、乐器、票券等",
-    tags: ["手办", "吉他", "门票", "乐高"],
+    id: "price-desc",
+    sortBy: "price",
+    sortOrder: "desc",
+    label: "价格从高到低",
   },
 ];
-
-const hotTabs = [
-  { id: "today", label: "今日热门" },
-  { id: "book", label: "爆款教材" },
-  { id: "digital", label: "数码精选" },
-];
-
-const hotItems = [
-  {
-    id: 1,
-    tabId: "today",
-    categoryId: "book",
-    title: "22级高数教材+辅导书全套",
-    price: 35,
-    campus: "东校区",
-    desc: "九成新，无笔记，适合低年级同学使用。",
-    time: "1小时前",
-    badge: "热门",
-  },
-  {
-    id: 2,
-    tabId: "today",
-    categoryId: "digital",
-    title: "iPad 9 64G + 原装笔",
-    price: 1200,
-    campus: "本部",
-    desc: "用于记笔记，电池健康良好，附带原装包装盒。",
-    time: "2小时前",
-    badge: "急售",
-  },
-  {
-    id: 3,
-    tabId: "book",
-    categoryId: "book",
-    title: "考研政治核心考点精讲",
-    price: 20,
-    campus: "南校区",
-    desc: "基本全新，少量划线，已顺利上岸转让。",
-    time: "3小时前",
-    badge: "",
-  },
-  {
-    id: 4,
-    tabId: "digital",
-    categoryId: "digital",
-    title: "降噪无线蓝牙耳机",
-    price: 80,
-    campus: "本部",
-    desc: "音质不错，适合通勤与自习使用。",
-    time: "半小时前",
-    badge: "精选",
-  },
-  {
-    id: 5,
-    tabId: "today",
-    categoryId: "life",
-    title: "宿舍护眼台灯（可调色温）",
-    price: 28,
-    campus: "东校区",
-    desc: "灯光柔和，支持三档调节，自习必备。",
-    time: "刚刚",
-    badge: "新品",
-  },
-  {
-    id: 6,
-    tabId: "today",
-    categoryId: "sport",
-    title: "九成新山地自行车",
-    price: 360,
-    campus: "本部",
-    desc: "通勤代步稳定，车况良好，可当面试骑。",
-    time: "45分钟前",
-    badge: "热销",
-  },
-  {
-    id: 7,
-    tabId: "digital",
-    categoryId: "digital",
-    title: "机械键盘青轴 87键",
-    price: 99,
-    campus: "南校区",
-    desc: "手感清脆，带灯效，送拔键器。",
-    time: "2小时前",
-    badge: "精选",
-  },
-  {
-    id: 8,
-    tabId: "book",
-    categoryId: "other",
-    title: "吉他入门教程 + 民谣谱合集",
-    price: 26,
-    campus: "本部",
-    desc: "包含多本教材，适合零基础上手。",
-    time: "1天前",
-    badge: "超值",
-  },
-];
-
-const activeCategoryId = ref("");
-const activeHotTabId = ref(hotTabs[0]?.id || "today");
-
-const filteredHotItems = computed(() =>
-  hotItems.filter((item) => item.tabId === activeHotTabId.value)
-);
 
 const activeCategory = computed(() =>
-  categories.find((cat) => cat.id === activeCategoryId.value)
+  categories.value.find((cat) => cat.id === activeCategoryId.value)
 );
 
 const isHotMode = computed(
@@ -804,55 +639,121 @@ const blockDesc = computed(() => {
 });
 
 const dynamicHotKeywords = computed(() => {
-  const size = 5;
-  const start = keywordCursor.value % hotKeywordPool.length;
-  return Array.from({ length: size }, (_, idx) => {
-    const offset = (start + idx) % hotKeywordPool.length;
-    return hotKeywordPool[offset];
-  });
+  return hotKeywords.value.map((keyword) => keyword.keyword);
 });
 
 const displayedItems = computed(() => {
-  let source = isHotMode.value
-    ? filteredHotItems.value
-    : activeCategoryId.value
-    ? hotItems.filter((item) => item.categoryId === activeCategoryId.value)
-    : hotItems;
-
-  const word = searchedKeyword.value.trim().toLowerCase();
-  if (!word) return source;
-
-  source = source.filter((item) => {
-    const catName =
-      categories.find((cat) => cat.id === item.categoryId)?.name || "";
-    return [item.title, item.desc, catName]
-      .join(" ")
-      .toLowerCase()
-      .includes(word);
-  });
-
-  return source;
+  return isHotMode.value ? hotItems.value : listItems.value;
 });
 
-const handleSearch = () => {
+const formatRelativeTime = (createdAt) => {
+  const parsed = new Date(createdAt);
+  const timestamp = parsed.getTime();
+  if (Number.isNaN(timestamp)) {
+    return "刚刚";
+  }
+  const diffMinutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
+  if (diffMinutes < 1) return "刚刚";
+  if (diffMinutes < 60) return `${diffMinutes}分钟前`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}小时前`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}天前`;
+};
+
+const mapHomeItem = (item) => ({
+  id: item.id,
+  categoryId: item.categoryId,
+  title: item.title,
+  price: item.price,
+  campus: item.campus,
+  desc: item.description,
+  time: formatRelativeTime(item.createdAt),
+  badge: item.badge,
+});
+
+const loadCategories = async () => {
+  const responseBody = await fetchHomeCategories();
+  categories.value = responseBody.data.map((item) => ({
+    id: item.id,
+    name: item.name,
+    desc: item.description,
+    tags: item.tags,
+  }));
+};
+
+const loadHotKeywords = async () => {
+  const responseBody = await fetchHotKeywords(8);
+  hotKeywords.value = responseBody.data || [];
+};
+
+const loadHotItems = async () => {
+  const responseBody = await fetchHotItems(8);
+  hotItems.value = (responseBody.data || []).map(mapHomeItem);
+};
+
+const loadListItems = async () => {
+  const responseBody = await fetchHomeItems({
+    keyword: searchedKeyword.value.trim(),
+    categoryId: activeCategoryId.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+    page: 1,
+    size: 12,
+  });
+  listItems.value = (responseBody.data?.items || []).map(mapHomeItem);
+};
+
+const handleSearch = async () => {
   const value = keyword.value.trim();
   searchedKeyword.value = value;
-  if (!value) return;
-  // 目前先简单控制台输出，后续可对接搜索结果页
-  // eslint-disable-next-line no-console
-  console.log("搜索关键字：", value);
+  homeError.value = "";
+  if (!value && !activeCategoryId.value) {
+    return;
+  }
+  try {
+    await loadListItems();
+  } catch (error) {
+    homeError.value = error.message || "获取物品列表失败";
+  }
 };
 
-const quickSearch = (word) => {
+const quickSearch = async (word) => {
   keyword.value = word;
   searchedKeyword.value = word;
-  handleSearch();
+  await handleSearch();
 };
 
-const selectCategory = (id) => {
-  activeCategoryId.value = activeCategoryId.value === id ? "" : id;
+const selectCategory = async (id) => {
+  activeCategoryId.value = activeCategoryId.value === id ? null : id;
   searchedKeyword.value = "";
   keyword.value = "";
+  homeError.value = "";
+  if (!activeCategoryId.value) {
+    return;
+  }
+  try {
+    await loadListItems();
+  } catch (error) {
+    homeError.value = error.message || "获取物品列表失败";
+  }
+};
+
+const isSortActive = (option) =>
+  sortBy.value === option.sortBy && sortOrder.value === option.sortOrder;
+
+const applySort = async (option) => {
+  sortBy.value = option.sortBy;
+  sortOrder.value = option.sortOrder;
+  if (isHotMode.value) {
+    return;
+  }
+  homeError.value = "";
+  try {
+    await loadListItems();
+  } catch (error) {
+    homeError.value = error.message || "获取物品列表失败";
+  }
 };
 
 const openLoginModal = () => {
@@ -896,6 +797,15 @@ const goToProfile = () => {
 
 const goToPublish = () => {
   router.push("/publish");
+};
+
+const goToChat = () => {
+  if (!isUserLoggedIn.value) {
+    openLoginModal();
+    return;
+  }
+  const resolved = router.resolve("/chat");
+  window.open(resolved.href, "_blank");
 };
 
 const goToItemDetail = (id) => {
@@ -1091,6 +1001,7 @@ const submitLogin = async () => {
   try {
     const responseBody = await loginUser(email, password);
     saveAuthSession(responseBody);
+    ElMessage.success("登录成功");
     closeAuthModal();
   } catch (error) {
     loginError.value = error.message || "登录失败";
@@ -1184,16 +1095,16 @@ const submitRegister = async () => {
 
 onMounted(async () => {
   await initAuthSession();
-  keywordTimer = window.setInterval(() => {
-    keywordCursor.value += 1;
-  }, 2600);
+  homeError.value = "";
+  try {
+    await Promise.all([loadCategories(), loadHotItems(), loadHotKeywords()]);
+  } catch (error) {
+    homeError.value = error.message || "首页数据加载失败";
+    ElMessage.error(homeError.value);
+  }
 });
 
 onBeforeUnmount(() => {
-  if (keywordTimer) {
-    clearInterval(keywordTimer);
-    keywordTimer = null;
-  }
   if (codeCountdownTimer) {
     clearInterval(codeCountdownTimer);
     codeCountdownTimer = null;
@@ -1207,7 +1118,10 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .home {
-  min-height: 100vh;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: #f5f7fb;
   color: #1f2933;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -1343,6 +1257,19 @@ onBeforeUnmount(() => {
   color: #1d4ed8;
 }
 
+.message-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.message-btn :deep(svg) {
+  font-size: 15px;
+}
+
 .primary-btn {
   border: none;
   border-radius: 999px;
@@ -1366,13 +1293,19 @@ onBeforeUnmount(() => {
 }
 
 .home-main {
+  flex: 1;
   display: grid;
-  grid-template-columns: 240px minmax(0, 1.6fr) 260px;
+  grid-template-columns: 240px minmax(0, 1fr);
+  align-items: stretch;
   gap: 16px;
-  padding: 18px 40px 40px;
+  min-height: 0;
+  overflow: hidden;
+  padding: 16px 40px 12px;
 }
 
 .category-nav {
+  height: 100%;
+  overflow: auto;
   background: #ffffff;
   border-radius: 14px;
   padding: 14px 12px;
@@ -1424,55 +1357,9 @@ onBeforeUnmount(() => {
 .content {
   display: flex;
   flex-direction: column;
+  min-height: 100%;
+  overflow: hidden;
   gap: 16px;
-}
-
-.banner {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
-  gap: 16px;
-  padding: 18px 20px;
-  border-radius: 18px;
-  background: radial-gradient(circle at top left, #e0f2fe, #eff6ff);
-  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.22);
-}
-
-.banner__text h2 {
-  font-size: 20px;
-  margin-bottom: 6px;
-}
-
-.banner__text p {
-  font-size: 13px;
-  color: #4b5563;
-}
-
-.banner__actions {
-  margin-top: 12px;
-  display: flex;
-  gap: 10px;
-}
-
-.banner__stats {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.stats-item {
-  text-align: center;
-}
-
-.stats-item__num {
-  font-size: 18px;
-  font-weight: 700;
-  color: #1d4ed8;
-}
-
-.stats-item__label {
-  font-size: 12px;
-  color: #6b7280;
-  margin-top: 4px;
 }
 
 .block {
@@ -1483,7 +1370,10 @@ onBeforeUnmount(() => {
 }
 
 .block--featured {
-  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .block__header {
@@ -1523,7 +1413,10 @@ onBeforeUnmount(() => {
 .card-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
   gap: 10px;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .card-grid--featured {
@@ -1538,6 +1431,7 @@ onBeforeUnmount(() => {
   border-radius: 12px;
   border: 1px solid #e5e7eb;
   background: #f9fafb;
+  cursor: pointer;
 }
 
 .item-card__thumb {
@@ -1606,14 +1500,6 @@ onBeforeUnmount(() => {
   color: #9ca3af;
 }
 
-.text-btn {
-  border: none;
-  background: transparent;
-  color: #2563eb;
-  cursor: pointer;
-  font-size: 12px;
-}
-
 .display-words {
   display: flex;
   align-items: center;
@@ -1646,36 +1532,6 @@ onBeforeUnmount(() => {
   color: #6b7280;
   background: #f8fafc;
   border: 1px dashed #cbd5e1;
-}
-
-.side-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.side-card {
-  background: #ffffff;
-  border-radius: 14px;
-  padding: 12px 12px 10px;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
-}
-
-.side-card__title {
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 6px;
-}
-
-.side-card__list {
-  margin: 0;
-  padding-left: 16px;
-  font-size: 12px;
-  color: #4b5563;
-}
-
-.side-card__list--ordered {
-  list-style: decimal;
 }
 
 .login-modal-mask {
@@ -1843,10 +1699,6 @@ onBeforeUnmount(() => {
 
   .home-main {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .side-panel {
-    order: 3;
   }
 
   .home-header__right {

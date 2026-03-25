@@ -11,6 +11,9 @@
               {{ item.publisher.credit }}
             </p>
           </div>
+          <button class="seller-home-btn" type="button" @click="goToSellerHome">
+            TA的主页
+          </button>
         </div>
         <p class="seller-note">{{ item.publisher.note }}</p>
       </section>
@@ -397,8 +400,19 @@ const startChat = () => {
   const resolved = router.resolve({
     path: "/chat",
     query: {
+      itemId: String(route.params.id || ""),
       itemTitle: item.value.title,
       sellerName: item.value.publisher.name,
+    },
+  });
+  window.open(resolved.href, "_blank");
+};
+
+const goToSellerHome = () => {
+  const resolved = router.resolve({
+    name: "other-profile",
+    params: {
+      name: item.value.publisher.name,
     },
   });
   window.open(resolved.href, "_blank");
@@ -448,6 +462,17 @@ const toggleFavorite = () => {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.seller-home-btn {
+  margin-left: auto;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
 }
 
 .seller-avatar {

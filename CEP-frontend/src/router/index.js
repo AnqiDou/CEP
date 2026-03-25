@@ -4,6 +4,7 @@ import Profile from "../pages/Profile.vue";
 import Publish from "../pages/Publish.vue";
 import ItemDetail from "../pages/ItemDetail.vue";
 import Chat from "../pages/Chat.vue";
+import OtherProfile from "../pages/OtherProfile.vue";
 import Terms from "../pages/Terms.vue";
 import Privacy from "../pages/Privacy.vue";
 import {
@@ -38,6 +39,11 @@ const router = createRouter({
       path: "/chat",
       name: "chat",
       component: Chat,
+    },
+    {
+      path: "/user/:name",
+      name: "other-profile",
+      component: OtherProfile,
     },
     {
       path: "/terms",

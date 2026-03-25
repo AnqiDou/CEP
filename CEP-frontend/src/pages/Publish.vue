@@ -127,16 +127,31 @@ import { useRouter } from "vue-router";
 const router = useRouter();
 
 const categories = [
-  { label: "学习教材 / 书籍", value: "book" },
-  { label: "数码电子", value: "digital" },
-  { label: "生活用品", value: "life" },
-  { label: "运动出行", value: "sport" },
-  { label: "其他闲置", value: "other" },
+  {
+    label: "数码产品（手机、电脑、平板、耳机、充电器等）",
+    value: "digital",
+  },
+  {
+    label: "图书教材（课本、考研考公资料、小说、专业书）",
+    value: "book",
+  },
+  { label: "服饰鞋包（衣服、鞋子、包包、配饰）", value: "clothes" },
+  { label: "美妆护肤（化妆品、护肤品、香水）", value: "beauty" },
+  {
+    label: "运动器材（篮球、羽毛球拍、瑜伽垫、自行车）",
+    value: "sports",
+  },
+  {
+    label: "生活用品（收纳、小家电、锅碗瓢盆、寝室用品）",
+    value: "daily",
+  },
+  { label: "文具办公（笔、本、计算器、文件夹等）", value: "stationery" },
+  { label: "其他（不好归类的都放这）", value: "other" },
 ];
 
 const form = ref({
   name: "",
-  category: "",
+  category: "other",
   purchaseDate: "",
   usageDuration: "",
   description: "",
@@ -193,10 +208,6 @@ const removePhoto = (id) => {
 const handleSubmit = () => {
   if (!form.value.name.trim()) {
     submitMessage.value = "请填写物品名称";
-    return;
-  }
-  if (!form.value.category) {
-    submitMessage.value = "请选择物品分类";
     return;
   }
   if (!form.value.purchaseDate) {
