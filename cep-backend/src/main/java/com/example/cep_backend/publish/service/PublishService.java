@@ -1,0 +1,143 @@
+package com.example.cep_backend.publish.service;
+
+import com.example.cep_backend.auth.BusinessException;
+import com.example.cep_backend.publish.dto.PublishItemDto;
+import com.example.cep_backend.publish.dto.PublishItemRequest;
+import com.example.cep_backend.publish.repository.PublishRepository;
+import org.springframework.dao.DataAccessException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.List;
+
+@Service
+public class PublishService {
+    private static final int MAX_PHOTO_COUNT = 6;
+
+    private final PublishRepository publishRepository;
+
+    public PublishService(PublishRepository publishRepository) {
+        this.publishRepository = publishRepository;
+    }
+
+    @Transactional
+    public PublishItemDto publishItem(Long userId, PublishItemRequest request) {
+        if (userId == null || userId <= 0) {
+            throw new BusinessException("用户信息无效，请重新登录");
+        }
+
+        String itemName = validateText(request.name(), "物品名称", 120);
+        String categoryCode = normalizeCategoryCode(request.categoryCode());
+        BigDecimal price = validatePrice(request.price());
+        LocalDate purchaseDate = normalizePurchaseDate(request.purchaseDate());
+        String usageDuration = normalizeOptionalText(request.usageDuration(), "使用时长", 50);
+        String description = normalizeOptionalText(request.description(), "物品描述", 500);
+        List<String> photoUrls = validatePhotoUrls(request.photoUrls());
+
+        Long categoryId = publishRepository.findCategoryIdByCode(categoryCode);
+        if (categoryId == null) {
+            throw new BusinessException("分类不存在，请重新选择");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        Long itemId;
+        try {
+            itemId = publishRepository.insertItem(
+                    categoryId,
+                    itemName,
+                    price,
+                    description,
+                    now);
+            publishRepository.insertItemPhotos(itemId, photoUrls, now);
+        } catch (DataAccessException ex) {
+            throw new BusinessException("发布失败：请先确认已执行建表脚本并检查数据库字段");
+        }
+
+        return new PublishItemDto(
+                itemId,
+                itemName,
+                categoryCode,
+                price,
+                purchaseDate,
+                usageDuration,
+                description,
+                photoUrls,
+                now);
+    }
+
+    private String normalizeCategoryCode(String categoryCode) {
+        String value = categoryCode == null ? "other" : categoryCode.trim().toLowerCase();
+        return value.isEmpty() ? "other" : value;
+    }
+
+    private LocalDate normalizePurchaseDate(LocalDate purchaseDate) {
+        if (purchaseDate == null) {
+            return LocalDate.now();
+        }
+        if (purchaseDate.isAfter(LocalDate.now())) {
+            throw new BusinessException("购买时间不能晚于当前日期");
+        }
+        return purchaseDate;
+    }
+
+    private BigDecimal validatePrice(BigDecimal price) {
+        if (price == null) {
+            throw new BusinessException("请填写价格");
+        }
+        if (price.compareTo(new BigDecimal("99999999.99")) > 0) {
+            throw new BusinessException("价格超出允许范围");
+        }
+        return price.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private List<String> validatePhotoUrls(List<String> photoUrls) {
+        if (photoUrls == null || photoUrls.isEmpty()) {
+            return List.of();
+        }
+        if (photoUrls.size() > MAX_PHOTO_COUNT) {
+            throw new BusinessException("最多上传 6 张图片");
+        }
+
+        List<String> normalized = photoUrls.stream().map(url -> {
+            if (url == null || url.trim().isEmpty()) {
+                throw new BusinessException("图片地址不能为空");
+            }
+            String value = url.trim();
+            if (value.length() > 500) {
+                throw new BusinessException("图片地址长度不能超过 500");
+            }
+            return value;
+        }).toList();
+
+        if (normalized.stream().distinct().count() != normalized.size()) {
+            throw new BusinessException("图片不能重复上传");
+        }
+        return normalized;
+    }
+
+    private String normalizeOptionalText(String value, String fieldName, int maxLength) {
+        if (value == null || value.trim().isEmpty()) {
+            return "";
+        }
+        String trimmed = value.trim();
+        if (trimmed.length() > maxLength) {
+            throw new BusinessException(fieldName + "长度不能超过 " + maxLength + " 个字符");
+        }
+        return trimmed;
+    }
+
+    private String validateText(String value, String fieldName, int maxLength) {
+        if (value == null || value.trim().isEmpty()) {
+            throw new BusinessException("请填写" + fieldName);
+        }
+        String trimmed = value.trim();
+        if (trimmed.length() > maxLength) {
+            throw new BusinessException(fieldName + "长度不能超过 " + maxLength + " 个字符");
+        }
+        return trimmed;
+    }
+}

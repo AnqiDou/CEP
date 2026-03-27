@@ -16,17 +16,6 @@
           />
           <button class="search-bar__btn" @click="handleSearch">搜索</button>
         </div>
-        <div class="search-suggest">
-          <span class="search-suggest__label">大家都在搜：</span>
-          <button
-            v-for="hot in dynamicHotKeywords"
-            :key="hot"
-            class="search-suggest__item"
-            @click="quickSearch(hot)"
-          >
-            {{ hot }}
-          </button>
-        </div>
       </div>
       <div class="home-header__right">
         <button
@@ -120,6 +109,13 @@
               @click="goToItemDetail(item.id)"
             >
               <div class="item-card__thumb">
+                <img
+                  v-if="item.photoUrl"
+                  :src="item.photoUrl"
+                  alt="物品图片"
+                  class="item-card__thumb-image"
+                  loading="lazy"
+                />
                 <span class="item-card__badge" v-if="item.badge">
                   {{ item.badge }}
                 </span>
@@ -130,7 +126,9 @@
                 </h4>
                 <div class="item-card__meta">
                   <span class="item-card__price">￥{{ item.price }}</span>
-                  <span class="item-card__origin">{{ item.campus }}</span>
+                  <span v-if="item.campus" class="item-card__origin">{{
+                    item.campus
+                  }}</span>
                 </div>
                 <p class="item-card__desc">
                   {{ item.desc }}
@@ -519,7 +517,6 @@ import {
   fetchHomeCategories,
   fetchHomeItems,
   fetchHotItems,
-  fetchHotKeywords,
 } from "../service/home/homeApiService";
 
 const router = useRouter();
@@ -599,7 +596,6 @@ const authModalSubtitle = computed(() => {
 
 const categories = ref([]);
 const hotItems = ref([]);
-const hotKeywords = ref([]);
 const listItems = ref([]);
 const homeError = ref("");
 const activeCategoryId = ref(null);
@@ -638,10 +634,6 @@ const blockDesc = computed(() => {
   return "未搜索或未选择分类时，默认展示热门推荐";
 });
 
-const dynamicHotKeywords = computed(() => {
-  return hotKeywords.value.map((keyword) => keyword.keyword);
-});
-
 const displayedItems = computed(() => {
   return isHotMode.value ? hotItems.value : listItems.value;
 });
@@ -666,10 +658,17 @@ const mapHomeItem = (item) => ({
   categoryId: item.categoryId,
   title: item.title,
   price: item.price,
-  campus: item.campus,
+  photoUrl: typeof item.photoUrl === "string" ? item.photoUrl.trim() : "",
+  campus:
+    typeof item.campus === "string" && item.campus.trim() !== "未填写"
+      ? item.campus.trim()
+      : "",
   desc: item.description,
   time: formatRelativeTime(item.createdAt),
-  badge: item.badge,
+  badge:
+    typeof item.badge === "string" && item.badge.trim() !== "未填写"
+      ? item.badge.trim()
+      : "",
 });
 
 const loadCategories = async () => {
@@ -680,11 +679,6 @@ const loadCategories = async () => {
     desc: item.description,
     tags: item.tags,
   }));
-};
-
-const loadHotKeywords = async () => {
-  const responseBody = await fetchHotKeywords(8);
-  hotKeywords.value = responseBody.data || [];
 };
 
 const loadHotItems = async () => {
@@ -1097,7 +1091,7 @@ onMounted(async () => {
   await initAuthSession();
   homeError.value = "";
   try {
-    await Promise.all([loadCategories(), loadHotItems(), loadHotKeywords()]);
+    await Promise.all([loadCategories(), loadHotItems()]);
   } catch (error) {
     homeError.value = error.message || "首页数据加载失败";
     ElMessage.error(homeError.value);
@@ -1205,29 +1199,6 @@ onBeforeUnmount(() => {
   box-shadow: 0 8px 18px rgba(37, 99, 235, 0.32);
 }
 
-.search-suggest {
-  width: min(100%, 680px);
-  margin: 6px auto 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-}
-
-.search-suggest__label {
-  color: #9ca3af;
-}
-
-.search-suggest__item {
-  border: none;
-  border-radius: 999px;
-  padding: 2px 10px;
-  font-size: 12px;
-  background: #e5edff;
-  color: #2563eb;
-  cursor: pointer;
-}
-
 .home-header__right {
   display: flex;
   justify-content: flex-end;
@@ -1237,6 +1208,7 @@ onBeforeUnmount(() => {
 
 .home-header__right .ghost-btn,
 .home-header__right .primary-btn {
+  height: 44px;
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -1437,14 +1409,23 @@ onBeforeUnmount(() => {
 .item-card__thumb {
   width: 104px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #bfdbfe, #e5e7eb);
+  background: #bfdbfe;
   position: relative;
+  overflow: hidden;
+}
+
+.item-card__thumb-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }
 
 .item-card__badge {
   position: absolute;
   top: 6px;
   left: 6px;
+  z-index: 1;
   padding: 2px 6px;
   font-size: 10px;
   border-radius: 999px;

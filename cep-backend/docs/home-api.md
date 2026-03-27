@@ -75,6 +75,7 @@
         "price": 80.0,
         "campus": "本部",
         "badge": "精选",
+        "photoUrl": "https://example.com/item-4-1.jpg",
         "createdAt": "2026-03-25T16:15:00"
       }
     ],
@@ -101,6 +102,11 @@
 
 - 按热度分值降序：`favorite_count * 6 + view_count`
 - 热度相同按发布时间倒序
+
+### 字段说明
+
+- 返回的 `photoUrl` 为物品首图（按 `item_photos.sort_order` 升序取第一张）
+- 若物品未上传图片，则 `photoUrl` 为空
 
 ### 请求示例
 

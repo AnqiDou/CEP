@@ -4,6 +4,12 @@ DROP TABLE IF EXISTS auth_sessions;
 
 DROP TABLE IF EXISTS search_keywords;
 
+DROP TABLE IF EXISTS item_photos;
+
+DROP TABLE IF EXISTS idle_item_photos;
+
+DROP TABLE IF EXISTS idle_items;
+
 DROP TABLE IF EXISTS items;
 
 DROP TABLE IF EXISTS item_categories;
@@ -71,6 +77,15 @@ CREATE TABLE items (
     CONSTRAINT fk_items_category FOREIGN KEY (category_id) REFERENCES item_categories (id)
 );
 
+CREATE TABLE item_photos (
+    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
+    item_id BIGINT NOT NULL,
+    photo_url NVARCHAR(500) NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_item_photos_item FOREIGN KEY (item_id) REFERENCES items (id)
+);
+
 CREATE TABLE search_keywords (
     id BIGINT IDENTITY(1, 1) PRIMARY KEY,
     keyword NVARCHAR(100) NOT NULL UNIQUE,
@@ -108,6 +123,9 @@ INDEX idx_items_hot ON items (
     view_count DESC,
     created_at DESC
 );
+
+CREATE
+INDEX idx_item_photos_item ON item_photos (item_id, sort_order ASC);
 
 CREATE
 INDEX idx_search_keywords_hot ON search_keywords (

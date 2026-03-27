@@ -8,7 +8,11 @@
             "mainClass": "com.example.cep_backend.CepBackendApplication",
             "projectName": "cep-backend",
             "args": "",
-            "envFile": "${workspaceFolder}/.env"
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "TENCENT_COS_SECRET_ID": "AKIDBD3g6LNCnBLacAVdXEg2B7qOjqsskH2e",
+                "TENCENT_COS_SECRET_KEY": "Ss57yczEG5iLp8EiAxcQ4Vnta8TdbNwI"
+            }
         }
     ]
 }

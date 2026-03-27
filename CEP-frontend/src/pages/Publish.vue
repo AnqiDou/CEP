@@ -3,16 +3,16 @@
     <header class="publish-header">
       <div>
         <h1 class="publish-title">发布闲置</h1>
-        <p class="publish-subtitle">
-          完善信息后可快速发布，当前仅前端展示不提交后端
-        </p>
+        <p class="publish-subtitle">完善信息后可快速发布</p>
       </div>
       <div class="publish-header__actions">
         <button
+          type="button"
           class="primary-btn publish-header__submit"
+          :disabled="submitting"
           @click="handleSubmit"
         >
-          提交发布
+          {{ submitting ? "发布中..." : "提交发布" }}
         </button>
         <button class="ghost-btn" @click="goBackHome">返回首页</button>
       </div>
@@ -44,6 +44,19 @@
                 {{ category.label }}
               </option>
             </select>
+          </label>
+
+          <label class="form-field">
+            <span class="form-label">价格（元） *</span>
+            <input
+              v-model="form.price"
+              class="form-input"
+              type="number"
+              min="0"
+              step="0.01"
+              required
+              placeholder="例如：99.00"
+            />
           </label>
 
           <div class="form-grid">
@@ -121,8 +134,13 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, ref } from "vue";
+import { onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import { ElMessage } from "element-plus";
+import {
+  createPublishItem,
+  uploadPublishImage,
+} from "../service/publish/publishApiService";
 
 const router = useRouter();
 
@@ -146,12 +164,13 @@ const categories = [
     value: "daily",
   },
   { label: "文具办公（笔、本、计算器、文件夹等）", value: "stationery" },
-  { label: "其他（不好归类的都放这）", value: "other" },
+  { label: "其他", value: "other" },
 ];
 
 const form = ref({
   name: "",
   category: "other",
+  price: "",
   purchaseDate: "",
   usageDuration: "",
   description: "",
@@ -159,6 +178,7 @@ const form = ref({
 
 const submitMessage = ref("");
 const photoPreviews = ref([]);
+const submitting = ref(false);
 let photoId = 0;
 
 const goBackHome = () => {
@@ -192,6 +212,7 @@ const handleFileChange = (event) => {
 
   const nextPreviews = nextFiles.map((file) => ({
     id: `${Date.now()}-${photoId++}`,
+    file,
     url: URL.createObjectURL(file),
   }));
   photoPreviews.value = [...photoPreviews.value, ...nextPreviews];
@@ -205,30 +226,106 @@ const removePhoto = (id) => {
   photoPreviews.value = photoPreviews.value.filter((photo) => photo.id !== id);
 };
 
-const handleSubmit = () => {
+const loadCategories = async () => {
+  try {
+    const response = await fetch("/api/home/categories");
+    const body = await response.json().catch(() => null);
+    if (!response.ok || !body?.success || !Array.isArray(body.data)) {
+      return;
+    }
+
+    const remoteCategories = body.data
+      .filter((item) => item?.code && item?.name)
+      .map((item) => ({
+        label:
+          item.code === "other"
+            ? "其他"
+            : `${item.name}（${item.description || ""}）`,
+        value: item.code,
+      }));
+    if (remoteCategories.length) {
+      categories.splice(0, categories.length, ...remoteCategories);
+    }
+  } catch {}
+};
+
+const showSubmitMessage = (message, type = "warning") => {
+  submitMessage.value = message;
+  if (type === "success") {
+    ElMessage.success(message);
+    return;
+  }
+  if (type === "error") {
+    ElMessage.error(message);
+    return;
+  }
+  ElMessage.warning(message);
+};
+
+const handleSubmit = async () => {
+  if (submitting.value) return;
+
   if (!form.value.name.trim()) {
-    submitMessage.value = "请填写物品名称";
-    return;
-  }
-  if (!form.value.purchaseDate) {
-    submitMessage.value = "请选择购买时间";
-    return;
-  }
-  if (!form.value.usageDuration.trim()) {
-    submitMessage.value = "请填写使用时长";
-    return;
-  }
-  if (!form.value.description.trim()) {
-    submitMessage.value = "请填写物品描述";
-    return;
-  }
-  if (!photoPreviews.value.length) {
-    submitMessage.value = "请至少上传一张照片";
+    showSubmitMessage("请填写物品名称");
     return;
   }
 
-  submitMessage.value = "发布信息已暂存（仅前端演示，后端接口暂未接入）";
+  const rawPrice = `${form.value.price ?? ""}`.trim();
+  if (!rawPrice) {
+    showSubmitMessage("请填写价格");
+    return;
+  }
+
+  const normalizedPrice = Number(rawPrice);
+  if (!Number.isFinite(normalizedPrice)) {
+    showSubmitMessage("请填写价格");
+    return;
+  }
+
+  submitting.value = true;
+  submitMessage.value = "正在上传图片并提交发布...";
+
+  try {
+    const uploadUrls = [];
+    for (const photo of photoPreviews.value) {
+      const uploadResult = await uploadPublishImage(photo.file);
+      uploadUrls.push(uploadResult?.data?.url);
+    }
+
+    await createPublishItem({
+      name: form.value.name.trim(),
+      categoryCode: form.value.category || "other",
+      price: Number(normalizedPrice.toFixed(2)),
+      purchaseDate: form.value.purchaseDate || null,
+      usageDuration: form.value.usageDuration.trim(),
+      description: form.value.description.trim(),
+      photoUrls: uploadUrls,
+    });
+
+    showSubmitMessage("发布成功", "success");
+    revokeUrls(photoPreviews.value);
+    photoPreviews.value = [];
+    form.value = {
+      name: "",
+      category: "other",
+      price: "",
+      purchaseDate: "",
+      usageDuration: "",
+      description: "",
+    };
+    window.setTimeout(() => {
+      router.push("/");
+    }, 600);
+  } catch (error) {
+    showSubmitMessage(error?.message || "发布失败，请稍后重试", "error");
+  } finally {
+    submitting.value = false;
+  }
 };
+
+onMounted(() => {
+  loadCategories();
+});
 
 onBeforeUnmount(() => {
   revokeUrls(photoPreviews.value);
@@ -320,6 +417,17 @@ onBeforeUnmount(() => {
   color: #1f2937;
   outline: none;
   box-sizing: border-box;
+}
+
+.form-input[type="number"]::-webkit-outer-spin-button,
+.form-input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.form-input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 .form-input:focus {

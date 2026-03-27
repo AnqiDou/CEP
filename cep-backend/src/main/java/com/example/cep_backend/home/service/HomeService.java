@@ -90,6 +90,7 @@ public class HomeService {
                 record.price(),
                 record.campus(),
                 record.badge(),
+                record.photoUrl(),
                 record.createdAt());
     }
 

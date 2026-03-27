@@ -32,6 +32,7 @@ public class HomeRepository {
             rs.getBigDecimal("price"),
             rs.getString("campus"),
             rs.getString("badge"),
+            rs.getString("photo_url"),
             rs.getTimestamp("created_at").toLocalDateTime());
 
     private final RowMapper<HotKeywordRecord> hotKeywordRowMapper = (rs, rowNum) -> new HotKeywordRecord(
@@ -84,9 +85,16 @@ public class HomeRepository {
                     i.price,
                     i.campus,
                     i.badge,
+                    p.photo_url,
                     i.created_at
                 FROM items i
                 INNER JOIN item_categories c ON c.id = i.category_id
+                OUTER APPLY (
+                    SELECT TOP 1 ip.photo_url
+                    FROM item_photos ip
+                    WHERE ip.item_id = i.id
+                    ORDER BY ip.sort_order ASC, ip.id ASC
+                ) p
                 WHERE i.status = 'PUBLISHED'
                 ORDER BY (i.favorite_count * 6 + i.view_count) DESC, i.created_at DESC
                 OFFSET 0 ROWS FETCH NEXT ? ROWS ONLY
@@ -131,6 +139,7 @@ public class HomeRepository {
                         i.price,
                         i.campus,
                         i.badge,
+                        p.photo_url,
                         i.created_at
                     """);
         }
@@ -138,6 +147,12 @@ public class HomeRepository {
         sql.append("""
                 FROM items i
                 INNER JOIN item_categories c ON c.id = i.category_id
+                OUTER APPLY (
+                    SELECT TOP 1 ip.photo_url
+                    FROM item_photos ip
+                    WHERE ip.item_id = i.id
+                    ORDER BY ip.sort_order ASC, ip.id ASC
+                ) p
                 WHERE i.status = 'PUBLISHED'
                 """);
 
