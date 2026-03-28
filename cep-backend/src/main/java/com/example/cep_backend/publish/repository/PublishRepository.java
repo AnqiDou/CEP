@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
 import java.util.List;
@@ -73,5 +74,40 @@ public class PublishRepository {
         for (int index = 0; index < photoUrls.size(); index++) {
             jdbcTemplate.update(sql, itemId, photoUrls.get(index), index + 1, Timestamp.valueOf(now));
         }
+    }
+
+    public void insertItemDetail(Long itemId,
+            Long userId,
+            LocalDate purchaseDate,
+            String usageDuration,
+            LocalDateTime now) {
+        String sql = """
+                INSERT INTO item_details (
+                    item_id,
+                    publisher_user_id,
+                    purchase_date,
+                    usage_duration,
+                    item_condition,
+                    accessories,
+                    detail_note,
+                    trade_location,
+                    original_price,
+                    created_at,
+                    updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """;
+        jdbcTemplate.update(
+                sql,
+                itemId,
+                userId,
+                purchaseDate,
+                usageDuration,
+                "",
+                "",
+                "",
+                "",
+                null,
+                Timestamp.valueOf(now),
+                Timestamp.valueOf(now));
     }
 }

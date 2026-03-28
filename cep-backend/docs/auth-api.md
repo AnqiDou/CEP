@@ -1,5 +1,7 @@
 # 认证模块接口文档
 
+> 使用认证接口前，请先在 SQL Server 执行 `docs/init-auth-tables.sql` 初始化 `users`、`email_verification_codes`、`auth_sessions` 三张表与索引。
+
 ## 1. 发送注册验证码
 
 - **URL**: `POST /api/auth/send-register-code`

@@ -6,6 +6,8 @@ DROP TABLE IF EXISTS search_keywords;
 
 DROP TABLE IF EXISTS item_photos;
 
+DROP TABLE IF EXISTS item_details;
+
 DROP TABLE IF EXISTS idle_item_photos;
 
 DROP TABLE IF EXISTS idle_items;
@@ -13,6 +15,8 @@ DROP TABLE IF EXISTS idle_items;
 DROP TABLE IF EXISTS items;
 
 DROP TABLE IF EXISTS item_categories;
+
+DROP TABLE IF EXISTS user_profiles;
 
 DROP TABLE IF EXISTS users;
 
@@ -48,6 +52,18 @@ CREATE TABLE auth_sessions (
     created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_auth_sessions_user FOREIGN KEY (user_id) REFERENCES users (id)
+);
+
+CREATE TABLE user_profiles (
+    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
+    user_id BIGINT NOT NULL UNIQUE,
+    college NVARCHAR(80) NULL,
+    campus NVARCHAR(50) NULL,
+    credit_score DECIMAL(3, 1) NULL,
+    note NVARCHAR(200) NULL,
+    created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_user_profiles_user FOREIGN KEY (user_id) REFERENCES users (id)
 );
 
 CREATE TABLE item_categories (
@@ -86,6 +102,23 @@ CREATE TABLE item_photos (
     CONSTRAINT fk_item_photos_item FOREIGN KEY (item_id) REFERENCES items (id)
 );
 
+CREATE TABLE item_details (
+    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
+    item_id BIGINT NOT NULL UNIQUE,
+    publisher_user_id BIGINT NULL,
+    purchase_date DATE NULL,
+    usage_duration NVARCHAR(50) NULL,
+    item_condition NVARCHAR(50) NULL,
+    accessories NVARCHAR(200) NULL,
+    detail_note NVARCHAR(300) NULL,
+    trade_location NVARCHAR(80) NULL,
+    original_price DECIMAL(10, 2) NULL,
+    created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_item_details_item FOREIGN KEY (item_id) REFERENCES items (id),
+    CONSTRAINT fk_item_details_publisher FOREIGN KEY (publisher_user_id) REFERENCES users (id)
+);
+
 CREATE TABLE search_keywords (
     id BIGINT IDENTITY(1, 1) PRIMARY KEY,
     keyword NVARCHAR(100) NOT NULL UNIQUE,
@@ -104,6 +137,8 @@ INDEX idx_verification_email_purpose ON email_verification_codes (
 
 CREATE
 INDEX idx_auth_sessions_user ON auth_sessions (user_id, created_at DESC);
+
+CREATE INDEX idx_user_profiles_user ON user_profiles (user_id);
 
 CREATE
 INDEX idx_item_categories_sort ON item_categories (sort_order ASC);
@@ -126,6 +161,9 @@ INDEX idx_items_hot ON items (
 
 CREATE
 INDEX idx_item_photos_item ON item_photos (item_id, sort_order ASC);
+
+CREATE
+INDEX idx_item_details_item ON item_details (item_id, publisher_user_id);
 
 CREATE
 INDEX idx_search_keywords_hot ON search_keywords (

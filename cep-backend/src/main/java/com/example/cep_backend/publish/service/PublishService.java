@@ -53,6 +53,7 @@ public class PublishService {
                     description,
                     now);
             publishRepository.insertItemPhotos(itemId, photoUrls, now);
+            publishRepository.insertItemDetail(itemId, userId, purchaseDate, usageDuration, now);
         } catch (DataAccessException ex) {
             throw new BusinessException("发布失败：请先确认已执行建表脚本并检查数据库字段");
         }
