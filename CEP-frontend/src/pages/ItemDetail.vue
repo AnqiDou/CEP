@@ -301,7 +301,16 @@ watch(
 );
 
 const applyTrade = () => {
-  ElMessage.info("申请交易功能即将上线");
+  if (!item.value.id) {
+    ElMessage.warning("当前物品不可交易");
+    return;
+  }
+  router.push({
+    name: "confirm-order",
+    query: {
+      itemId: String(item.value.id),
+    },
+  });
 };
 
 const startChat = () => {

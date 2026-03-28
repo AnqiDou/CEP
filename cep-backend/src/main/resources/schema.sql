@@ -8,6 +8,8 @@ DROP TABLE IF EXISTS item_photos;
 
 DROP TABLE IF EXISTS item_details;
 
+DROP TABLE IF EXISTS trade_orders;
+
 DROP TABLE IF EXISTS idle_item_photos;
 
 DROP TABLE IF EXISTS idle_items;
@@ -119,6 +121,23 @@ CREATE TABLE item_details (
     CONSTRAINT fk_item_details_publisher FOREIGN KEY (publisher_user_id) REFERENCES users (id)
 );
 
+CREATE TABLE trade_orders (
+    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
+    order_no NVARCHAR(40) NOT NULL UNIQUE,
+    item_id BIGINT NOT NULL,
+    item_title NVARCHAR(120) NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,
+    cover_photo_url NVARCHAR(500) NULL,
+    receiver_name NVARCHAR(50) NOT NULL,
+    receiver_phone NVARCHAR(30) NOT NULL,
+    receiver_address NVARCHAR(200) NOT NULL,
+    status NVARCHAR(30) NOT NULL DEFAULT 'PENDING_PAYMENT',
+    paid_at DATETIME2 NULL,
+    created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_trade_orders_item FOREIGN KEY (item_id) REFERENCES items (id)
+);
+
 CREATE TABLE search_keywords (
     id BIGINT IDENTITY(1, 1) PRIMARY KEY,
     keyword NVARCHAR(100) NOT NULL UNIQUE,
@@ -164,6 +183,12 @@ INDEX idx_item_photos_item ON item_photos (item_id, sort_order ASC);
 
 CREATE
 INDEX idx_item_details_item ON item_details (item_id, publisher_user_id);
+
+CREATE
+INDEX idx_trade_orders_item ON trade_orders (item_id, created_at DESC);
+
+CREATE
+INDEX idx_trade_orders_status ON trade_orders (status, created_at DESC);
 
 CREATE
 INDEX idx_search_keywords_hot ON search_keywords (

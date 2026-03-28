@@ -1,0 +1,123 @@
+package com.example.cep_backend.payment.service;
+
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Component;
+
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Locale;
+
+@Component
+public class PaymentSchemaInitializer {
+    private static final Logger log = LoggerFactory.getLogger(PaymentSchemaInitializer.class);
+    private static final String TABLE_NAME = "trade_orders";
+
+    private final JdbcTemplate jdbcTemplate;
+
+    public PaymentSchemaInitializer(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    @PostConstruct
+    public void ensureTradeOrdersSchema() {
+        try {
+            if (!tableExists(TABLE_NAME)) {
+                createTradeOrdersTable();
+                log.info("Created table: {}", TABLE_NAME);
+            }
+
+            createIndexIfMissing("idx_trade_orders_item",
+                    "CREATE INDEX idx_trade_orders_item ON trade_orders (item_id, created_at DESC)");
+            createIndexIfMissing("idx_trade_orders_status",
+                    "CREATE INDEX idx_trade_orders_status ON trade_orders (status, created_at DESC)");
+        } catch (SQLException ex) {
+            throw new IllegalStateException("初始化支付表结构失败", ex);
+        }
+    }
+
+    private void createTradeOrdersTable() {
+        String ddl = """
+                CREATE TABLE trade_orders (
+                    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
+                    order_no NVARCHAR(40) NOT NULL UNIQUE,
+                    item_id BIGINT NOT NULL,
+                    item_title NVARCHAR(120) NOT NULL,
+                    amount DECIMAL(10, 2) NOT NULL,
+                    cover_photo_url NVARCHAR(500) NULL,
+                    receiver_name NVARCHAR(50) NOT NULL,
+                    receiver_phone NVARCHAR(30) NOT NULL,
+                    receiver_address NVARCHAR(200) NOT NULL,
+                    status NVARCHAR(30) NOT NULL DEFAULT 'PENDING_PAYMENT',
+                    paid_at DATETIME2 NULL,
+                    created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT fk_trade_orders_item FOREIGN KEY (item_id) REFERENCES items (id)
+                )
+                """;
+        jdbcTemplate.execute(ddl);
+    }
+
+    private void createIndexIfMissing(String indexName, String ddl) throws SQLException {
+        if (indexExists(TABLE_NAME, indexName)) {
+            return;
+        }
+        jdbcTemplate.execute(ddl);
+    }
+
+    private boolean tableExists(String tableName) throws SQLException {
+        return matchMetadataTableName(tableName, (metaData, normalizedName) -> {
+            try (ResultSet tables = metaData.getTables(null, null, normalizedName, new String[] { "TABLE" })) {
+                return tables.next();
+            }
+        });
+    }
+
+    private boolean indexExists(String tableName, String indexName) throws SQLException {
+        return matchMetadataTableName(tableName, (metaData, normalizedTableName) -> {
+            try (ResultSet indexes = metaData.getIndexInfo(null, null, normalizedTableName, false, false)) {
+                while (indexes.next()) {
+                    String current = indexes.getString("INDEX_NAME");
+                    if (current != null && current.equalsIgnoreCase(indexName)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        });
+    }
+
+    private boolean matchMetadataTableName(String tableName, MetadataMatcher matcher) throws SQLException {
+        DataSource dataSource = jdbcTemplate.getDataSource();
+        if (dataSource == null) {
+            throw new IllegalStateException("DataSource not configured");
+        }
+
+        try (Connection connection = dataSource.getConnection()) {
+            DatabaseMetaData metaData = connection.getMetaData();
+            String normalized = isStoresLowerCase(metaData)
+                    ? tableName.toLowerCase(Locale.ROOT)
+                    : tableName.toUpperCase(Locale.ROOT);
+
+            if (matcher.match(metaData, normalized)) {
+                return true;
+            }
+
+            return matcher.match(metaData, tableName);
+        }
+    }
+
+    private boolean isStoresLowerCase(DatabaseMetaData metaData) throws SQLException {
+        return metaData.storesLowerCaseIdentifiers() && !metaData.storesUpperCaseIdentifiers();
+    }
+
+    @FunctionalInterface
+    private interface MetadataMatcher {
+        boolean match(DatabaseMetaData metaData, String tableName) throws SQLException;
+    }
+}

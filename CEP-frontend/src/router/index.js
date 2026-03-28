@@ -7,6 +7,10 @@ import Chat from "../pages/Chat.vue";
 import OtherProfile from "../pages/OtherProfile.vue";
 import Terms from "../pages/Terms.vue";
 import Privacy from "../pages/Privacy.vue";
+import ConfirmOrder from "../pages/ConfirmOrder.vue";
+import PaymentMethod from "../pages/PaymentMethod.vue";
+import WechatPay from "../pages/WechatPay.vue";
+import PaymentResult from "../pages/PaymentResult.vue";
 import {
   authState,
   initAuthSession,
@@ -54,6 +58,26 @@ const router = createRouter({
       path: "/privacy",
       name: "privacy",
       component: Privacy,
+    },
+    {
+      path: "/trade/confirm",
+      name: "confirm-order",
+      component: ConfirmOrder,
+    },
+    {
+      path: "/trade/pay-method",
+      name: "payment-method",
+      component: PaymentMethod,
+    },
+    {
+      path: "/trade/wechat-pay",
+      name: "wechat-pay",
+      component: WechatPay,
+    },
+    {
+      path: "/trade/result",
+      name: "payment-result",
+      component: PaymentResult,
     },
   ],
 });
