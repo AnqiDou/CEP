@@ -77,15 +77,44 @@
       "from": "other",
       "text": "你好，这个还在吗？",
       "imageUrl": "",
-      "time": "2026-03-28 20:09"
+      "time": "2026-03-28 20:09",
+      "messageType": "TEXT",
+      "reviewOrderId": null,
+      "reviewStatus": ""
     },
     {
       "id": 1002,
       "from": "self",
       "text": "在的，可以面交",
       "imageUrl": "",
-      "time": "2026-03-28 20:10"
+      "time": "2026-03-28 20:10",
+      "messageType": "TEXT",
+      "reviewOrderId": null,
+      "reviewStatus": ""
+    },
+    {
+      "id": 1003,
+      "from": "other",
+      "text": "交易已完成，邀请你进行本次交易评价。",
+      "imageUrl": "",
+      "time": "2026-03-28 20:11",
+      "messageType": "REVIEW_INVITE",
+      "reviewOrderId": 88,
+      "reviewStatus": "PENDING"
     }
   ]
 }
 ```
+
+### `data` 字段说明（消息项）
+
+| 字段          | 类型   | 说明                                                          |
+| ------------- | ------ | ------------------------------------------------------------- |
+| id            | long   | 消息 ID                                                       |
+| from          | string | `self/other`                                                  |
+| text          | string | 文本内容                                                      |
+| imageUrl      | string | 图片地址                                                      |
+| time          | string | 时间（`yyyy-MM-dd HH:mm`）                                    |
+| messageType   | string | 消息类型（`TEXT/IMAGE/REVIEW_INVITE`）                        |
+| reviewOrderId | long   | 评价邀请关联订单 ID，非邀评消息为 `null`                      |
+| reviewStatus  | string | 当前用户评价状态（`PENDING/SUBMITTED`），非邀评消息为空字符串 |

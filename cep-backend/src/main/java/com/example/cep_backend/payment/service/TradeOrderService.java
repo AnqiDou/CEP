@@ -6,6 +6,7 @@ import com.example.cep_backend.payment.dto.TradeOrderDto;
 import com.example.cep_backend.payment.model.TradeOrderItemSnapshot;
 import com.example.cep_backend.payment.model.TradeOrderRecord;
 import com.example.cep_backend.payment.repository.TradeOrderRepository;
+import com.example.cep_backend.review.service.ReviewService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,9 +21,11 @@ public class TradeOrderService {
     private static final DateTimeFormatter ORDER_NO_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     private final TradeOrderRepository tradeOrderRepository;
+    private final ReviewService reviewService;
 
-    public TradeOrderService(TradeOrderRepository tradeOrderRepository) {
+    public TradeOrderService(TradeOrderRepository tradeOrderRepository, ReviewService reviewService) {
         this.tradeOrderRepository = tradeOrderRepository;
+        this.reviewService = reviewService;
     }
 
     @Transactional
@@ -108,6 +111,8 @@ public class TradeOrderService {
         if (updated == null) {
             throw new BusinessException("支付状态更新失败，请稍后重试");
         }
+
+        reviewService.ensureReviewInvite(updated.id(), updated.itemId(), updated.buyerUserId(), updated.sellerUserId());
         return toDto(updated);
     }
 

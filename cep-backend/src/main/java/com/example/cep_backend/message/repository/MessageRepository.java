@@ -98,9 +98,22 @@ public class MessageRepository {
                     m.message_type,
                     m.text_content,
                     m.image_url,
-                    m.created_at
+                    m.created_at,
+                    CASE
+                        WHEN m.message_type = 'REVIEW_INVITE' AND m.biz_type = 'TRADE_ORDER_REVIEW' THEN m.biz_id
+                        ELSE NULL
+                    END AS review_order_id,
+                    CASE
+                        WHEN m.message_type = 'REVIEW_INVITE' THEN t.status
+                        ELSE NULL
+                    END AS review_status
                 FROM message_records m
                 INNER JOIN message_conversations c ON c.id = m.conversation_id
+                LEFT JOIN trade_review_tasks t
+                    ON m.message_type = 'REVIEW_INVITE'
+                    AND m.biz_type = 'TRADE_ORDER_REVIEW'
+                    AND t.order_id = m.biz_id
+                    AND t.reviewer_user_id = ?
                 WHERE m.conversation_id = ?
                   AND (c.buyer_user_id = ? OR c.seller_user_id = ?)
                 ORDER BY m.created_at ASC, m.id ASC
@@ -112,6 +125,8 @@ public class MessageRepository {
             String messageType = rs.getString("message_type");
             String text = rs.getString("text_content");
             String imageUrl = rs.getString("image_url");
+            Long reviewOrderId = rs.getObject("review_order_id", Long.class);
+            String reviewStatus = rs.getString("review_status");
 
             if ((text == null || text.trim().isEmpty()) && "IMAGE".equalsIgnoreCase(messageType)) {
                 text = "";
@@ -122,7 +137,10 @@ public class MessageRepository {
                     currentUserId.equals(senderUserId) ? "self" : "other",
                     text == null ? "" : text,
                     imageUrl == null ? "" : imageUrl,
-                    createdAt.format(DATE_TIME_FORMATTER));
-        }, conversationId, currentUserId, currentUserId);
+                    createdAt.format(DATE_TIME_FORMATTER),
+                    messageType == null ? "TEXT" : messageType,
+                    reviewOrderId,
+                    reviewStatus == null ? "" : reviewStatus);
+        }, currentUserId, conversationId, currentUserId, currentUserId);
     }
 }

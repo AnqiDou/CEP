@@ -11,6 +11,7 @@ import ConfirmOrder from "../pages/ConfirmOrder.vue";
 import PaymentMethod from "../pages/PaymentMethod.vue";
 import WechatPay from "../pages/WechatPay.vue";
 import PaymentResult from "../pages/PaymentResult.vue";
+import TradeReview from "../pages/TradeReview.vue";
 import {
   authState,
   initAuthSession,
@@ -78,6 +79,11 @@ const router = createRouter({
       path: "/trade/result",
       name: "payment-result",
       component: PaymentResult,
+    },
+    {
+      path: "/trade/review",
+      name: "trade-review",
+      component: TradeReview,
     },
   ],
 });

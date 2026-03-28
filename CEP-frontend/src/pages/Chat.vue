@@ -142,6 +142,18 @@
                 <p v-if="message.text" class="message-text">
                   {{ message.text }}
                 </p>
+                <div v-if="isReviewInvite(message)" class="review-invite-row">
+                  <button
+                    class="review-invite-btn"
+                    type="button"
+                    :disabled="message.reviewStatus === 'SUBMITTED'"
+                    @click="goToReview(message.reviewOrderId)"
+                  >
+                    {{
+                      message.reviewStatus === "SUBMITTED" ? "已评价" : "去评价"
+                    }}
+                  </button>
+                </div>
                 <time class="message-time">{{ message.time }}</time>
               </div>
             </article>
@@ -400,12 +412,39 @@ const loadMessages = async (conversationId) => {
       text: typeof item?.text === "string" ? item.text : "",
       imageUrl: typeof item?.imageUrl === "string" ? item.imageUrl : "",
       time: typeof item?.time === "string" ? item.time : "",
+      messageType:
+        typeof item?.messageType === "string" ? item.messageType : "TEXT",
+      reviewOrderId:
+        Number.isInteger(item?.reviewOrderId) && item.reviewOrderId > 0
+          ? item.reviewOrderId
+          : null,
+      reviewStatus:
+        typeof item?.reviewStatus === "string" ? item.reviewStatus : "",
     }));
   } catch (error) {
     ElMessage.error(error.message || "加载消息失败");
   } finally {
     isLoadingMessages.value = false;
   }
+};
+
+const isReviewInvite = (message) =>
+  message?.messageType === "REVIEW_INVITE" &&
+  Number.isInteger(message?.reviewOrderId) &&
+  message.reviewOrderId > 0;
+
+const goToReview = (orderId) => {
+  if (!Number.isInteger(orderId) || orderId <= 0) {
+    ElMessage.warning("评价订单参数无效");
+    return;
+  }
+
+  router.push({
+    name: "trade-review",
+    query: {
+      orderId: String(orderId),
+    },
+  });
 };
 
 const ensureConversationFromQuery = () => {
@@ -922,6 +961,28 @@ onBeforeUnmount(() => {
   display: block;
   font-size: 11px;
   opacity: 0.76;
+}
+
+.review-invite-row {
+  margin-top: 8px;
+}
+
+.review-invite-btn {
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1d4ed8;
+  background: #eff6ff;
+  cursor: pointer;
+}
+
+.review-invite-btn:disabled {
+  border-color: #d1d5db;
+  color: #6b7280;
+  background: #f3f4f6;
+  cursor: default;
 }
 
 .composer {

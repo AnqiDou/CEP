@@ -31,11 +31,25 @@ BEGIN
         message_type NVARCHAR(20) NOT NULL DEFAULT 'TEXT',
         text_content NVARCHAR(2000) NULL,
         image_url NVARCHAR(500) NULL,
+        biz_type NVARCHAR(40) NULL,
+        biz_id BIGINT NULL,
         created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
         read_at DATETIME2 NULL,
         CONSTRAINT fk_message_records_conversation FOREIGN KEY (conversation_id) REFERENCES message_conversations (id),
         CONSTRAINT fk_message_records_sender FOREIGN KEY (sender_user_id) REFERENCES users (id)
     );
+END;
+GO
+
+IF COL_LENGTH('message_records', 'biz_type') IS NULL
+BEGIN
+    ALTER TABLE message_records ADD biz_type NVARCHAR(40) NULL;
+END;
+GO
+
+IF COL_LENGTH('message_records', 'biz_id') IS NULL
+BEGIN
+    ALTER TABLE message_records ADD biz_id BIGINT NULL;
 END;
 GO
 

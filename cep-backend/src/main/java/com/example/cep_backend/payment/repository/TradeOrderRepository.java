@@ -28,6 +28,8 @@ public class TradeOrderRepository {
             rs.getLong("id"),
             rs.getString("order_no"),
             rs.getLong("item_id"),
+            rs.getObject("buyer_user_id", Long.class),
+            rs.getObject("seller_user_id", Long.class),
             rs.getString("item_title"),
             rs.getBigDecimal("amount"),
             rs.getString("cover_photo_url"),
@@ -87,7 +89,7 @@ public class TradeOrderRepository {
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING_PAYMENT', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING_PAYMENT', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """;
 
         KeyHolder keyHolder = new GeneratedKeyHolder();
@@ -119,6 +121,8 @@ public class TradeOrderRepository {
                     id,
                     order_no,
                     item_id,
+                    buyer_user_id,
+                    seller_user_id,
                     item_title,
                     amount,
                     cover_photo_url,
