@@ -21,6 +21,7 @@ BEGIN
     CREATE TABLE items (
         id BIGINT IDENTITY(1, 1) PRIMARY KEY,
         category_id BIGINT NOT NULL,
+        publisher_user_id BIGINT NULL,
         title NVARCHAR(120) NOT NULL,
         description NVARCHAR(500) NOT NULL,
         price DECIMAL(10, 2) NOT NULL,
@@ -31,9 +32,31 @@ BEGIN
         favorite_count INT NOT NULL DEFAULT 0,
         created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT fk_items_category FOREIGN KEY (category_id) REFERENCES item_categories (id)
+        CONSTRAINT fk_items_category FOREIGN KEY (category_id) REFERENCES item_categories (id),
+        CONSTRAINT fk_items_publisher FOREIGN KEY (publisher_user_id) REFERENCES users (id)
     );
 END;
+GO
+
+IF COL_LENGTH('dbo.items', 'publisher_user_id') IS NULL
+BEGIN
+    ALTER TABLE items ADD publisher_user_id BIGINT NULL;
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'fk_items_publisher')
+BEGIN
+    ALTER TABLE items
+    ADD CONSTRAINT fk_items_publisher FOREIGN KEY (publisher_user_id) REFERENCES users (id);
+END;
+GO
+
+UPDATE i
+SET i.publisher_user_id = d.publisher_user_id
+FROM items i
+INNER JOIN item_details d ON d.item_id = i.id
+WHERE i.publisher_user_id IS NULL
+  AND d.publisher_user_id IS NOT NULL;
 GO
 
 IF OBJECT_ID('dbo.item_photos', 'U') IS NULL
@@ -58,6 +81,12 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_items_hot' AND object_id = OBJECT_ID('dbo.items'))
 BEGIN
     CREATE INDEX idx_items_hot ON items (status, favorite_count DESC, view_count DESC, created_at DESC);
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_items_publisher' AND object_id = OBJECT_ID('dbo.items'))
+BEGIN
+    CREATE INDEX idx_items_publisher ON items (publisher_user_id, created_at DESC);
 END;
 GO
 

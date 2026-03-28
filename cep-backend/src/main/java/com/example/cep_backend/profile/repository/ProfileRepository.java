@@ -147,8 +147,8 @@ public class ProfileRepository {
                         ORDER BY p.sort_order ASC, p.id ASC
                     ) AS photo_url
                 FROM items i
-                INNER JOIN item_details d ON d.item_id = i.id
-                WHERE d.publisher_user_id = ?
+                LEFT JOIN item_details d ON d.item_id = i.id
+                WHERE COALESCE(i.publisher_user_id, d.publisher_user_id) = ?
                 ORDER BY i.created_at DESC, i.id DESC
                 """;
         return jdbcTemplate.query(sql, tradeItemRowMapper, userId);
@@ -289,8 +289,8 @@ public class ProfileRepository {
                         ) AS image,
                         i.created_at
                     FROM items i
-                    INNER JOIN item_details d ON d.item_id = i.id
-                    WHERE d.publisher_user_id = ?
+                    LEFT JOIN item_details d ON d.item_id = i.id
+                    WHERE COALESCE(i.publisher_user_id, d.publisher_user_id) = ?
                       AND i.status = 'PUBLISHED'
                     """);
         } else if ("sold".equals(status)) {
@@ -324,8 +324,8 @@ public class ProfileRepository {
                             ) AS image,
                             i.created_at
                         FROM items i
-                        INNER JOIN item_details d ON d.item_id = i.id
-                        WHERE d.publisher_user_id = ?
+                        LEFT JOIN item_details d ON d.item_id = i.id
+                        WHERE COALESCE(i.publisher_user_id, d.publisher_user_id) = ?
                           AND i.status = 'PUBLISHED'
                         UNION ALL
                         SELECT

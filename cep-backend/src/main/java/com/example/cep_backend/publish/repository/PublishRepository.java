@@ -42,6 +42,7 @@ public class PublishRepository {
     }
 
     public Long insertItem(Long categoryId,
+            Long publisherUserId,
             String itemName,
             BigDecimal price,
             String description,
@@ -49,6 +50,7 @@ public class PublishRepository {
         String sql = """
                 INSERT INTO items (
                     category_id,
+                    publisher_user_id,
                     title,
                     description,
                     price,
@@ -57,20 +59,21 @@ public class PublishRepository {
                     status,
                     created_at,
                     updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, 'PUBLISHED', ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'PUBLISHED', ?, ?)
                 """;
 
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
             statement.setLong(1, categoryId);
-            statement.setString(2, itemName);
-            statement.setString(3, description);
-            statement.setBigDecimal(4, price);
-            statement.setString(5, "");
-            statement.setString(6, null);
-            statement.setTimestamp(7, Timestamp.valueOf(now));
+            statement.setLong(2, publisherUserId);
+            statement.setString(3, itemName);
+            statement.setString(4, description);
+            statement.setBigDecimal(5, price);
+            statement.setString(6, "");
+            statement.setString(7, null);
             statement.setTimestamp(8, Timestamp.valueOf(now));
+            statement.setTimestamp(9, Timestamp.valueOf(now));
             return statement;
         }, keyHolder);
 
@@ -138,9 +141,9 @@ public class PublishRepository {
                     i.status,
                     i.created_at
                 FROM items i
-                INNER JOIN item_details d ON d.item_id = i.id
+                LEFT JOIN item_details d ON d.item_id = i.id
                 INNER JOIN item_categories c ON c.id = i.category_id
-                WHERE d.publisher_user_id = ?
+                WHERE COALESCE(i.publisher_user_id, d.publisher_user_id) = ?
                   AND i.status <> 'DELETED'
                 ORDER BY i.created_at DESC, i.id DESC
                 """;
@@ -160,9 +163,9 @@ public class PublishRepository {
                     i.status,
                     i.created_at
                 FROM items i
-                INNER JOIN item_details d ON d.item_id = i.id
+                LEFT JOIN item_details d ON d.item_id = i.id
                 INNER JOIN item_categories c ON c.id = i.category_id
-                WHERE d.publisher_user_id = ?
+                WHERE COALESCE(i.publisher_user_id, d.publisher_user_id) = ?
                   AND i.id = ?
                 """;
         List<PublishOwnedItemBaseRecord> records = jdbcTemplate.query(sql, ownedItemRowMapper, userId, itemId);
@@ -183,6 +186,7 @@ public class PublishRepository {
     }
 
     public void updateItemAndDetail(
+            Long userId,
             Long itemId,
             Long categoryId,
             String itemName,
@@ -194,6 +198,7 @@ public class PublishRepository {
         String updateItemSql = """
                 UPDATE items
                 SET category_id = ?,
+                    publisher_user_id = ?,
                     title = ?,
                     description = ?,
                     price = ?,
@@ -203,20 +208,52 @@ public class PublishRepository {
         jdbcTemplate.update(
                 updateItemSql,
                 categoryId,
+                userId,
                 itemName,
                 description,
                 price,
                 Timestamp.valueOf(now),
                 itemId);
 
-        String updateDetailSql = """
+        String upsertDetailSql = """
                 UPDATE item_details
-                SET purchase_date = ?,
+                SET publisher_user_id = ?,
+                    purchase_date = ?,
                     usage_duration = ?,
                     updated_at = ?
-                WHERE item_id = ?
+                WHERE item_id = ?;
+
+                IF @@ROWCOUNT = 0
+                BEGIN
+                    INSERT INTO item_details (
+                        item_id,
+                        publisher_user_id,
+                        purchase_date,
+                        usage_duration,
+                        item_condition,
+                        accessories,
+                        detail_note,
+                        trade_location,
+                        original_price,
+                        created_at,
+                        updated_at
+                    ) VALUES (?, ?, ?, ?, '', '', '', '', NULL, ?, ?)
+                END
                 """;
-        jdbcTemplate.update(updateDetailSql, purchaseDate, usageDuration, Timestamp.valueOf(now), itemId);
+        Timestamp timestampNow = Timestamp.valueOf(now);
+        jdbcTemplate.update(
+                upsertDetailSql,
+                userId,
+                purchaseDate,
+                usageDuration,
+                timestampNow,
+                itemId,
+                itemId,
+                userId,
+                purchaseDate,
+                usageDuration,
+                timestampNow,
+                timestampNow);
     }
 
     public void replaceItemPhotos(Long itemId, List<String> photoUrls, LocalDateTime now) {
@@ -231,8 +268,8 @@ public class PublishRepository {
                 SET i.status = 'DELETED',
                     i.updated_at = ?
                 FROM items i
-                INNER JOIN item_details d ON d.item_id = i.id
-                WHERE d.publisher_user_id = ?
+                LEFT JOIN item_details d ON d.item_id = i.id
+                WHERE COALESCE(i.publisher_user_id, d.publisher_user_id) = ?
                   AND i.id = ?
                   AND i.status <> 'DELETED'
                 """;
@@ -245,8 +282,8 @@ public class PublishRepository {
                 SET i.status = ?,
                     i.updated_at = ?
                 FROM items i
-                INNER JOIN item_details d ON d.item_id = i.id
-                WHERE d.publisher_user_id = ?
+                LEFT JOIN item_details d ON d.item_id = i.id
+                WHERE COALESCE(i.publisher_user_id, d.publisher_user_id) = ?
                   AND i.id = ?
                   AND i.status <> 'DELETED'
                 """;

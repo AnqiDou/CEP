@@ -53,6 +53,7 @@ public class PublishService {
         try {
             itemId = publishRepository.insertItem(
                     categoryId,
+                    userId,
                     itemName,
                     price,
                     description,
@@ -116,7 +117,7 @@ public class PublishService {
         }
 
         LocalDateTime now = LocalDateTime.now();
-        publishRepository.updateItemAndDetail(itemId, categoryId, itemName, price, description, purchaseDate,
+        publishRepository.updateItemAndDetail(userId, itemId, categoryId, itemName, price, description, purchaseDate,
                 usageDuration, now);
         publishRepository.replaceItemPhotos(itemId, photoUrls, now);
 

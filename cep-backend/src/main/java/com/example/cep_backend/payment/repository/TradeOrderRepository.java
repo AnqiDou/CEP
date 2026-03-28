@@ -48,7 +48,7 @@ public class TradeOrderRepository {
         String sql = """
                 SELECT
                     i.id AS item_id,
-                    d.publisher_user_id AS seller_user_id,
+                    COALESCE(i.publisher_user_id, d.publisher_user_id) AS seller_user_id,
                     i.title AS item_title,
                     i.price,
                     (

@@ -89,6 +89,7 @@ CREATE TABLE item_categories (
 CREATE TABLE items (
     id BIGINT IDENTITY(1, 1) PRIMARY KEY,
     category_id BIGINT NOT NULL,
+    publisher_user_id BIGINT NULL,
     title NVARCHAR(120) NOT NULL,
     description NVARCHAR(500) NOT NULL,
     price DECIMAL(10, 2) NOT NULL,
@@ -99,7 +100,8 @@ CREATE TABLE items (
     favorite_count INT NOT NULL DEFAULT 0,
     created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_items_category FOREIGN KEY (category_id) REFERENCES item_categories (id)
+    CONSTRAINT fk_items_category FOREIGN KEY (category_id) REFERENCES item_categories (id),
+    CONSTRAINT fk_items_publisher FOREIGN KEY (publisher_user_id) REFERENCES users (id)
 );
 
 CREATE TABLE item_photos (
@@ -222,6 +224,9 @@ INDEX idx_items_hot ON items (
     view_count DESC,
     created_at DESC
 );
+
+CREATE
+INDEX idx_items_publisher ON items (publisher_user_id, created_at DESC);
 
 CREATE
 INDEX idx_item_photos_item ON item_photos (item_id, sort_order ASC);
