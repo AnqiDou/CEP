@@ -14,8 +14,12 @@
             <div class="seller-meta-wrap">
               <div class="seller-name-row">
                 <h1 class="seller-name">{{ seller.name }}</h1>
-                <span class="seller-badge">卖家信用较好</span>
-                <span class="seller-badge">买家信用较好</span>
+                <span class="seller-badge"
+                  >卖家信用{{ seller.sellerCredit }}</span
+                >
+                <span class="seller-badge"
+                  >买家信用{{ seller.buyerCredit }}</span
+                >
               </div>
               <p class="seller-stats">
                 {{ seller.city }} ｜ {{ seller.fans }}粉丝 ｜
@@ -175,142 +179,43 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
+import { ElMessage } from "element-plus";
+import {
+  fetchOtherProfileItems,
+  fetchOtherProfileOverview,
+  fetchOtherProfileReviews,
+  followOtherProfile,
+  unfollowOtherProfile,
+} from "../service/profile/profileApiService";
 
 const route = useRoute();
-
-const createMockPhoto = (label, color) =>
-  `data:image/svg+xml;utf8,${encodeURIComponent(
-    `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 900'>
-      <defs>
-        <linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
-          <stop offset='0%' stop-color='${color}'/>
-          <stop offset='100%' stop-color='#e2e8f0'/>
-        </linearGradient>
-      </defs>
-      <rect width='900' height='900' fill='url(#g)'/>
-      <text x='450' y='460' text-anchor='middle' font-size='56' fill='#1e3a8a' font-family='Arial'>${label}</text>
-    </svg>`
-  )}`;
-
-const sellerMap = {
-  王同学: {
-    name: "王同学",
-    avatar: createMockPhoto("王", "#bfdbfe"),
-    city: "浙江省",
-    fans: 64,
-    following: 5,
-    bio: "校园闲置爱好者，主打教材和生活好物，支持当面验货交易。",
-    credit: 4.8,
-    items: [
-      {
-        id: "g1",
-        title: "22级高数教材+辅导书全套",
-        price: 35,
-        status: "onsale",
-        image: createMockPhoto("教材", "#dbeafe"),
-      },
-      {
-        id: "g2",
-        title: "英语六级听力专项",
-        price: 15,
-        status: "onsale",
-        image: createMockPhoto("六级", "#c7d2fe"),
-      },
-      {
-        id: "g3",
-        title: "二手羽毛球拍",
-        price: 68,
-        status: "sold",
-        image: createMockPhoto("球拍", "#93c5fd"),
-      },
-      {
-        id: "g4",
-        title: "宿舍收纳套盒",
-        price: 39,
-        status: "onsale",
-        image: createMockPhoto("收纳", "#bfdbfe"),
-      },
-      {
-        id: "g5",
-        title: "保温杯（九成新）",
-        price: 20,
-        status: "sold",
-        image: createMockPhoto("水杯", "#a5b4fc"),
-      },
-    ],
-    reviews: [
-      {
-        id: "r1",
-        user: "李同学",
-        time: "2天前",
-        tag: "好评",
-        avatar: createMockPhoto("李", "#93c5fd"),
-        content: "回复快，面交准时，物品和描述一致。",
-      },
-      {
-        id: "r2",
-        user: "张同学",
-        time: "1周前",
-        tag: "好评",
-        avatar: createMockPhoto("张", "#bfdbfe"),
-        content: "卖家很好沟通，交易过程顺利。",
-      },
-      {
-        id: "r3",
-        user: "陈同学",
-        time: "2周前",
-        tag: "差评",
-        avatar: createMockPhoto("陈", "#a5b4fc"),
-        content: "整体不错，建议提前确认具体地点。",
-      },
-    ],
-  },
-};
-
-const fallbackSeller = {
-  name: "校园卖家",
-  avatar: createMockPhoto("卖", "#bfdbfe"),
-  city: "本地",
-  fans: 18,
-  following: 3,
-  bio: "仅前端演示数据，后端暂未接入。",
-  credit: 4.7,
-  items: [
-    {
-      id: "f1",
-      title: "校园闲置物品",
-      price: 99,
-      status: "onsale",
-      image: createMockPhoto("闲置", "#dbeafe"),
-    },
-  ],
-  reviews: [
-    {
-      id: "fr1",
-      user: "平台用户",
-      time: "刚刚",
-      tag: "好评",
-      avatar: createMockPhoto("平", "#93c5fd"),
-      content: "演示数据：卖家沟通友好。",
-    },
-  ],
-};
 
 const activeTab = ref("goods");
 const activeStatus = ref("all");
 const activeSort = ref("price-desc");
+const isLoading = ref(false);
+const seller = ref({
+  id: null,
+  name: "校园卖家",
+  avatar: "",
+  city: "未填写校区",
+  fans: 0,
+  following: 0,
+  bio: "该用户暂未填写简介",
+  sellerCredit: "良好",
+  buyerCredit: "良好",
+  items: [],
+  reviews: [],
+});
 const isFollowing = ref(false);
 
 const sellerName = computed(() => String(route.params.name || "").trim());
-const seller = computed(
-  () =>
-    sellerMap[sellerName.value] || {
-      ...fallbackSeller,
-      name: sellerName.value || fallbackSeller.name,
-    }
-);
+const sellerUserId = computed(() => {
+  const value = Number(route.query.userId);
+  return Number.isInteger(value) && value > 0 ? value : null;
+});
 
 const onSaleCount = computed(
   () => seller.value.items.filter((item) => item.status === "onsale").length
@@ -337,8 +242,114 @@ const displayedGoods = computed(() => {
   return list;
 });
 
-const toggleFollow = () => {
-  isFollowing.value = !isFollowing.value;
+const loadOtherProfile = async () => {
+  isLoading.value = true;
+  try {
+    const params = {
+      userId: sellerUserId.value,
+      username: sellerName.value,
+    };
+    const [overviewBody, itemsBody, reviewsBody] = await Promise.all([
+      fetchOtherProfileOverview(params),
+      fetchOtherProfileItems({ ...params, status: "all", sort: "price-desc" }),
+      fetchOtherProfileReviews({ ...params, rating: "all" }),
+    ]);
+
+    const overview = overviewBody?.data || {};
+    const items = Array.isArray(itemsBody?.data) ? itemsBody.data : [];
+    const reviews = Array.isArray(reviewsBody?.data?.reviews)
+      ? reviewsBody.data.reviews
+      : [];
+
+    seller.value = {
+      id: Number.isInteger(overview?.userId)
+        ? overview.userId
+        : sellerUserId.value,
+      name:
+        typeof overview?.username === "string" && overview.username.trim()
+          ? overview.username.trim()
+          : sellerName.value || "校园卖家",
+      avatar:
+        typeof overview?.avatar === "string" && overview.avatar.trim()
+          ? overview.avatar.trim()
+          : "",
+      city:
+        typeof overview?.city === "string" && overview.city.trim()
+          ? overview.city.trim()
+          : "未填写校区",
+      fans: Number.isInteger(overview?.fans) ? overview.fans : 0,
+      following: Number.isInteger(overview?.following) ? overview.following : 0,
+      bio:
+        typeof overview?.bio === "string" && overview.bio.trim()
+          ? overview.bio.trim()
+          : "该用户暂未填写简介",
+      sellerCredit:
+        typeof overview?.sellerCredit === "string" &&
+        overview.sellerCredit.trim()
+          ? overview.sellerCredit.trim()
+          : "良好",
+      buyerCredit:
+        typeof overview?.buyerCredit === "string" && overview.buyerCredit.trim()
+          ? overview.buyerCredit.trim()
+          : "良好",
+      items: items.map((item) => ({
+        id: item?.id ?? null,
+        title:
+          typeof item?.title === "string" && item.title.trim()
+            ? item.title.trim()
+            : "未命名宝贝",
+        price: Number(item?.price) || 0,
+        status: item?.status === "sold" ? "sold" : "onsale",
+        image: typeof item?.image === "string" ? item.image : "",
+      })),
+      reviews: reviews.map((review) => ({
+        id: review?.id ?? Date.now(),
+        user:
+          typeof review?.user === "string" && review.user.trim()
+            ? review.user.trim()
+            : "校园用户",
+        time: typeof review?.time === "string" ? review.time : "",
+        tag: typeof review?.tag === "string" ? review.tag : "好评",
+        avatar: typeof review?.avatar === "string" ? review.avatar : "",
+        content: typeof review?.content === "string" ? review.content : "",
+      })),
+    };
+    isFollowing.value = overview?.followed === true;
+  } catch (error) {
+    ElMessage.error(error.message || "加载他人主页失败");
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+watch(
+  () => [route.params.name, route.query.userId],
+  () => {
+    loadOtherProfile();
+  },
+  { immediate: true }
+);
+
+const toggleFollow = async () => {
+  const params = {
+    userId: seller.value.id,
+    username: seller.value.name,
+  };
+  try {
+    if (isFollowing.value) {
+      await unfollowOtherProfile(params);
+      isFollowing.value = false;
+      seller.value.fans = Math.max(0, seller.value.fans - 1);
+      ElMessage.success("已取消关注");
+      return;
+    }
+    await followOtherProfile(params);
+    isFollowing.value = true;
+    seller.value.fans += 1;
+    ElMessage.success("关注成功");
+  } catch (error) {
+    ElMessage.error(error.message || "关注操作失败");
+  }
 };
 
 const getReviewTagText = (tag) => (tag === "差评" ? "😞 差评" : "🥰 好评");

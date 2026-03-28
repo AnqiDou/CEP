@@ -324,6 +324,9 @@ const startChat = () => {
       itemId: String(item.value.id),
       itemTitle: item.value.title,
       sellerName: item.value.publisher.name,
+      sellerUserId: item.value.publisher.id
+        ? String(item.value.publisher.id)
+        : undefined,
     },
   });
   window.open(resolved.href, "_blank");
@@ -339,6 +342,11 @@ const goToSellerHome = () => {
     params: {
       name: item.value.publisher.name,
     },
+    query: item.value.publisher.id
+      ? {
+          userId: String(item.value.publisher.id),
+        }
+      : undefined,
   });
   window.open(resolved.href, "_blank");
 };

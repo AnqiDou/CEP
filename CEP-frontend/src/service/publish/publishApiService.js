@@ -19,28 +19,73 @@ const requestJson = async (url, options) => {
   }
 };
 
-export const uploadPublishImage = async (file) => {
+const getAuthHeader = async () => {
   const accessToken = await ensureValidAccessToken();
+  return {
+    Authorization: `Bearer ${accessToken}`,
+  };
+};
+
+export const uploadPublishImage = async (file) => {
+  const authHeader = await getAuthHeader();
   const formData = new FormData();
   formData.append("file", file);
 
   return requestJson(`${PUBLISH_API_BASE}/images`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
+    headers: authHeader,
     body: formData,
   });
 };
 
 export const createPublishItem = async (payload) => {
-  const accessToken = await ensureValidAccessToken();
+  const authHeader = await getAuthHeader();
   return requestJson(`${PUBLISH_API_BASE}/items`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
+      ...authHeader,
     },
     body: JSON.stringify(payload),
+  });
+};
+
+export const fetchMyPublishItems = async () => {
+  const authHeader = await getAuthHeader();
+  return requestJson(`${PUBLISH_API_BASE}/items/mine`, {
+    method: "GET",
+    headers: authHeader,
+  });
+};
+
+export const updateMyPublishItem = async (itemId, payload) => {
+  const authHeader = await getAuthHeader();
+  return requestJson(`${PUBLISH_API_BASE}/items/${itemId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeader,
+    },
+    body: JSON.stringify(payload),
+  });
+};
+
+export const deleteMyPublishItem = async (itemId) => {
+  const authHeader = await getAuthHeader();
+  return requestJson(`${PUBLISH_API_BASE}/items/${itemId}`, {
+    method: "DELETE",
+    headers: authHeader,
+  });
+};
+
+export const updateMyPublishItemStatus = async (itemId, status) => {
+  const authHeader = await getAuthHeader();
+  return requestJson(`${PUBLISH_API_BASE}/items/${itemId}/status`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeader,
+    },
+    body: JSON.stringify({ status }),
   });
 };

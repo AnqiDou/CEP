@@ -19,6 +19,7 @@ public class TradeOrderRepository {
 
     private final RowMapper<TradeOrderItemSnapshot> itemSnapshotRowMapper = (rs, rowNum) -> new TradeOrderItemSnapshot(
             rs.getLong("item_id"),
+            rs.getObject("seller_user_id", Long.class),
             rs.getString("item_title"),
             rs.getBigDecimal("price"),
             rs.getString("cover_photo_url"));
@@ -45,6 +46,7 @@ public class TradeOrderRepository {
         String sql = """
                 SELECT
                     i.id AS item_id,
+                    d.publisher_user_id AS seller_user_id,
                     i.title AS item_title,
                     i.price,
                     (
@@ -54,6 +56,7 @@ public class TradeOrderRepository {
                         ORDER BY p.sort_order ASC, p.id ASC
                     ) AS cover_photo_url
                 FROM items i
+                LEFT JOIN item_details d ON d.item_id = i.id
                 WHERE i.id = ? AND i.status = 'PUBLISHED'
                 """;
 
@@ -64,6 +67,7 @@ public class TradeOrderRepository {
     public Long createOrder(
             String orderNo,
             TradeOrderItemSnapshot snapshot,
+            Long buyerUserId,
             String receiverName,
             String receiverPhone,
             String receiverAddress) {
@@ -71,6 +75,8 @@ public class TradeOrderRepository {
                 INSERT INTO trade_orders (
                     order_no,
                     item_id,
+                    buyer_user_id,
+                    seller_user_id,
                     item_title,
                     amount,
                     cover_photo_url,
@@ -81,7 +87,7 @@ public class TradeOrderRepository {
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING_PAYMENT', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING_PAYMENT', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """;
 
         KeyHolder keyHolder = new GeneratedKeyHolder();
@@ -89,12 +95,14 @@ public class TradeOrderRepository {
             var statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
             statement.setString(1, orderNo);
             statement.setLong(2, snapshot.itemId());
-            statement.setString(3, snapshot.itemTitle());
-            statement.setBigDecimal(4, snapshot.price());
-            statement.setString(5, snapshot.coverPhotoUrl());
-            statement.setString(6, receiverName);
-            statement.setString(7, receiverPhone);
-            statement.setString(8, receiverAddress);
+            statement.setLong(3, buyerUserId);
+            statement.setLong(4, snapshot.sellerUserId());
+            statement.setString(5, snapshot.itemTitle());
+            statement.setBigDecimal(6, snapshot.price());
+            statement.setString(7, snapshot.coverPhotoUrl());
+            statement.setString(8, receiverName);
+            statement.setString(9, receiverPhone);
+            statement.setString(10, receiverAddress);
             return statement;
         }, keyHolder);
 

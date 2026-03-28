@@ -1,6 +1,6 @@
 import { ensureValidAccessToken } from "../common/authSessionService";
 
-const PAYMENT_API_BASE = "/api/payment/orders";
+const MESSAGE_API_BASE = "/api/messages";
 
 const requestJson = async (url, options = {}) => {
   try {
@@ -20,22 +20,23 @@ const requestJson = async (url, options = {}) => {
   }
 };
 
-export const createTradeOrder = async (payload) => {
+const withAuthHeaders = async (extraHeaders = {}) => {
   const accessToken = await ensureValidAccessToken();
-  return requestJson(PAYMENT_API_BASE, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify(payload),
-  });
+  return {
+    Authorization: `Bearer ${accessToken}`,
+    ...extraHeaders,
+  };
 };
 
-export const fetchTradeOrder = (orderId) =>
-  requestJson(`${PAYMENT_API_BASE}/${orderId}`);
+export const fetchMessageConversations = async (filter = "all") =>
+  requestJson(
+    `${MESSAGE_API_BASE}/conversations?filter=${encodeURIComponent(filter)}`,
+    {
+      headers: await withAuthHeaders(),
+    },
+  );
 
-export const markTradeOrderPaid = (orderId) =>
-  requestJson(`${PAYMENT_API_BASE}/${orderId}/pay-success`, {
-    method: "POST",
+export const fetchConversationMessages = async (conversationId) =>
+  requestJson(`${MESSAGE_API_BASE}/conversations/${conversationId}/messages`, {
+    headers: await withAuthHeaders(),
   });

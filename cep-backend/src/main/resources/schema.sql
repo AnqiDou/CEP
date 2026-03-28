@@ -8,6 +8,12 @@ DROP TABLE IF EXISTS item_photos;
 
 DROP TABLE IF EXISTS item_details;
 
+DROP TABLE IF EXISTS user_credit_reviews;
+
+DROP TABLE IF EXISTS user_favorites;
+
+DROP TABLE IF EXISTS user_follows;
+
 DROP TABLE IF EXISTS trade_orders;
 
 DROP TABLE IF EXISTS idle_item_photos;
@@ -63,6 +69,7 @@ CREATE TABLE user_profiles (
     campus NVARCHAR(50) NULL,
     credit_score DECIMAL(3, 1) NULL,
     note NVARCHAR(200) NULL,
+    avatar_url NVARCHAR(500) NULL,
     created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_user_profiles_user FOREIGN KEY (user_id) REFERENCES users (id)
@@ -125,6 +132,8 @@ CREATE TABLE trade_orders (
     id BIGINT IDENTITY(1, 1) PRIMARY KEY,
     order_no NVARCHAR(40) NOT NULL UNIQUE,
     item_id BIGINT NOT NULL,
+    buyer_user_id BIGINT NULL,
+    seller_user_id BIGINT NULL,
     item_title NVARCHAR(120) NOT NULL,
     amount DECIMAL(10, 2) NOT NULL,
     cover_photo_url NVARCHAR(500) NULL,
@@ -135,7 +144,43 @@ CREATE TABLE trade_orders (
     paid_at DATETIME2 NULL,
     created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_trade_orders_item FOREIGN KEY (item_id) REFERENCES items (id)
+    CONSTRAINT fk_trade_orders_item FOREIGN KEY (item_id) REFERENCES items (id),
+    CONSTRAINT fk_trade_orders_buyer FOREIGN KEY (buyer_user_id) REFERENCES users (id),
+    CONSTRAINT fk_trade_orders_seller FOREIGN KEY (seller_user_id) REFERENCES users (id)
+);
+
+CREATE TABLE user_follows (
+    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    target_user_id BIGINT NOT NULL,
+    created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_user_follows UNIQUE (user_id, target_user_id),
+    CONSTRAINT fk_user_follows_user FOREIGN KEY (user_id) REFERENCES users (id),
+    CONSTRAINT fk_user_follows_target FOREIGN KEY (target_user_id) REFERENCES users (id)
+);
+
+CREATE TABLE user_favorites (
+    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    item_id BIGINT NOT NULL,
+    created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_user_favorites UNIQUE (user_id, item_id),
+    CONSTRAINT fk_user_favorites_user FOREIGN KEY (user_id) REFERENCES users (id),
+    CONSTRAINT fk_user_favorites_item FOREIGN KEY (item_id) REFERENCES items (id)
+);
+
+CREATE TABLE user_credit_reviews (
+    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
+    order_id BIGINT NULL,
+    rater_user_id BIGINT NOT NULL,
+    target_user_id BIGINT NOT NULL,
+    target_role NVARCHAR(20) NOT NULL,
+    rating NVARCHAR(10) NOT NULL,
+    content NVARCHAR(300) NULL,
+    created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_user_credit_reviews_order FOREIGN KEY (order_id) REFERENCES trade_orders (id),
+    CONSTRAINT fk_user_credit_reviews_rater FOREIGN KEY (rater_user_id) REFERENCES users (id),
+    CONSTRAINT fk_user_credit_reviews_target FOREIGN KEY (target_user_id) REFERENCES users (id)
 );
 
 CREATE TABLE search_keywords (
@@ -189,6 +234,21 @@ INDEX idx_trade_orders_item ON trade_orders (item_id, created_at DESC);
 
 CREATE
 INDEX idx_trade_orders_status ON trade_orders (status, created_at DESC);
+
+CREATE
+INDEX idx_trade_orders_buyer ON trade_orders (buyer_user_id, created_at DESC);
+
+CREATE
+INDEX idx_trade_orders_seller ON trade_orders (seller_user_id, created_at DESC);
+
+CREATE
+INDEX idx_user_follows_target ON user_follows (target_user_id, created_at DESC);
+
+CREATE
+INDEX idx_user_favorites_user ON user_favorites (user_id, created_at DESC);
+
+CREATE
+INDEX idx_user_credit_reviews_target ON user_credit_reviews (target_user_id, created_at DESC);
 
 CREATE
 INDEX idx_search_keywords_hot ON search_keywords (

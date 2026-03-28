@@ -32,6 +32,15 @@ public class UserRepository {
         return Optional.of(result.getFirst());
     }
 
+    public Optional<UserRecord> findById(Long userId) {
+        String sql = "SELECT id, email, username, password_hash FROM users WHERE id = ?";
+        List<UserRecord> result = jdbcTemplate.query(sql, userRowMapper, userId);
+        if (result.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(result.getFirst());
+    }
+
     public long createUser(String email, String username, String passwordHash, LocalDateTime now) {
         String insertSql = """
                 INSERT INTO users (email, username, password_hash, status, created_at, updated_at)
@@ -55,5 +64,15 @@ public class UserRepository {
     public void updatePasswordByEmail(String email, String passwordHash, LocalDateTime now) {
         String sql = "UPDATE users SET password_hash = ?, updated_at = ? WHERE email = ?";
         jdbcTemplate.update(sql, passwordHash, now, email);
+    }
+
+    public void updateBasicInfo(Long userId, String username, String passwordHash, LocalDateTime now) {
+        if (passwordHash == null) {
+            String sql = "UPDATE users SET username = ?, updated_at = ? WHERE id = ?";
+            jdbcTemplate.update(sql, username, now, userId);
+            return;
+        }
+        String sql = "UPDATE users SET username = ?, password_hash = ?, updated_at = ? WHERE id = ?";
+        jdbcTemplate.update(sql, username, passwordHash, now, userId);
     }
 }

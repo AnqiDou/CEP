@@ -240,6 +240,10 @@ import {
 import { ElMessage } from "element-plus";
 import { useRoute, useRouter } from "vue-router";
 import { Picture } from "@element-plus/icons-vue";
+import {
+  fetchConversationMessages,
+  fetchMessageConversations,
+} from "../service/chat/chatApiService";
 import data from "emoji-mart-vue-fast/data/all.json";
 import { Picker, EmojiIndex } from "emoji-mart-vue-fast/src";
 import "emoji-mart-vue-fast/css/emoji-mart.css";
@@ -248,110 +252,7 @@ const emojiIndex = new EmojiIndex(data);
 const route = useRoute();
 const router = useRouter();
 
-const createMockThumb = (label, color) =>
-  `data:image/svg+xml;utf8,${encodeURIComponent(
-    `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'>
-      <defs>
-        <linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
-          <stop offset='0%' stop-color='${color}'/>
-          <stop offset='100%' stop-color='#e2e8f0'/>
-        </linearGradient>
-      </defs>
-      <rect width='200' height='200' fill='url(#g)'/>
-      <text x='100' y='108' text-anchor='middle' font-size='28' fill='#1e3a8a' font-family='Arial'>${label}</text>
-    </svg>`
-  )}`;
-
-const conversationList = ref([
-  {
-    id: "conv-101",
-    sellerName: "不吃奶酪的熙熙",
-    itemId: 1,
-    itemTitle: "投缘优惠团购券",
-    itemImage: createMockThumb("团购", "#bfdbfe"),
-    unread: 2,
-    lastMessage: "在的，今晚 8 点前都可以当面交易。",
-    lastTime: "18分钟前",
-    updatedAt: Date.now() - 1000 * 60 * 18,
-    messages: [
-      {
-        id: 1,
-        from: "other",
-        text: "你好，这个优惠券还在吗？",
-        imageUrl: "",
-        time: "10:18",
-      },
-      {
-        id: 2,
-        from: "self",
-        text: "还在的，我在本部。",
-        imageUrl: "",
-        time: "10:19",
-      },
-      {
-        id: 3,
-        from: "other",
-        text: "在的，今晚 8 点前都可以当面交易。",
-        imageUrl: "",
-        time: "10:20",
-      },
-    ],
-  },
-  {
-    id: "conv-102",
-    sellerName: "AI领航店",
-    itemId: 2,
-    itemTitle: "Claude code 教程合集",
-    itemImage: createMockThumb("教程", "#93c5fd"),
-    unread: 0,
-    lastMessage: "支持小刀，资料发你预览图。",
-    lastTime: "1天前",
-    updatedAt: Date.now() - 1000 * 60 * 60 * 24,
-    messages: [
-      {
-        id: 11,
-        from: "other",
-        text: "这套资料是最新版吗？",
-        imageUrl: "",
-        time: "昨天 12:12",
-      },
-      {
-        id: 12,
-        from: "other",
-        text: "支持小刀，资料发你预览图。",
-        imageUrl: "",
-        time: "昨天 12:13",
-      },
-    ],
-  },
-  {
-    id: "conv-103",
-    sellerName: "闲小蜜",
-    itemId: 205,
-    itemTitle: "售后问卷礼包",
-    itemImage: createMockThumb("礼包", "#a5b4fc"),
-    unread: 1,
-    lastMessage: "收到，辛苦给个评价～",
-    lastTime: "03-11",
-    updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 5,
-    messages: [
-      {
-        id: 21,
-        from: "self",
-        text: "礼包已收到，谢谢。",
-        imageUrl: "",
-        time: "03-11 15:06",
-      },
-      {
-        id: 22,
-        from: "other",
-        text: "收到，辛苦给个评价～",
-        imageUrl: "",
-        time: "03-11 15:07",
-      },
-    ],
-  },
-]);
+const conversationList = ref([]);
 
 const sessionFilter = ref("all");
 const selectedConversationId = ref(null);
@@ -372,12 +273,42 @@ const emojiCategories = [
   "flags",
 ];
 const replyTimers = new Set();
+const isLoadingConversations = ref(false);
+const isLoadingMessages = ref(false);
 
-const sortedConversations = computed(() =>
-  [...conversationList.value].sort(
-    (first, second) => second.updatedAt - first.updatedAt
-  )
-);
+const normalizeConversation = (raw) => ({
+  id: String(raw?.conversationId ?? ""),
+  sellerUserId:
+    Number.isInteger(raw?.peerUserId) && raw.peerUserId > 0
+      ? raw.peerUserId
+      : null,
+  sellerName:
+    typeof raw?.peerName === "string" && raw.peerName.trim()
+      ? raw.peerName.trim()
+      : "校园用户",
+  itemId: Number.isInteger(raw?.itemId) && raw.itemId > 0 ? raw.itemId : null,
+  itemTitle:
+    typeof raw?.itemTitle === "string" && raw.itemTitle.trim()
+      ? raw.itemTitle.trim()
+      : "校园闲置物品",
+  itemImage:
+    typeof raw?.itemImage === "string" && raw.itemImage.trim()
+      ? raw.itemImage.trim()
+      : "",
+  unread: Number.isInteger(raw?.unread) ? Math.max(raw.unread, 0) : 0,
+  lastMessage:
+    typeof raw?.lastMessage === "string" && raw.lastMessage.trim()
+      ? raw.lastMessage
+      : "暂无消息",
+  lastTime:
+    typeof raw?.lastTime === "string" && raw.lastTime.trim()
+      ? raw.lastTime.trim()
+      : "",
+  updatedAt: Date.now(),
+  messages: [],
+});
+
+const sortedConversations = computed(() => [...conversationList.value]);
 
 const filteredConversations = computed(() => {
   if (sessionFilter.value === "unread") {
@@ -424,6 +355,7 @@ watch(
 
 const selectConversation = (conversationId) => {
   selectedConversationId.value = conversationId;
+  loadMessages(conversationId);
   const current = conversationList.value.find(
     (conversation) => conversation.id === conversationId
   );
@@ -432,8 +364,57 @@ const selectConversation = (conversationId) => {
   }
 };
 
+const loadConversations = async () => {
+  isLoadingConversations.value = true;
+  try {
+    const responseBody = await fetchMessageConversations("all");
+    const list = Array.isArray(responseBody?.data) ? responseBody.data : [];
+    conversationList.value = list.map(normalizeConversation);
+    if (conversationList.value.length > 0) {
+      const firstId = conversationList.value[0].id;
+      selectedConversationId.value = firstId;
+      await loadMessages(firstId);
+    }
+  } catch (error) {
+    ElMessage.error(error.message || "加载消息列表失败");
+  } finally {
+    isLoadingConversations.value = false;
+  }
+};
+
+const loadMessages = async (conversationId) => {
+  const current = conversationList.value.find(
+    (conversation) => conversation.id === conversationId
+  );
+  if (!current || current.messages.length > 0) {
+    return;
+  }
+
+  isLoadingMessages.value = true;
+  try {
+    const responseBody = await fetchConversationMessages(conversationId);
+    const messages = Array.isArray(responseBody?.data) ? responseBody.data : [];
+    current.messages = messages.map((item) => ({
+      id: item?.id ?? Date.now(),
+      from: item?.from === "self" ? "self" : "other",
+      text: typeof item?.text === "string" ? item.text : "",
+      imageUrl: typeof item?.imageUrl === "string" ? item.imageUrl : "",
+      time: typeof item?.time === "string" ? item.time : "",
+    }));
+  } catch (error) {
+    ElMessage.error(error.message || "加载消息失败");
+  } finally {
+    isLoadingMessages.value = false;
+  }
+};
+
 const ensureConversationFromQuery = () => {
   const sellerName = String(route.query.sellerName || "").trim();
+  const sellerUserIdRaw = Number(route.query.sellerUserId);
+  const sellerUserId =
+    Number.isInteger(sellerUserIdRaw) && sellerUserIdRaw > 0
+      ? sellerUserIdRaw
+      : null;
   const itemTitle = String(route.query.itemTitle || "").trim();
   const itemIdRaw = Number(route.query.itemId);
   const itemId = Number.isFinite(itemIdRaw) && itemIdRaw > 0 ? itemIdRaw : null;
@@ -454,13 +435,14 @@ const ensureConversationFromQuery = () => {
   }
 
   const now = getNowTime();
-  const id = `conv-${Date.now()}`;
+  const id = String(Date.now());
   conversationList.value.unshift({
     id,
+    sellerUserId,
     sellerName: sellerName || "卖家同学",
     itemId,
     itemTitle: itemTitle || "校园闲置物品",
-    itemImage: createMockThumb("闲置", "#dbeafe"),
+    itemImage: "",
     unread: 0,
     lastMessage: "你好，物品还在，欢迎咨询交易细节。",
     lastTime: "刚刚",
@@ -479,7 +461,12 @@ const ensureConversationFromQuery = () => {
 };
 
 watch(
-  () => [route.query.sellerName, route.query.itemTitle, route.query.itemId],
+  () => [
+    route.query.sellerName,
+    route.query.sellerUserId,
+    route.query.itemTitle,
+    route.query.itemId,
+  ],
   () => {
     ensureConversationFromQuery();
   },
@@ -514,6 +501,11 @@ const goToSellerHome = () => {
     params: {
       name: current.sellerName,
     },
+    query: current.sellerUserId
+      ? {
+          userId: String(current.sellerUserId),
+        }
+      : undefined,
   });
   window.open(resolved.href, "_blank");
 };
@@ -612,6 +604,7 @@ const sendMessage = () => {
 
 onMounted(() => {
   window.addEventListener("click", handleClickOutsideEmojiPanel);
+  loadConversations();
 });
 
 onBeforeUnmount(() => {

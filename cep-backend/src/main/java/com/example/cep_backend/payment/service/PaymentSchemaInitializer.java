@@ -47,6 +47,8 @@ public class PaymentSchemaInitializer {
                     id BIGINT IDENTITY(1, 1) PRIMARY KEY,
                     order_no NVARCHAR(40) NOT NULL UNIQUE,
                     item_id BIGINT NOT NULL,
+                    buyer_user_id BIGINT NULL,
+                    seller_user_id BIGINT NULL,
                     item_title NVARCHAR(120) NOT NULL,
                     amount DECIMAL(10, 2) NOT NULL,
                     cover_photo_url NVARCHAR(500) NULL,
@@ -57,7 +59,9 @@ public class PaymentSchemaInitializer {
                     paid_at DATETIME2 NULL,
                     created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    CONSTRAINT fk_trade_orders_item FOREIGN KEY (item_id) REFERENCES items (id)
+                    CONSTRAINT fk_trade_orders_item FOREIGN KEY (item_id) REFERENCES items (id),
+                    CONSTRAINT fk_trade_orders_buyer FOREIGN KEY (buyer_user_id) REFERENCES users (id),
+                    CONSTRAINT fk_trade_orders_seller FOREIGN KEY (seller_user_id) REFERENCES users (id)
                 )
                 """;
         jdbcTemplate.execute(ddl);

@@ -26,7 +26,10 @@ public class TradeOrderService {
     }
 
     @Transactional
-    public TradeOrderDto createOrder(CreateTradeOrderRequest request) {
+    public TradeOrderDto createOrder(Long buyerUserId, CreateTradeOrderRequest request) {
+        if (buyerUserId == null || buyerUserId <= 0) {
+            throw new BusinessException("登录状态已失效，请重新登录");
+        }
         if (request == null) {
             throw new BusinessException("订单信息无效");
         }
@@ -44,10 +47,17 @@ public class TradeOrderService {
         if (snapshot == null) {
             throw new BusinessException("物品不存在或不可交易");
         }
+        if (snapshot.sellerUserId() == null || snapshot.sellerUserId() <= 0) {
+            throw new BusinessException("物品发布者信息缺失，暂不可下单");
+        }
+        if (snapshot.sellerUserId().equals(buyerUserId)) {
+            throw new BusinessException("不能购买自己发布的物品");
+        }
 
         Long orderId = tradeOrderRepository.createOrder(
                 generateOrderNo(),
                 snapshot,
+                buyerUserId,
                 receiverName,
                 receiverPhone,
                 receiverAddress);

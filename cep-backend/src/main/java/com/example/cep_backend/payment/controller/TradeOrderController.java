@@ -1,5 +1,7 @@
 package com.example.cep_backend.payment.controller;
 
+import com.example.cep_backend.auth.dto.AuthUserDto;
+import com.example.cep_backend.auth.service.AuthService;
 import com.example.cep_backend.common.api.ApiResponse;
 import com.example.cep_backend.payment.dto.CreateTradeOrderRequest;
 import com.example.cep_backend.payment.dto.TradeOrderDto;
@@ -8,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -15,14 +18,19 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/payment/orders")
 public class TradeOrderController {
     private final TradeOrderService tradeOrderService;
+    private final AuthService authService;
 
-    public TradeOrderController(TradeOrderService tradeOrderService) {
+    public TradeOrderController(TradeOrderService tradeOrderService, AuthService authService) {
         this.tradeOrderService = tradeOrderService;
+        this.authService = authService;
     }
 
     @PostMapping
-    public ApiResponse<TradeOrderDto> createOrder(@RequestBody CreateTradeOrderRequest request) {
-        return ApiResponse.ok("订单创建成功", tradeOrderService.createOrder(request));
+    public ApiResponse<TradeOrderDto> createOrder(
+            @RequestHeader("Authorization") String authorization,
+            @RequestBody CreateTradeOrderRequest request) {
+        AuthUserDto user = authService.currentUser(authorization);
+        return ApiResponse.ok("订单创建成功", tradeOrderService.createOrder(user.userId(), request));
     }
 
     @PostMapping("/{orderId}/pay-success")

@@ -3,6 +3,8 @@ package com.example.cep_backend.publish.service;
 import com.example.cep_backend.auth.BusinessException;
 import com.example.cep_backend.publish.dto.PublishItemDto;
 import com.example.cep_backend.publish.dto.PublishItemRequest;
+import com.example.cep_backend.publish.dto.PublishItemUpdateRequest;
+import com.example.cep_backend.publish.dto.PublishOwnedItemDto;
 import com.example.cep_backend.publish.repository.PublishRepository;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,9 @@ import java.util.List;
 @Service
 public class PublishService {
     private static final int MAX_PHOTO_COUNT = 6;
+    private static final String STATUS_PUBLISHED = "PUBLISHED";
+    private static final String STATUS_OFF_SHELF = "OFF_SHELF";
+    private static final String STATUS_DELETED = "DELETED";
 
     private final PublishRepository publishRepository;
 
@@ -68,6 +73,108 @@ public class PublishService {
                 description,
                 photoUrls,
                 now);
+    }
+
+    public List<PublishOwnedItemDto> getMyItems(Long userId) {
+        if (userId == null || userId <= 0) {
+            throw new BusinessException("用户信息无效，请重新登录");
+        }
+        return publishRepository.findMyItems(userId).stream()
+                .map(item -> toOwnedItemDto(item, publishRepository.findPhotoUrlsByItemId(item.id())))
+                .toList();
+    }
+
+    @Transactional
+    public PublishOwnedItemDto updateMyItem(Long userId, Long itemId, PublishItemUpdateRequest request) {
+        if (userId == null || userId <= 0) {
+            throw new BusinessException("用户信息无效，请重新登录");
+        }
+        if (itemId == null || itemId <= 0) {
+            throw new BusinessException("物品信息无效");
+        }
+        if (request == null) {
+            throw new BusinessException("物品参数无效");
+        }
+
+        PublishRepository.PublishOwnedItemBaseRecord existing = publishRepository.findOwnedItem(userId, itemId)
+                .orElseThrow(() -> new BusinessException("物品不存在或无操作权限"));
+        if (STATUS_DELETED.equals(existing.status())) {
+            throw new BusinessException("已删除物品不可编辑");
+        }
+
+        String itemName = validateText(request.name(), "物品名称", 120);
+        String categoryCode = normalizeCategoryCode(request.categoryCode());
+        BigDecimal price = validatePrice(request.price());
+        LocalDate purchaseDate = normalizePurchaseDate(request.purchaseDate());
+        String usageDuration = normalizeOptionalText(request.usageDuration(), "使用时长", 50);
+        String description = normalizeOptionalText(request.description(), "物品描述", 500);
+        List<String> photoUrls = validatePhotoUrls(request.photoUrls());
+
+        Long categoryId = publishRepository.findCategoryIdByCode(categoryCode);
+        if (categoryId == null) {
+            throw new BusinessException("分类不存在，请重新选择");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        publishRepository.updateItemAndDetail(itemId, categoryId, itemName, price, description, purchaseDate,
+                usageDuration, now);
+        publishRepository.replaceItemPhotos(itemId, photoUrls, now);
+
+        PublishRepository.PublishOwnedItemBaseRecord updated = publishRepository.findOwnedItem(userId, itemId)
+                .orElseThrow(() -> new BusinessException("物品不存在或无操作权限"));
+        return toOwnedItemDto(updated, publishRepository.findPhotoUrlsByItemId(itemId));
+    }
+
+    @Transactional
+    public void deleteMyItem(Long userId, Long itemId) {
+        if (userId == null || userId <= 0) {
+            throw new BusinessException("用户信息无效，请重新登录");
+        }
+        if (itemId == null || itemId <= 0) {
+            throw new BusinessException("物品信息无效");
+        }
+        int updated = publishRepository.markDeleted(userId, itemId, LocalDateTime.now());
+        if (updated <= 0) {
+            throw new BusinessException("物品不存在或无操作权限");
+        }
+    }
+
+    @Transactional
+    public PublishOwnedItemDto updateMyItemStatus(Long userId, Long itemId, String status) {
+        if (userId == null || userId <= 0) {
+            throw new BusinessException("用户信息无效，请重新登录");
+        }
+        if (itemId == null || itemId <= 0) {
+            throw new BusinessException("物品信息无效");
+        }
+
+        String normalized = status == null ? "" : status.trim().toUpperCase();
+        if (!STATUS_PUBLISHED.equals(normalized) && !STATUS_OFF_SHELF.equals(normalized)) {
+            throw new BusinessException("状态无效，仅支持 PUBLISHED / OFF_SHELF");
+        }
+
+        int updated = publishRepository.updateStatus(userId, itemId, normalized, LocalDateTime.now());
+        if (updated <= 0) {
+            throw new BusinessException("物品不存在、已删除或无操作权限");
+        }
+        PublishRepository.PublishOwnedItemBaseRecord item = publishRepository.findOwnedItem(userId, itemId)
+                .orElseThrow(() -> new BusinessException("物品不存在或无操作权限"));
+        return toOwnedItemDto(item, publishRepository.findPhotoUrlsByItemId(itemId));
+    }
+
+    private PublishOwnedItemDto toOwnedItemDto(PublishRepository.PublishOwnedItemBaseRecord item,
+            List<String> photoUrls) {
+        return new PublishOwnedItemDto(
+                item.id(),
+                item.name(),
+                item.categoryCode(),
+                item.price(),
+                item.purchaseDate(),
+                item.usageDuration(),
+                item.description(),
+                photoUrls,
+                item.status(),
+                item.createdAt());
     }
 
     private String normalizeCategoryCode(String categoryCode) {

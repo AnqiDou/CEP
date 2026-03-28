@@ -11,7 +11,7 @@
           @click="selectMenu('idle')"
         >
           <el-icon><User /></el-icon>
-          <span>我的闲置</span>
+          <span>我的评价</span>
         </button>
 
         <button
@@ -227,16 +227,16 @@
                 <button
                   type="button"
                   class="pending-btn pending-btn--confirm"
-                  @click="confirmTrade(item.id)"
+                  @click="goPay(item.orderId)"
                 >
-                  确认交易完成
+                  去付款
                 </button>
                 <button
                   type="button"
                   class="pending-btn pending-btn--cancel"
-                  @click="cancelTrade(item.id)"
+                  @click="goToItemDetail(item.itemId)"
                 >
-                  取消交易
+                  查看商品
                 </button>
               </div>
             </article>
@@ -259,15 +259,44 @@
                 <h4 class="section-item__title">{{ item.title }}</h4>
                 <p class="section-item__meta">
                   {{ item.price }} · {{ item.campus }} · {{ item.time }}
+                  <span v-if="selectedMenu === 'trade-published'">
+                    · {{ mapStatusText(item.status) }}
+                  </span>
                 </p>
               </div>
-              <button
-                class="section-item__btn"
-                type="button"
-                @click="goToItemDetail(item.itemId)"
-              >
-                查看详情
-              </button>
+              <div class="section-item__actions">
+                <button
+                  class="section-item__btn"
+                  type="button"
+                  @click="goToItemDetail(item.itemId)"
+                >
+                  查看详情
+                </button>
+                <button
+                  v-if="selectedMenu === 'trade-published'"
+                  class="section-item__btn section-item__btn--edit"
+                  type="button"
+                  @click="openItemEditDialog(item)"
+                >
+                  编辑
+                </button>
+                <button
+                  v-if="selectedMenu === 'trade-published'"
+                  class="section-item__btn section-item__btn--danger"
+                  type="button"
+                  @click="handleDeletePublishedItem(item)"
+                >
+                  删除
+                </button>
+                <button
+                  v-if="selectedMenu === 'trade-published'"
+                  class="section-item__btn section-item__btn--shelf"
+                  type="button"
+                  @click="togglePublishedItemShelf(item)"
+                >
+                  {{ item.status === "OFF_SHELF" ? "上架" : "下架" }}
+                </button>
+              </div>
             </article>
 
             <div v-if="!currentSectionItems.length" class="pending-empty">
@@ -321,12 +350,64 @@
         <el-button type="primary" @click="saveProfile">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="itemEditDialogVisible"
+      title="编辑我发布的物品"
+      width="520px"
+      destroy-on-close
+    >
+      <el-form label-width="86px">
+        <el-form-item label="名称"
+          ><el-input
+            v-model="itemEditForm.name"
+            maxlength="120"
+            show-word-limit
+        /></el-form-item>
+        <el-form-item label="分类"
+          ><el-input
+            v-model="itemEditForm.categoryCode"
+            placeholder="如 digital/book/other"
+        /></el-form-item>
+        <el-form-item label="价格"
+          ><el-input-number
+            v-model="itemEditForm.price"
+            :min="0"
+            :precision="2"
+            :step="1"
+            style="width: 100%"
+        /></el-form-item>
+        <el-form-item label="购买日期"
+          ><el-date-picker
+            v-model="itemEditForm.purchaseDate"
+            type="date"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+        /></el-form-item>
+        <el-form-item label="使用时长"
+          ><el-input v-model="itemEditForm.usageDuration"
+        /></el-form-item>
+        <el-form-item label="描述"
+          ><el-input
+            v-model="itemEditForm.description"
+            type="textarea"
+            :rows="3"
+        /></el-form-item>
+      </el-form>
+      <p v-if="itemEditError" class="edit-error">{{ itemEditError }}</p>
+      <template #footer>
+        <el-button @click="itemEditDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="savePublishedItemEdit"
+          >保存</el-button
+        >
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import { useRouter } from "vue-router";
 import {
   ArrowDown,
@@ -343,16 +424,32 @@ import {
   initAuthSession,
   logout,
 } from "../service/common/authSessionService";
+import {
+  fetchBoughtItems,
+  fetchFavoriteItems,
+  fetchPendingPaymentTrades,
+  fetchProfileOverview,
+  fetchProfileReviews,
+  fetchSoldItems,
+  updateProfileBasic,
+  uploadProfileAvatar,
+} from "../service/profile/profileApiService";
+import {
+  deleteMyPublishItem,
+  fetchMyPublishItems,
+  updateMyPublishItem,
+  updateMyPublishItemStatus,
+} from "../service/publish/publishApiService";
 
 const router = useRouter();
 
 const userInfo = reactive({
   avatar: "",
-  username: "金星焦糖味的柑桔",
+  username: "校园用户",
   fans: 0,
   following: 0,
-  sellerCredit: "极好",
-  buyerCredit: "极好",
+  sellerCredit: "良好",
+  buyerCredit: "良好",
   passwordUpdatedAt: "2026-03-01",
 });
 const tradeMenus = [
@@ -364,129 +461,73 @@ const tradeMenus = [
 const tradeOpen = ref(true);
 const selectedMenu = ref("idle");
 const editDialogVisible = ref(false);
+const itemEditDialogVisible = ref(false);
 const avatarInputRef = ref(null);
 const editError = ref("");
+const selectedAvatarFile = ref(null);
+const itemEditError = ref("");
 const activeReviewTab = ref("all");
 const editForm = reactive({ avatar: "", username: "", password: "" });
+const itemEditForm = reactive({
+  id: null,
+  itemId: null,
+  name: "",
+  categoryCode: "other",
+  price: 0,
+  purchaseDate: "",
+  usageDuration: "",
+  description: "",
+  photoUrls: [],
+});
+const reviewStats = reactive({ total: 0, good: 0, bad: 0 });
+const reviewList = ref([]);
 
 const sectionMap = {
-  idle: { title: "我的闲置" },
+  idle: { title: "我的评价" },
   "pending-trade": { title: "待处理交易" },
   "trade-published": { title: "我发布的" },
   "trade-sold": { title: "我卖出的" },
   "trade-bought": { title: "我买到的" },
   favorite: { title: "我的收藏" },
 };
-const detailMenuKeys = ["trade-published", "trade-sold", "trade-bought"];
+const detailMenuKeys = [
+  "trade-published",
+  "trade-sold",
+  "trade-bought",
+  "favorite",
+];
 const sectionItemMap = {
-  "trade-published": [
-    {
-      id: "published-1",
-      itemId: 201,
-      title: "自用台灯（护眼款）",
-      price: "￥49",
-      campus: "南校区",
-      time: "今天",
-    },
-    {
-      id: "published-2",
-      itemId: 202,
-      title: "英语六级备考资料",
-      price: "￥20",
-      campus: "本部",
-      time: "昨天",
-    },
-  ],
-  "trade-sold": [
-    {
-      id: "sold-1",
-      itemId: 203,
-      title: "二手羽毛球拍",
-      price: "￥68",
-      campus: "东校区",
-      time: "2天前",
-    },
-  ],
-  "trade-bought": [
-    {
-      id: "bought-1",
-      itemId: 204,
-      title: "宿舍收纳柜",
-      price: "￥35",
-      campus: "本部",
-      time: "1周前",
-    },
-  ],
+  "trade-published": [],
+  "trade-sold": [],
+  "trade-bought": [],
+  favorite: [],
 };
+const loadedMenus = reactive({
+  idle: false,
+  "pending-trade": false,
+  "trade-published": false,
+  "trade-sold": false,
+  "trade-bought": false,
+  favorite: false,
+});
 
-const pendingTrades = ref([
-  {
-    id: 1,
-    itemId: 205,
-    title: "罗技机械键盘 K845",
-    partner: "信息学院-陈同学",
-    location: "图书馆南门",
-    time: "今天 18:30",
-    statusText: "待确认",
-  },
-  {
-    id: 2,
-    itemId: 206,
-    title: "高等数学教材（同济版）",
-    partner: "外语学院-赵同学",
-    location: "二食堂门口",
-    time: "明天 12:20",
-    statusText: "待确认",
-  },
-]);
+const pendingTrades = ref([]);
 
-const reviewList = [
-  {
-    id: 1,
-    user: "计算机学院-王同学",
-    time: "2026-03-20",
-    rating: "good",
-    avatar: `data:image/svg+xml;utf8,${encodeURIComponent(
-      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><rect width='80' height='80' rx='40' fill='#93c5fd'/><text x='40' y='47' text-anchor='middle' fill='#1e3a8a' font-size='26'>王</text></svg>"
-    )}`,
-    content: "卖家回复很快，商品描述一致，交易顺利。",
-  },
-  {
-    id: 2,
-    user: "外语学院-李同学",
-    time: "2026-03-15",
-    rating: "good",
-    avatar: `data:image/svg+xml;utf8,${encodeURIComponent(
-      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><rect width='80' height='80' rx='40' fill='#bfdbfe'/><text x='40' y='47' text-anchor='middle' fill='#1e3a8a' font-size='26'>李</text></svg>"
-    )}`,
-    content: "沟通友好，见面交易很准时，体验不错。",
-  },
-  {
-    id: 3,
-    user: "经管学院-周同学",
-    time: "2026-03-10",
-    rating: "bad",
-    avatar: `data:image/svg+xml;utf8,${encodeURIComponent(
-      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><rect width='80' height='80' rx='40' fill='#a5b4fc'/><text x='40' y='47' text-anchor='middle' fill='#1e3a8a' font-size='26'>周</text></svg>"
-    )}`,
-    content: "沟通一般，交易时间有变更，建议提前确认。",
-  },
-];
-const reviewTotal = 34;
-const reviewTabs = [
+const reviewTotal = computed(() => reviewStats.total);
+const reviewTabs = computed(() => [
   { key: "all", label: "全部" },
-  { key: "good", label: "好评 32" },
-  { key: "bad", label: "差评 2" },
-];
+  { key: "good", label: `好评 ${reviewStats.good}` },
+  { key: "bad", label: `差评 ${reviewStats.bad}` },
+]);
 
 const filteredReviewList = computed(() => {
   if (activeReviewTab.value === "good") {
-    return reviewList.filter((item) => item.rating === "good");
+    return reviewList.value.filter((item) => item.rating === "good");
   }
   if (activeReviewTab.value === "bad") {
-    return reviewList.filter((item) => item.rating === "bad");
+    return reviewList.value.filter((item) => item.rating === "bad");
   }
-  return reviewList;
+  return reviewList.value;
 });
 
 const currentSection = computed(
@@ -496,16 +537,23 @@ const currentSectionItems = computed(
   () => sectionItemMap[selectedMenu.value] || []
 );
 
-const selectMenu = (key) => {
+const selectMenu = async (key) => {
   selectedMenu.value = key;
+  try {
+    await loadMenuData(key, key === "idle");
+  } catch (error) {
+    ElMessage.error(error.message || "数据加载失败");
+  }
 };
-const confirmTrade = (id) => {
-  pendingTrades.value = pendingTrades.value.filter((item) => item.id !== id);
-  ElMessage.success("已确认交易完成（仅前端演示）");
-};
-const cancelTrade = (id) => {
-  pendingTrades.value = pendingTrades.value.filter((item) => item.id !== id);
-  ElMessage.warning("已取消交易（仅前端演示）");
+const goPay = (orderId) => {
+  if (!orderId) {
+    ElMessage.warning("订单信息无效");
+    return;
+  }
+  router.push({
+    name: "payment-method",
+    query: { orderId: String(orderId) },
+  });
 };
 const goToItemDetail = (id) => {
   const resolved = router.resolve(`/item/${id}`);
@@ -518,6 +566,7 @@ const openEditDialog = () => {
   editForm.avatar = userInfo.avatar;
   editForm.username = userInfo.username;
   editForm.password = "";
+  selectedAvatarFile.value = null;
   editError.value = "";
   editDialogVisible.value = true;
 };
@@ -527,6 +576,7 @@ const triggerAvatarSelect = () => {
 const handleAvatarChange = (event) => {
   const file = event.target.files?.[0];
   if (!file) return;
+  selectedAvatarFile.value = file;
   const reader = new FileReader();
   reader.onload = () => {
     editForm.avatar = typeof reader.result === "string" ? reader.result : "";
@@ -534,7 +584,7 @@ const handleAvatarChange = (event) => {
   reader.readAsDataURL(file);
   event.target.value = "";
 };
-const saveProfile = () => {
+const saveProfile = async () => {
   const username = editForm.username.trim();
   if (!username) {
     editError.value = "用户名不能为空";
@@ -544,17 +594,253 @@ const saveProfile = () => {
     editError.value = "新密码至少 6 位";
     return;
   }
-  userInfo.username = username;
-  if (editForm.avatar) userInfo.avatar = editForm.avatar;
-  if (editForm.password)
-    userInfo.passwordUpdatedAt = new Date().toISOString().slice(0, 10);
-  editDialogVisible.value = false;
-  ElMessage.success("资料已更新");
+  editError.value = "";
+  try {
+    let avatarUrl = "";
+    if (selectedAvatarFile.value) {
+      const uploadRes = await uploadProfileAvatar(selectedAvatarFile.value);
+      avatarUrl = uploadRes?.data?.url || "";
+    }
+    const responseBody = await updateProfileBasic({
+      username,
+      password: editForm.password,
+      avatar: avatarUrl,
+    });
+    const overview = responseBody?.data || {};
+    userInfo.username = overview.username || username;
+    userInfo.avatar = overview.avatar || userInfo.avatar;
+    userInfo.sellerCredit = overview.sellerCredit || userInfo.sellerCredit;
+    userInfo.buyerCredit = overview.buyerCredit || userInfo.buyerCredit;
+    userInfo.fans = Number(overview.fans || 0);
+    userInfo.following = Number(overview.following || 0);
+    if (authState.user) {
+      authState.user.username = userInfo.username;
+    }
+    if (editForm.password) {
+      userInfo.passwordUpdatedAt = new Date().toISOString().slice(0, 10);
+    }
+    editDialogVisible.value = false;
+    ElMessage.success("资料已更新");
+  } catch (error) {
+    editError.value = error.message || "资料更新失败";
+  }
 };
 
-const syncUserInfo = () => {
-  if (!authState.user) return;
-  userInfo.username = authState.user.username || "校园用户";
+const toPrice = (value) => {
+  const numberValue = Number(value || 0);
+  const fixed = Number.isFinite(numberValue) ? numberValue.toFixed(2) : "0.00";
+  return fixed.endsWith(".00") ? `￥${fixed.slice(0, -3)}` : `￥${fixed}`;
+};
+
+const mapTradeItem = (item) => ({
+  id: item.id,
+  itemId: item.itemId || item.id,
+  title: item.title || item.name || "未命名物品",
+  price: toPrice(item.price),
+  campus: item.campus || "校区未填写",
+  time: item.time || "",
+  photoUrl: item.photoUrl || "",
+  status: item.status || "PUBLISHED",
+  categoryCode: item.categoryCode || "other",
+  purchaseDate: item.purchaseDate || "",
+  usageDuration: item.usageDuration || "",
+  description: item.description || "",
+  photoUrls: Array.isArray(item.photoUrls) ? item.photoUrls : [],
+});
+
+const mapStatusText = (status) => {
+  if (status === "OFF_SHELF") {
+    return "已下架";
+  }
+  if (status === "DELETED") {
+    return "已删除";
+  }
+  return "已上架";
+};
+
+const reloadMyPublishedItems = async () => {
+  const publishedRes = await fetchMyPublishItems();
+  sectionItemMap["trade-published"] = (publishedRes?.data || []).map(
+    mapTradeItem
+  );
+  loadedMenus["trade-published"] = true;
+};
+
+const openItemEditDialog = (item) => {
+  itemEditForm.id = item.id;
+  itemEditForm.itemId = item.itemId;
+  itemEditForm.name = item.title || "";
+  itemEditForm.categoryCode = item.categoryCode || "other";
+  itemEditForm.price = Number(
+    item.price?.replace?.("￥", "") || item.price || 0
+  );
+  itemEditForm.purchaseDate = item.purchaseDate || "";
+  itemEditForm.usageDuration = item.usageDuration || "";
+  itemEditForm.description = item.description || "";
+  itemEditForm.photoUrls = Array.isArray(item.photoUrls)
+    ? [...item.photoUrls]
+    : [];
+  itemEditError.value = "";
+  itemEditDialogVisible.value = true;
+};
+
+const savePublishedItemEdit = async () => {
+  if (!itemEditForm.itemId) {
+    itemEditError.value = "物品信息无效";
+    return;
+  }
+  if (!itemEditForm.name.trim()) {
+    itemEditError.value = "物品名称不能为空";
+    return;
+  }
+  if (Number(itemEditForm.price) < 0) {
+    itemEditError.value = "价格不能小于 0";
+    return;
+  }
+
+  itemEditError.value = "";
+  try {
+    await updateMyPublishItem(itemEditForm.itemId, {
+      name: itemEditForm.name.trim(),
+      categoryCode: itemEditForm.categoryCode || "other",
+      price: Number(Number(itemEditForm.price || 0).toFixed(2)),
+      purchaseDate: itemEditForm.purchaseDate || null,
+      usageDuration: itemEditForm.usageDuration || "",
+      description: itemEditForm.description || "",
+      photoUrls: itemEditForm.photoUrls,
+    });
+    await reloadMyPublishedItems();
+    itemEditDialogVisible.value = false;
+    ElMessage.success("物品已更新");
+  } catch (error) {
+    itemEditError.value = error.message || "更新失败";
+  }
+};
+
+const handleDeletePublishedItem = async (item) => {
+  try {
+    await ElMessageBox.confirm(
+      `确认删除「${item.title}」吗？删除后不可恢复。`,
+      "删除确认",
+      {
+        confirmButtonText: "确认删除",
+        cancelButtonText: "取消",
+        type: "warning",
+      }
+    );
+    await deleteMyPublishItem(item.itemId);
+    await reloadMyPublishedItems();
+    ElMessage.success("已删除");
+  } catch (error) {
+    if (error === "cancel" || error === "close") {
+      return;
+    }
+    ElMessage.error(error.message || "删除失败");
+  }
+};
+
+const togglePublishedItemShelf = async (item) => {
+  const targetStatus = item.status === "OFF_SHELF" ? "PUBLISHED" : "OFF_SHELF";
+  try {
+    await updateMyPublishItemStatus(item.itemId, targetStatus);
+    await reloadMyPublishedItems();
+    ElMessage.success(targetStatus === "PUBLISHED" ? "已上架" : "已下架");
+  } catch (error) {
+    ElMessage.error(error.message || "操作失败");
+  }
+};
+
+const applyOverview = (overviewRes) => {
+  const overview = overviewRes?.data || {};
+  userInfo.avatar = overview.avatar || "";
+  userInfo.username =
+    overview.username || authState.user?.username || "校园用户";
+  userInfo.fans = Number(overview.fans || 0);
+  userInfo.following = Number(overview.following || 0);
+  userInfo.sellerCredit = overview.sellerCredit || "良好";
+  userInfo.buyerCredit = overview.buyerCredit || "良好";
+};
+
+const applyReviews = (reviewsRes) => {
+  const reviewSummary = reviewsRes?.data || {};
+  reviewStats.total = Number(reviewSummary.total || 0);
+  reviewStats.good = Number(reviewSummary.goodCount || 0);
+  reviewStats.bad = Number(reviewSummary.badCount || 0);
+  reviewList.value = (reviewSummary.reviews || []).map((item) => ({
+    id: item.id,
+    user: item.user || "校园用户",
+    time: item.time || "",
+    rating: item.rating === "bad" ? "bad" : "good",
+    avatar: item.avatar || "",
+    content: item.content || "",
+  }));
+};
+
+const loadOverview = async () => {
+  const overviewRes = await fetchProfileOverview();
+  applyOverview(overviewRes);
+};
+
+const loadIdleData = async () => {
+  const reviewsRes = await fetchProfileReviews("all");
+  applyReviews(reviewsRes);
+  loadedMenus.idle = true;
+};
+
+const loadPendingTrades = async () => {
+  const pendingRes = await fetchPendingPaymentTrades();
+  pendingTrades.value = (pendingRes?.data || []).map((item) => ({
+    id: item.id,
+    orderId: item.orderId,
+    itemId: item.itemId,
+    title: item.title || "未命名物品",
+    partner: item.partner || "校园用户",
+    location: item.location || "未填写",
+    time: item.time || "",
+    statusText: item.statusText || "待付款",
+  }));
+  loadedMenus["pending-trade"] = true;
+};
+
+const loadMenuData = async (menuKey, force = false) => {
+  if (!force && loadedMenus[menuKey]) {
+    return;
+  }
+
+  if (menuKey === "idle") {
+    await loadIdleData();
+    return;
+  }
+
+  if (menuKey === "pending-trade") {
+    await loadPendingTrades();
+    return;
+  }
+
+  if (menuKey === "trade-published") {
+    await reloadMyPublishedItems();
+    return;
+  }
+
+  if (menuKey === "trade-sold") {
+    const soldRes = await fetchSoldItems();
+    sectionItemMap["trade-sold"] = (soldRes?.data || []).map(mapTradeItem);
+    loadedMenus["trade-sold"] = true;
+    return;
+  }
+
+  if (menuKey === "trade-bought") {
+    const boughtRes = await fetchBoughtItems();
+    sectionItemMap["trade-bought"] = (boughtRes?.data || []).map(mapTradeItem);
+    loadedMenus["trade-bought"] = true;
+    return;
+  }
+
+  if (menuKey === "favorite") {
+    const favoritesRes = await fetchFavoriteItems();
+    sectionItemMap.favorite = (favoritesRes?.data || []).map(mapTradeItem);
+    loadedMenus.favorite = true;
+  }
 };
 
 const handleLogout = async () => {
@@ -569,12 +855,19 @@ const handleLogout = async () => {
 };
 
 onMounted(async () => {
+  selectedMenu.value = "idle";
+  activeReviewTab.value = "all";
   await initAuthSession();
   if (!authState.user) {
     router.push("/");
     return;
   }
-  syncUserInfo();
+  try {
+    await loadOverview();
+    await loadMenuData(selectedMenu.value, true);
+  } catch (error) {
+    ElMessage.error(error.message || "个人中心加载失败");
+  }
 });
 </script>
 
@@ -1011,6 +1304,13 @@ onMounted(async () => {
   color: #6b7280;
   font-size: 12px;
 }
+.section-item__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
 .section-item__btn {
   border: none;
   border-radius: 999px;
@@ -1021,6 +1321,15 @@ onMounted(async () => {
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 6px 14px rgba(37, 99, 235, 0.3);
+}
+.section-item__btn--edit {
+  background: linear-gradient(135deg, #0ea5e9, #3b82f6);
+}
+.section-item__btn--danger {
+  background: linear-gradient(135deg, #ef4444, #f87171);
+}
+.section-item__btn--shelf {
+  background: linear-gradient(135deg, #16a34a, #22c55e);
 }
 .section-head {
   display: flex;
