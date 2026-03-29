@@ -12,10 +12,13 @@ import PaymentMethod from "../pages/PaymentMethod.vue";
 import WechatPay from "../pages/WechatPay.vue";
 import PaymentResult from "../pages/PaymentResult.vue";
 import TradeReview from "../pages/TradeReview.vue";
+import AdminDashboard from "../pages/AdminDashboard.vue";
 import {
   authState,
   initAuthSession,
 } from "../service/common/authSessionService";
+
+const ADMIN_EMAIL = "3299166215@qq.com";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -29,6 +32,9 @@ const router = createRouter({
       path: "/profile",
       name: "profile",
       component: Profile,
+      meta: {
+        requiresAuth: true,
+      },
     },
     {
       path: "/publish",
@@ -85,11 +91,37 @@ const router = createRouter({
       name: "trade-review",
       component: TradeReview,
     },
+    {
+      path: "/admin",
+      name: "admin-dashboard",
+      component: AdminDashboard,
+      meta: {
+        requiresAuth: true,
+        requiresAdmin: true,
+      },
+    },
   ],
 });
 
 router.beforeEach(async (to) => {
   await initAuthSession();
+
+  const currentEmail = (authState.user?.email || "").trim().toLowerCase();
+  const isAdmin = currentEmail === ADMIN_EMAIL;
+
+  if (isAdmin && to.name !== "admin-dashboard") {
+    return { name: "admin-dashboard" };
+  }
+
+  if (to.meta?.requiresAuth && !authState.user) {
+    return { name: "home" };
+  }
+
+  if (to.meta?.requiresAdmin) {
+    if (currentEmail !== ADMIN_EMAIL) {
+      return { name: "home" };
+    }
+  }
 
   if (to.name === "profile" && !authState.user) {
     return { name: "home" };

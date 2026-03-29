@@ -520,6 +520,7 @@ import {
 } from "../service/home/homeApiService";
 
 const router = useRouter();
+const ADMIN_EMAIL = "3299166215@qq.com";
 const keyword = ref("");
 const searchedKeyword = ref("");
 const authModalType = ref("");
@@ -786,6 +787,11 @@ const goToProfile = () => {
     openLoginModal();
     return;
   }
+  const currentEmail = (authState.user?.email || "").trim().toLowerCase();
+  if (currentEmail === ADMIN_EMAIL) {
+    router.push("/admin");
+    return;
+  }
   router.push("/profile");
 };
 
@@ -997,6 +1003,9 @@ const submitLogin = async () => {
     saveAuthSession(responseBody);
     ElMessage.success("登录成功");
     closeAuthModal();
+    if (email.toLowerCase() === ADMIN_EMAIL) {
+      router.push("/admin");
+    }
   } catch (error) {
     loginError.value = error.message || "登录失败";
   }
