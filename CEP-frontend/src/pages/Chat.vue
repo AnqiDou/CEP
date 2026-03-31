@@ -3,9 +3,7 @@
     <main class="chat-main card">
       <aside class="session-panel">
         <header class="session-panel__header">
-          <p class="session-panel__kicker">Campus Messenger</p>
           <h2 class="session-panel__title">消息</h2>
-          <p class="session-panel__subtitle">柔和高效地管理你的校园会话</p>
         </header>
 
         <div class="session-filters">
@@ -261,7 +259,6 @@
             <div class="empty-bubble"></div>
           </div>
           <h3 class="conversation-empty__title">尚未选择任何联系人</h3>
-          <p class="conversation-empty__desc">快点左侧列表聊起来吧～</p>
         </section>
       </section>
     </main>
@@ -774,7 +771,9 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .chat-page {
+  height: 100vh;
   min-height: 100vh;
+  overflow: hidden;
   background: #f5f7fb;
   color: #1f2937;
 }
@@ -782,7 +781,8 @@ onBeforeUnmount(() => {
 .chat-main {
   max-width: 1420px;
   margin: 0 auto;
-  min-height: 100vh;
+  height: 100%;
+  min-height: 0;
   display: grid;
   grid-template-columns: 360px minmax(0, 1fr);
   gap: 18px;
@@ -796,7 +796,8 @@ onBeforeUnmount(() => {
 .session-panel {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100%;
+  min-height: 0;
   border-radius: 26px;
   background: linear-gradient(160deg, #ffffff 0%, #f8f6ff 100%);
   box-shadow: 0 12px 30px rgba(142, 126, 229, 0.14);
@@ -854,7 +855,7 @@ onBeforeUnmount(() => {
 .session-list {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow-y: hidden;
   padding: 0 12px 12px;
 }
 
@@ -1000,7 +1001,8 @@ onBeforeUnmount(() => {
 }
 
 .conversation-panel {
-  min-height: 100vh;
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   border-radius: 26px;
@@ -1374,8 +1376,15 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1080px) {
+  .chat-page {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
   .chat-main {
     grid-template-columns: 1fr;
+    height: auto;
   }
 
   .session-panel,

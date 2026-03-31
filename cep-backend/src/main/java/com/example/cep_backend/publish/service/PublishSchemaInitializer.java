@@ -8,45 +8,66 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class PublishSchemaInitializer {
-    private static final Logger log = LoggerFactory.getLogger(PublishSchemaInitializer.class);
+        private static final Logger log = LoggerFactory.getLogger(PublishSchemaInitializer.class);
 
-    private final JdbcTemplate jdbcTemplate;
+        private final JdbcTemplate jdbcTemplate;
 
-    public PublishSchemaInitializer(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
-    }
-
-    @PostConstruct
-    public void ensurePublishSchema() {
-        jdbcTemplate.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS publisher_user_id BIGINT NULL");
-
-        jdbcTemplate.execute("""
-                UPDATE i
-                SET i.publisher_user_id = d.publisher_user_id
-                FROM items i
-                INNER JOIN item_details d ON d.item_id = i.id
-                WHERE i.publisher_user_id IS NULL
-                  AND d.publisher_user_id IS NOT NULL;
-                """);
-
-        Integer fkCount = jdbcTemplate.queryForObject(
-                """
-                        SELECT COUNT(1)
-                        FROM information_schema.table_constraints
-                        WHERE constraint_schema = DATABASE()
-                          AND table_name = 'items'
-                          AND constraint_name = 'fk_items_publisher'
-                          AND constraint_type = 'FOREIGN KEY'
-                        """,
-                Integer.class);
-        if (fkCount == null || fkCount == 0) {
-            jdbcTemplate.execute(
-                    "ALTER TABLE items ADD CONSTRAINT fk_items_publisher FOREIGN KEY (publisher_user_id) REFERENCES users (id)");
+        public PublishSchemaInitializer(JdbcTemplate jdbcTemplate) {
+                this.jdbcTemplate = jdbcTemplate;
         }
 
-        jdbcTemplate.execute(
-                "CREATE INDEX IF NOT EXISTS idx_items_publisher ON items (publisher_user_id, created_at DESC)");
+        @PostConstruct
+        public void ensurePublishSchema() {
+                Integer columnCount = jdbcTemplate.queryForObject(
+                                """
+                                                SELECT COUNT(1)
+                                                FROM information_schema.columns
+                                                WHERE table_schema = DATABASE()
+                                                  AND table_name = 'items'
+                                                  AND column_name = 'publisher_user_id'
+                                                """,
+                                Integer.class);
+                if (columnCount == null || columnCount == 0) {
+                        jdbcTemplate.execute("ALTER TABLE items ADD COLUMN publisher_user_id BIGINT NULL");
+                }
 
-        log.info("Publish schema ensured: items.publisher_user_id");
-    }
+                jdbcTemplate.execute("""
+                                UPDATE items i
+                                INNER JOIN item_details d ON d.item_id = i.id
+                                SET i.publisher_user_id = d.publisher_user_id
+                                WHERE i.publisher_user_id IS NULL
+                                  AND d.publisher_user_id IS NOT NULL
+                                """);
+
+                Integer fkCount = jdbcTemplate.queryForObject(
+                                """
+                                                SELECT COUNT(1)
+                                                FROM information_schema.table_constraints
+                                                WHERE constraint_schema = DATABASE()
+                                                  AND table_name = 'items'
+                                                  AND constraint_name = 'fk_items_publisher'
+                                                  AND constraint_type = 'FOREIGN KEY'
+                                                """,
+                                Integer.class);
+                if (fkCount == null || fkCount == 0) {
+                        jdbcTemplate.execute(
+                                        "ALTER TABLE items ADD CONSTRAINT fk_items_publisher FOREIGN KEY (publisher_user_id) REFERENCES users (id)");
+                }
+
+                Integer indexCount = jdbcTemplate.queryForObject(
+                                """
+                                                SELECT COUNT(1)
+                                                FROM information_schema.statistics
+                                                WHERE table_schema = DATABASE()
+                                                  AND table_name = 'items'
+                                                  AND index_name = 'idx_items_publisher'
+                                                """,
+                                Integer.class);
+                if (indexCount == null || indexCount == 0) {
+                        jdbcTemplate.execute(
+                                        "CREATE INDEX idx_items_publisher ON items (publisher_user_id, created_at)");
+                }
+
+                log.info("Publish schema ensured: items.publisher_user_id");
+        }
 }

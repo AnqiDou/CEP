@@ -108,7 +108,8 @@ body,
 }
 
 .chat-page::before {
-  content: "💬";
+  content: none;
+  display: none;
 }
 
 .other-profile-page::before {

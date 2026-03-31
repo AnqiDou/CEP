@@ -146,341 +146,374 @@
 
     <div v-if="isAuthModalVisible" class="login-modal-mask">
       <section class="login-modal" @click.stop>
-        <div class="login-modal__header">
-          <div>
-            <h3 class="login-modal__title">{{ authModalTitle }}</h3>
-            <p class="login-modal__subtitle">{{ authModalSubtitle }}</p>
+        <div class="login-modal__panel">
+          <div class="login-modal__header">
+            <div>
+              <h3 class="login-modal__title">{{ authModalTitle }}</h3>
+              <p class="login-modal__subtitle">{{ authModalSubtitle }}</p>
+            </div>
+            <button class="login-modal__close" @click="closeAuthModal">
+              ×
+            </button>
           </div>
-          <button class="login-modal__close" @click="closeAuthModal">×</button>
+
+          <form
+            v-if="authModalType === 'login'"
+            class="login-form"
+            method="post"
+            autocomplete="on"
+            @submit.prevent="submitLogin"
+          >
+            <section class="login-form__group">
+              <label class="login-form__field">
+                <span class="login-form__label">邮箱</span>
+                <input
+                  v-model="loginForm.email"
+                  class="login-form__input"
+                  name="username"
+                  type="email"
+                  placeholder="请输入邮箱"
+                  autocomplete="username"
+                />
+              </label>
+
+              <label class="login-form__field">
+                <span class="login-form__label">密码</span>
+                <input
+                  v-model="loginForm.password"
+                  class="login-form__input"
+                  name="password"
+                  type="password"
+                  placeholder="请输入密码"
+                  autocomplete="current-password"
+                />
+              </label>
+            </section>
+
+            <section class="login-form__group login-form__group--action">
+              <p v-if="loginError" class="login-form__error">
+                {{ loginError }}
+              </p>
+              <p v-if="loginSuccess" class="login-form__success">
+                {{ loginSuccess }}
+              </p>
+
+              <label class="agreement-check">
+                <input v-model="loginAgree" type="checkbox" />
+                <span>
+                  我已阅读并同意
+                  <a href="/terms" target="_blank" rel="noopener noreferrer"
+                    >《用户条款》</a
+                  >
+                  与
+                  <a href="/privacy" target="_blank" rel="noopener noreferrer"
+                    >《隐私协议》</a
+                  >
+                </span>
+              </label>
+
+              <button type="submit" class="primary-btn login-form__submit">
+                登录
+              </button>
+
+              <p class="login-form__hint">
+                <button
+                  type="button"
+                  class="login-form__switch"
+                  @click="switchToForgotPassword"
+                >
+                  忘记密码
+                </button>
+              </p>
+
+              <p class="login-form__hint">
+                还未注册？
+                <button
+                  type="button"
+                  class="login-form__switch"
+                  @click="switchToRegister"
+                >
+                  去注册
+                </button>
+              </p>
+            </section>
+          </form>
+
+          <form
+            v-else-if="authModalType === 'register-verify'"
+            class="login-form"
+          >
+            <section class="login-form__group">
+              <label class="login-form__field">
+                <span class="login-form__label">邮箱</span>
+                <div class="login-form__code-row">
+                  <input
+                    v-model="registerForm.email"
+                    class="login-form__input"
+                    type="email"
+                    placeholder="请输入邮箱"
+                    @input="onRegisterEmailInput"
+                  />
+                  <button
+                    type="button"
+                    class="ghost-btn login-form__code-btn"
+                    :disabled="isSendingCode || codeCountdown > 0"
+                    @click="sendRegisterCode"
+                  >
+                    {{ sendCodeButtonText }}
+                  </button>
+                </div>
+              </label>
+
+              <label class="login-form__field">
+                <span class="login-form__label">验证码</span>
+                <div class="login-form__code-row">
+                  <input
+                    v-model="registerForm.code"
+                    class="login-form__input"
+                    type="text"
+                    placeholder="请输入6位数字验证码"
+                    maxlength="6"
+                    @input="onRegisterCodeInput"
+                  />
+                  <button
+                    type="button"
+                    class="ghost-btn login-form__code-btn"
+                    @click="goRegisterProfileStep"
+                  >
+                    校验验证码
+                  </button>
+                </div>
+              </label>
+            </section>
+
+            <section class="login-form__group login-form__group--action">
+              <p v-if="registerError" class="login-form__error">
+                {{ registerError }}
+              </p>
+
+              <p class="login-form__hint">
+                已有账号？
+                <button
+                  type="button"
+                  class="login-form__switch"
+                  @click="switchToLogin"
+                >
+                  去登录
+                </button>
+              </p>
+            </section>
+          </form>
+
+          <form
+            v-else-if="authModalType === 'register-profile'"
+            class="login-form"
+          >
+            <section class="login-form__group">
+              <label class="login-form__field">
+                <span class="login-form__label">用户名（选填）</span>
+                <input
+                  v-model="registerForm.username"
+                  class="login-form__input"
+                  type="text"
+                  placeholder="请输入用户名（可留空）"
+                />
+              </label>
+
+              <label class="login-form__field">
+                <span class="login-form__label">密码</span>
+                <input
+                  v-model="registerForm.password"
+                  class="login-form__input"
+                  type="password"
+                  placeholder="8-20位，需包含数字和字母"
+                />
+              </label>
+
+              <label class="login-form__field">
+                <span class="login-form__label">确认密码</span>
+                <input
+                  v-model="registerForm.confirmPassword"
+                  class="login-form__input"
+                  type="password"
+                  placeholder="请再次输入密码"
+                />
+              </label>
+            </section>
+
+            <section class="login-form__group login-form__group--action">
+              <p v-if="registerError" class="login-form__error">
+                {{ registerError }}
+              </p>
+              <p v-if="registerSuccess" class="login-form__success">
+                {{ registerSuccess }}
+              </p>
+
+              <label class="agreement-check">
+                <input v-model="registerAgree" type="checkbox" />
+                <span>
+                  我已阅读并同意
+                  <a href="/terms" target="_blank" rel="noopener noreferrer"
+                    >《用户条款》</a
+                  >
+                  与
+                  <a href="/privacy" target="_blank" rel="noopener noreferrer"
+                    >《隐私协议》</a
+                  >
+                </span>
+              </label>
+
+              <button
+                type="button"
+                class="primary-btn login-form__submit"
+                @click="submitRegister"
+              >
+                注册
+              </button>
+
+              <p class="login-form__hint">
+                <button
+                  type="button"
+                  class="login-form__switch"
+                  @click="backToRegisterVerify"
+                >
+                  返回上一步
+                </button>
+              </p>
+
+              <p class="login-form__hint">
+                已有账号？
+                <button
+                  type="button"
+                  class="login-form__switch"
+                  @click="switchToLogin"
+                >
+                  去登录
+                </button>
+              </p>
+            </section>
+          </form>
+
+          <form
+            v-else-if="authModalType === 'forgot-verify'"
+            class="login-form"
+          >
+            <section class="login-form__group">
+              <label class="login-form__field">
+                <span class="login-form__label">邮箱</span>
+                <div class="login-form__code-row">
+                  <input
+                    v-model="forgotForm.email"
+                    class="login-form__input"
+                    type="email"
+                    placeholder="请输入已注册邮箱"
+                    @input="onForgotEmailInput"
+                  />
+                  <button
+                    type="button"
+                    class="ghost-btn login-form__code-btn"
+                    :disabled="isSendingForgotCode || forgotCodeCountdown > 0"
+                    @click="sendForgotCode"
+                  >
+                    {{ sendForgotCodeButtonText }}
+                  </button>
+                </div>
+              </label>
+
+              <label class="login-form__field">
+                <span class="login-form__label">验证码</span>
+                <div class="login-form__code-row">
+                  <input
+                    v-model="forgotForm.code"
+                    class="login-form__input"
+                    type="text"
+                    placeholder="请输入6位数字验证码"
+                    maxlength="6"
+                    @input="onForgotCodeInput"
+                  />
+                  <button
+                    type="button"
+                    class="ghost-btn login-form__code-btn"
+                    @click="goForgotResetStep"
+                  >
+                    校验验证码
+                  </button>
+                </div>
+              </label>
+            </section>
+
+            <section class="login-form__group login-form__group--action">
+              <p v-if="forgotError" class="login-form__error">
+                {{ forgotError }}
+              </p>
+              <p v-if="forgotSuccess" class="login-form__success">
+                {{ forgotSuccess }}
+              </p>
+
+              <p class="login-form__hint">
+                已想起密码？
+                <button
+                  type="button"
+                  class="login-form__switch"
+                  @click="switchToLogin"
+                >
+                  返回登录
+                </button>
+              </p>
+            </section>
+          </form>
+
+          <form v-else-if="authModalType === 'forgot-reset'" class="login-form">
+            <section class="login-form__group">
+              <label class="login-form__field">
+                <span class="login-form__label">新密码</span>
+                <input
+                  v-model="forgotForm.password"
+                  class="login-form__input"
+                  type="password"
+                  placeholder="8-20位，需包含数字和字母"
+                />
+              </label>
+
+              <label class="login-form__field">
+                <span class="login-form__label">确认新密码</span>
+                <input
+                  v-model="forgotForm.confirmPassword"
+                  class="login-form__input"
+                  type="password"
+                  placeholder="请再次输入新密码"
+                />
+              </label>
+            </section>
+
+            <section class="login-form__group login-form__group--action">
+              <p v-if="forgotError" class="login-form__error">
+                {{ forgotError }}
+              </p>
+              <p v-if="forgotSuccess" class="login-form__success">
+                {{ forgotSuccess }}
+              </p>
+
+              <button
+                type="button"
+                class="primary-btn login-form__submit"
+                @click="submitResetPassword"
+              >
+                重置密码
+              </button>
+
+              <p class="login-form__hint">
+                <button
+                  type="button"
+                  class="login-form__switch"
+                  @click="backToForgotVerify"
+                >
+                  返回上一步
+                </button>
+              </p>
+            </section>
+          </form>
         </div>
-
-        <form
-          v-if="authModalType === 'login'"
-          class="login-form"
-          method="post"
-          autocomplete="on"
-          @submit.prevent="submitLogin"
-        >
-          <label class="login-form__field">
-            <span class="login-form__label">邮箱</span>
-            <input
-              v-model="loginForm.email"
-              class="login-form__input"
-              name="username"
-              type="email"
-              placeholder="请输入邮箱"
-              autocomplete="username"
-            />
-          </label>
-
-          <label class="login-form__field">
-            <span class="login-form__label">密码</span>
-            <input
-              v-model="loginForm.password"
-              class="login-form__input"
-              name="password"
-              type="password"
-              placeholder="请输入密码"
-              autocomplete="current-password"
-            />
-          </label>
-
-          <p v-if="loginError" class="login-form__error">{{ loginError }}</p>
-          <p v-if="loginSuccess" class="login-form__success">
-            {{ loginSuccess }}
-          </p>
-
-          <label class="agreement-check">
-            <input v-model="loginAgree" type="checkbox" />
-            <span>
-              我已阅读并同意
-              <a href="/terms" target="_blank" rel="noopener noreferrer"
-                >《用户条款》</a
-              >
-              与
-              <a href="/privacy" target="_blank" rel="noopener noreferrer"
-                >《隐私协议》</a
-              >
-            </span>
-          </label>
-
-          <button type="submit" class="primary-btn login-form__submit">
-            登录
-          </button>
-
-          <p class="login-form__hint">
-            <button
-              type="button"
-              class="login-form__switch"
-              @click="switchToForgotPassword"
-            >
-              忘记密码
-            </button>
-          </p>
-
-          <p class="login-form__hint">
-            还未注册？
-            <button
-              type="button"
-              class="login-form__switch"
-              @click="switchToRegister"
-            >
-              去注册
-            </button>
-          </p>
-        </form>
-
-        <form
-          v-else-if="authModalType === 'register-verify'"
-          class="login-form"
-        >
-          <label class="login-form__field">
-            <span class="login-form__label">邮箱</span>
-            <div class="login-form__code-row">
-              <input
-                v-model="registerForm.email"
-                class="login-form__input"
-                type="email"
-                placeholder="请输入邮箱"
-                @input="onRegisterEmailInput"
-              />
-              <button
-                type="button"
-                class="ghost-btn login-form__code-btn"
-                :disabled="isSendingCode || codeCountdown > 0"
-                @click="sendRegisterCode"
-              >
-                {{ sendCodeButtonText }}
-              </button>
-            </div>
-          </label>
-
-          <label class="login-form__field">
-            <span class="login-form__label">验证码</span>
-            <div class="login-form__code-row">
-              <input
-                v-model="registerForm.code"
-                class="login-form__input"
-                type="text"
-                placeholder="请输入6位数字验证码"
-                maxlength="6"
-                @input="onRegisterCodeInput"
-              />
-              <button
-                type="button"
-                class="ghost-btn login-form__code-btn"
-                @click="goRegisterProfileStep"
-              >
-                校验验证码
-              </button>
-            </div>
-          </label>
-
-          <p v-if="registerError" class="login-form__error">
-            {{ registerError }}
-          </p>
-
-          <p class="login-form__hint">
-            已有账号？
-            <button
-              type="button"
-              class="login-form__switch"
-              @click="switchToLogin"
-            >
-              去登录
-            </button>
-          </p>
-        </form>
-
-        <form
-          v-else-if="authModalType === 'register-profile'"
-          class="login-form"
-        >
-          <label class="login-form__field">
-            <span class="login-form__label">用户名（选填）</span>
-            <input
-              v-model="registerForm.username"
-              class="login-form__input"
-              type="text"
-              placeholder="请输入用户名（可留空）"
-            />
-          </label>
-
-          <label class="login-form__field">
-            <span class="login-form__label">密码</span>
-            <input
-              v-model="registerForm.password"
-              class="login-form__input"
-              type="password"
-              placeholder="8-20位，需包含数字和字母"
-            />
-          </label>
-
-          <label class="login-form__field">
-            <span class="login-form__label">确认密码</span>
-            <input
-              v-model="registerForm.confirmPassword"
-              class="login-form__input"
-              type="password"
-              placeholder="请再次输入密码"
-            />
-          </label>
-
-          <p v-if="registerError" class="login-form__error">
-            {{ registerError }}
-          </p>
-          <p v-if="registerSuccess" class="login-form__success">
-            {{ registerSuccess }}
-          </p>
-
-          <label class="agreement-check">
-            <input v-model="registerAgree" type="checkbox" />
-            <span>
-              我已阅读并同意
-              <a href="/terms" target="_blank" rel="noopener noreferrer"
-                >《用户条款》</a
-              >
-              与
-              <a href="/privacy" target="_blank" rel="noopener noreferrer"
-                >《隐私协议》</a
-              >
-            </span>
-          </label>
-
-          <button
-            type="button"
-            class="primary-btn login-form__submit"
-            @click="submitRegister"
-          >
-            注册
-          </button>
-
-          <p class="login-form__hint">
-            <button
-              type="button"
-              class="login-form__switch"
-              @click="backToRegisterVerify"
-            >
-              返回上一步
-            </button>
-          </p>
-
-          <p class="login-form__hint">
-            已有账号？
-            <button
-              type="button"
-              class="login-form__switch"
-              @click="switchToLogin"
-            >
-              去登录
-            </button>
-          </p>
-        </form>
-
-        <form v-else-if="authModalType === 'forgot-verify'" class="login-form">
-          <label class="login-form__field">
-            <span class="login-form__label">邮箱</span>
-            <div class="login-form__code-row">
-              <input
-                v-model="forgotForm.email"
-                class="login-form__input"
-                type="email"
-                placeholder="请输入已注册邮箱"
-                @input="onForgotEmailInput"
-              />
-              <button
-                type="button"
-                class="ghost-btn login-form__code-btn"
-                :disabled="isSendingForgotCode || forgotCodeCountdown > 0"
-                @click="sendForgotCode"
-              >
-                {{ sendForgotCodeButtonText }}
-              </button>
-            </div>
-          </label>
-
-          <label class="login-form__field">
-            <span class="login-form__label">验证码</span>
-            <div class="login-form__code-row">
-              <input
-                v-model="forgotForm.code"
-                class="login-form__input"
-                type="text"
-                placeholder="请输入6位数字验证码"
-                maxlength="6"
-                @input="onForgotCodeInput"
-              />
-              <button
-                type="button"
-                class="ghost-btn login-form__code-btn"
-                @click="goForgotResetStep"
-              >
-                校验验证码
-              </button>
-            </div>
-          </label>
-
-          <p v-if="forgotError" class="login-form__error">{{ forgotError }}</p>
-          <p v-if="forgotSuccess" class="login-form__success">
-            {{ forgotSuccess }}
-          </p>
-
-          <p class="login-form__hint">
-            已想起密码？
-            <button
-              type="button"
-              class="login-form__switch"
-              @click="switchToLogin"
-            >
-              返回登录
-            </button>
-          </p>
-        </form>
-
-        <form v-else-if="authModalType === 'forgot-reset'" class="login-form">
-          <label class="login-form__field">
-            <span class="login-form__label">新密码</span>
-            <input
-              v-model="forgotForm.password"
-              class="login-form__input"
-              type="password"
-              placeholder="8-20位，需包含数字和字母"
-            />
-          </label>
-
-          <label class="login-form__field">
-            <span class="login-form__label">确认新密码</span>
-            <input
-              v-model="forgotForm.confirmPassword"
-              class="login-form__input"
-              type="password"
-              placeholder="请再次输入新密码"
-            />
-          </label>
-
-          <p v-if="forgotError" class="login-form__error">{{ forgotError }}</p>
-          <p v-if="forgotSuccess" class="login-form__success">
-            {{ forgotSuccess }}
-          </p>
-
-          <button
-            type="button"
-            class="primary-btn login-form__submit"
-            @click="submitResetPassword"
-          >
-            重置密码
-          </button>
-
-          <p class="login-form__hint">
-            <button
-              type="button"
-              class="login-form__switch"
-              @click="backToForgotVerify"
-            >
-              返回上一步
-            </button>
-          </p>
-        </form>
       </section>
     </div>
   </div>
@@ -1716,18 +1749,25 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
-  background: rgba(15, 23, 42, 0.42);
-  backdrop-filter: blur(4px);
+  padding: 26px;
+  background: rgba(42, 40, 64, 0.34);
+  backdrop-filter: blur(8px);
 }
 
 .login-modal {
-  width: min(100%, 420px);
-  border-radius: 20px;
-  padding: 22px;
-  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
-  box-shadow: 0 24px 60px rgba(37, 99, 235, 0.18);
-  border: 1px solid rgba(191, 219, 254, 0.9);
+  width: min(100%, 560px);
+  border-radius: 24px;
+  background: #fbfaff;
+  box-shadow: 0 32px 80px rgba(108, 90, 175, 0.22);
+  overflow: hidden;
+}
+
+.login-modal__panel {
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: #fcfbff;
 }
 
 .login-modal__header {
@@ -1735,30 +1775,30 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 18px;
 }
 
 .login-modal__title {
   margin: 0;
-  font-size: 22px;
+  font-size: 32px;
+  line-height: 1.2;
   font-weight: 700;
-  color: #1d4ed8;
+  color: #5745ad;
 }
 
 .login-modal__subtitle {
-  margin: 6px 0 0;
-  font-size: 13px;
-  color: #6b7280;
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: #8178a8;
 }
 
 .login-modal__close {
-  width: 32px;
-  height: 32px;
+  width: 38px;
+  height: 38px;
   border: none;
   border-radius: 50%;
-  background: #e5edff;
-  color: #2563eb;
-  font-size: 20px;
+  background: #ece8fb;
+  color: #6a58c7;
+  font-size: 24px;
   line-height: 1;
   cursor: pointer;
 }
@@ -1769,6 +1809,20 @@ onBeforeUnmount(() => {
   gap: 14px;
 }
 
+.login-form__group {
+  border-radius: 20px;
+  background: #f6f4ff;
+  box-shadow: 0 10px 24px rgba(133, 117, 198, 0.1);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.login-form__group--action {
+  background: #f9f8ff;
+}
+
 .login-form__field {
   display: flex;
   flex-direction: column;
@@ -1777,62 +1831,68 @@ onBeforeUnmount(() => {
 
 .login-form__label {
   font-size: 14px;
-  font-weight: 600;
-  color: #374151;
+  font-weight: 700;
+  color: #4f476f;
 }
 
 .login-form__input {
-  height: 44px;
-  border: 1px solid #dbeafe;
-  border-radius: 12px;
+  height: 46px;
+  border: none;
+  border-radius: 14px;
   padding: 0 14px;
-  background: #f8fbff;
+  background: #ffffff;
   font-size: 14px;
-  color: #1f2933;
+  color: #413b5f;
   outline: none;
+  box-shadow: inset 0 0 0 1px rgba(193, 183, 236, 0.52);
 }
 
 .login-form__input:focus {
-  border-color: #60a5fa;
-  box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.16);
+  box-shadow: inset 0 0 0 2px rgba(140, 124, 240, 0.68),
+    0 0 0 4px rgba(198, 185, 255, 0.34);
 }
 
 .login-form__submit {
   width: 100%;
-  margin-top: 4px;
-  padding: 11px 18px;
+  margin-top: 2px;
+  padding: 12px 18px;
+  background: #8c7cf0;
+  border-radius: 14px;
+  font-size: 18px;
+  box-shadow: 0 10px 24px rgba(140, 124, 240, 0.25);
 }
 
 .login-form__hint {
   margin: 0;
   text-align: center;
-  font-size: 13px;
-  color: #6b7280;
+  font-size: 14px;
+  color: #7a729b;
 }
 
 .login-form__switch {
   border: none;
   background: transparent;
-  color: #2563eb;
-  font-size: 13px;
+  color: #4f54de;
+  font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
 }
 
 .login-form__error {
-  margin: -4px 0 0;
+  margin: 0;
   font-size: 12px;
-  color: #dc2626;
+  color: #d95367;
 }
 
 .login-form__success {
-  margin: -4px 0 0;
+  margin: 0;
   font-size: 12px;
-  color: #16a34a;
+  color: #2f9f67;
 }
 
 .login-form__code-row {
   display: flex;
-  gap: 8px;
+  gap: 9px;
 }
 
 .login-form__code-row .login-form__input {
@@ -1840,8 +1900,12 @@ onBeforeUnmount(() => {
 }
 
 .login-form__code-btn {
-  min-width: 84px;
+  min-width: 110px;
+  border-radius: 14px;
   padding: 0 14px;
+  border: none;
+  background: #ebe7fb;
+  color: #61509f;
 }
 
 .agreement-check {
@@ -1849,15 +1913,16 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   gap: 8px;
   font-size: 12px;
-  color: #4b5563;
+  color: #645b87;
 }
 
 .agreement-check input {
   margin-top: 2px;
+  accent-color: #8c7cf0;
 }
 
 .agreement-check a {
-  color: #2563eb;
+  color: #5258dd;
   text-decoration: none;
 }
 
@@ -1933,9 +1998,28 @@ onBeforeUnmount(() => {
     font-size: 27px;
   }
 
+  .login-modal-mask {
+    padding: 14px;
+  }
+
   .login-modal {
+    border-radius: 20px;
+  }
+
+  .login-modal__panel {
     padding: 18px;
-    border-radius: 16px;
+  }
+
+  .login-modal__title {
+    font-size: 28px;
+  }
+
+  .login-form__group {
+    padding: 12px;
+  }
+
+  .login-form__code-btn {
+    min-width: 94px;
   }
 }
 </style>

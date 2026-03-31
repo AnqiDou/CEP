@@ -1,7 +1,8 @@
 <template>
   <div class="profile-page">
     <div class="profile-layout">
-      <aside class="profile-sidebar card">
+      <aside class="profile-sidebar soft-card">
+        <p class="sidebar-title">个人主页</p>
         <button
           :class="[
             'menu-item',
@@ -68,10 +69,10 @@
         </button>
       </aside>
 
-      <main class="profile-main card">
-        <section class="profile-banner">
+      <main class="profile-main">
+        <section class="hero-card soft-card">
           <div class="profile-user">
-            <el-avatar :size="74" :src="userInfo.avatar" class="profile-avatar">
+            <el-avatar :size="78" :src="userInfo.avatar" class="profile-avatar">
               <el-icon :size="34"><UserFilled /></el-icon>
             </el-avatar>
             <div>
@@ -90,7 +91,7 @@
                     <button
                       class="credit-help__btn"
                       type="button"
-                      aria-label="查看信用等级规划"
+                      aria-label="查看信用等级说明"
                     >
                       ?
                     </button>
@@ -128,32 +129,67 @@
                 </div>
               </div>
               <div class="user-stats">
-                <span>{{ userInfo.fans }}粉丝</span><span>|</span>
-                <span>{{ userInfo.following }}关注</span>
+                <span>{{ userInfo.fans }} 粉丝</span>
+                <span class="dot">·</span>
+                <span>{{ userInfo.following }} 关注</span>
+              </div>
+              <div class="banner-actions">
+                <button
+                  class="action-btn"
+                  type="button"
+                  @click="openEditDialog"
+                >
+                  编辑资料
+                </button>
+                <button
+                  class="action-btn action-btn--danger"
+                  type="button"
+                  @click="handleLogout"
+                >
+                  退出登录
+                </button>
+                <el-button class="home-btn" plain @click="goHome"
+                  ><el-icon><House /></el-icon>返回首页</el-button
+                >
               </div>
             </div>
           </div>
-          <div class="banner-actions">
-            <button class="action-btn" type="button" @click="openEditDialog">
-              编辑资料
-            </button>
-            <button
-              class="action-btn action-btn--danger"
-              type="button"
-              @click="handleLogout"
-            >
-              退出登录
-            </button>
-            <el-button class="home-btn" plain @click="goHome"
-              ><el-icon><House /></el-icon>返回首页</el-button
-            >
+
+          <div class="hero-illustration" aria-hidden="true">
+            <div class="character character--left">◕‿◕</div>
+            <div class="character character--right">•ᴗ•</div>
+            <span class="bubble bubble--a"></span>
+            <span class="bubble bubble--b"></span>
+            <span class="bubble bubble--c"></span>
           </div>
         </section>
 
-        <section class="profile-content">
-          <div v-if="selectedMenu === 'idle'" class="credit-head">
-            <h3 class="credit-title">信用及评价</h3>
-            <span class="credit-count">{{ reviewTotal }}</span>
+        <section class="summary-grid">
+          <article
+            v-for="card in overviewCards"
+            :key="card.title"
+            :class="['summary-card', 'summary-card--' + card.tone]"
+          >
+            <p class="summary-card__title">{{ card.title }}</p>
+            <p class="summary-card__value">{{ card.value }}</p>
+            <p class="summary-card__sub">{{ card.sub }}</p>
+            <div class="summary-card__progress">
+              <span :style="{ width: card.progress + '%' }"></span>
+            </div>
+          </article>
+        </section>
+
+        <section class="profile-content soft-card">
+          <div class="section-head">
+            <h3 class="section-title">{{ currentSection.title }}</h3>
+            <span v-if="selectedMenu === 'idle'" class="section-count"
+              >共 {{ reviewTotal }} 条</span
+            >
+            <span
+              v-else-if="detailMenuKeys.includes(selectedMenu)"
+              class="section-count"
+              >共 {{ currentSectionItems.length }} 条</span
+            >
           </div>
 
           <div v-if="selectedMenu === 'idle'" class="review-tabs">
@@ -186,13 +222,11 @@
                 <div class="review-main">
                   <div class="review-user-row">
                     <span class="review-user">{{ item.user }}</span>
-                  </div>
-                  <p class="review-content">
                     <span class="review-tag">
-                      {{ item.rating === "good" ? "🥰 好评" : "😞 差评" }}
+                      {{ item.rating === "good" ? "好评" : "差评" }}
                     </span>
-                    {{ item.content }}
-                  </p>
+                  </div>
+                  <p class="review-content">{{ item.content }}</p>
                   <span class="review-time">{{ item.time }}</span>
                 </div>
               </div>
@@ -303,10 +337,6 @@
               当前暂无物品
             </div>
           </div>
-
-          <div v-else class="section-head">
-            <h3 class="section-title">{{ currentSection.title }}</h3>
-          </div>
         </section>
       </main>
     </div>
@@ -367,7 +397,7 @@
         <el-form-item label="分类"
           ><el-input
             v-model="itemEditForm.categoryCode"
-            placeholder="如 digital/book/other"
+            placeholder="例如：数码、图书、其他"
         /></el-form-item>
         <el-form-item label="价格"
           ><el-input-number
@@ -442,6 +472,7 @@ import {
 } from "../service/publish/publishApiService";
 
 const router = useRouter();
+const PROFILE_SELECTED_MENU_KEY = "profile:selectedMenu";
 
 const userInfo = reactive({
   avatar: "",
@@ -496,12 +527,12 @@ const detailMenuKeys = [
   "trade-bought",
   "favorite",
 ];
-const sectionItemMap = {
+const sectionItemMap = reactive({
   "trade-published": [],
   "trade-sold": [],
   "trade-bought": [],
   favorite: [],
-};
+});
 const loadedMenus = reactive({
   idle: false,
   "pending-trade": false,
@@ -520,6 +551,38 @@ const reviewTabs = computed(() => [
   { key: "bad", label: `差评 ${reviewStats.bad}` },
 ]);
 
+const overviewCards = computed(() => {
+  const publishCount = sectionItemMap["trade-published"]?.length || 0;
+  const soldCount = sectionItemMap["trade-sold"]?.length || 0;
+  const totalTrade = publishCount + soldCount + pendingTrades.value.length;
+  return [
+    {
+      title: "待处理事项",
+      value: pendingTrades.value.length,
+      sub: "需要优先完成",
+      progress: Math.min(100, pendingTrades.value.length * 20),
+      tone: "purple",
+    },
+    {
+      title: "收到评价",
+      value: reviewStats.total,
+      sub: `好评 ${reviewStats.good} · 差评 ${reviewStats.bad}`,
+      progress:
+        reviewStats.total > 0
+          ? Math.round((reviewStats.good / reviewStats.total) * 100)
+          : 0,
+      tone: "orange",
+    },
+    {
+      title: "交易记录",
+      value: totalTrade,
+      sub: `已发布 ${publishCount} · 已卖出 ${soldCount}`,
+      progress: Math.min(100, totalTrade * 10),
+      tone: "green",
+    },
+  ];
+});
+
 const filteredReviewList = computed(() => {
   if (activeReviewTab.value === "good") {
     return reviewList.value.filter((item) => item.rating === "good");
@@ -537,8 +600,18 @@ const currentSectionItems = computed(
   () => sectionItemMap[selectedMenu.value] || []
 );
 
+const normalizeListData = (responseBody) => {
+  const payload = responseBody?.data;
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.records)) return payload.records;
+  if (Array.isArray(payload?.list)) return payload.list;
+  return [];
+};
+
 const selectMenu = async (key) => {
   selectedMenu.value = key;
+  localStorage.setItem(PROFILE_SELECTED_MENU_KEY, key);
   try {
     await loadMenuData(key, key === "idle");
   } catch (error) {
@@ -660,9 +733,8 @@ const mapStatusText = (status) => {
 
 const reloadMyPublishedItems = async () => {
   const publishedRes = await fetchMyPublishItems();
-  sectionItemMap["trade-published"] = (publishedRes?.data || []).map(
-    mapTradeItem
-  );
+  sectionItemMap["trade-published"] =
+    normalizeListData(publishedRes).map(mapTradeItem);
   loadedMenus["trade-published"] = true;
 };
 
@@ -824,21 +896,22 @@ const loadMenuData = async (menuKey, force = false) => {
 
   if (menuKey === "trade-sold") {
     const soldRes = await fetchSoldItems();
-    sectionItemMap["trade-sold"] = (soldRes?.data || []).map(mapTradeItem);
+    sectionItemMap["trade-sold"] = normalizeListData(soldRes).map(mapTradeItem);
     loadedMenus["trade-sold"] = true;
     return;
   }
 
   if (menuKey === "trade-bought") {
     const boughtRes = await fetchBoughtItems();
-    sectionItemMap["trade-bought"] = (boughtRes?.data || []).map(mapTradeItem);
+    sectionItemMap["trade-bought"] =
+      normalizeListData(boughtRes).map(mapTradeItem);
     loadedMenus["trade-bought"] = true;
     return;
   }
 
   if (menuKey === "favorite") {
     const favoritesRes = await fetchFavoriteItems();
-    sectionItemMap.favorite = (favoritesRes?.data || []).map(mapTradeItem);
+    sectionItemMap.favorite = normalizeListData(favoritesRes).map(mapTradeItem);
     loadedMenus.favorite = true;
   }
 };
@@ -855,7 +928,12 @@ const handleLogout = async () => {
 };
 
 onMounted(async () => {
-  selectedMenu.value = "idle";
+  const savedMenu = localStorage.getItem(PROFILE_SELECTED_MENU_KEY) || "idle";
+  selectedMenu.value = sectionMap[savedMenu] ? savedMenu : "idle";
+  if (!sectionMap[savedMenu]) {
+    localStorage.setItem(PROFILE_SELECTED_MENU_KEY, "idle");
+  }
+  tradeOpen.value = selectedMenu.value.startsWith("trade-");
   activeReviewTab.value = "all";
   await initAuthSession();
   if (!authState.user) {
@@ -874,27 +952,41 @@ onMounted(async () => {
 <style scoped>
 .profile-page {
   min-height: 100vh;
-  background: #f5f7fb;
+  padding: 24px;
+  background: #f8f7fd;
 }
+
 .profile-layout {
-  min-height: 100vh;
+  max-width: 1460px;
+  margin: 0 auto;
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
-  gap: 16px;
-  padding: 16px 16px 16px 0;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 20px;
 }
-.card {
-  border-radius: 14px;
-  background: #fff;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+
+.soft-card {
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 14px 36px rgba(140, 124, 240, 0.12);
 }
+
 .profile-sidebar {
-  border-radius: 0 14px 14px 0;
-  padding: 14px;
+  padding: 18px 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  align-self: start;
+  position: sticky;
+  top: 20px;
 }
+
+.sidebar-title {
+  margin: 4px 8px 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #6f5ab8;
+}
+
 .menu-item,
 .menu-title,
 .sub-item {
@@ -902,213 +994,361 @@ onMounted(async () => {
   border: none;
   text-align: left;
   background: transparent;
-  color: #1f2937;
+  color: #2f2f3f;
   cursor: pointer;
 }
+
 .menu-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
-  border-radius: 10px;
+  padding: 11px 12px;
+  border-radius: 12px;
   font-size: 15px;
   font-weight: 600;
 }
+
 .menu-item--active {
-  background: #eef4ff;
-  color: #1d4ed8;
+  background: #f1ecff;
+  color: #6f5ab8;
 }
+
 .menu-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  padding: 11px 12px;
+  border-radius: 12px;
   font-size: 15px;
   font-weight: 600;
 }
+
 .menu-title__left {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
+
 .menu-sublist {
   margin-top: 4px;
   display: flex;
   flex-direction: column;
 }
+
 .sub-item {
-  padding: 9px 36px;
-  color: #4b5563;
+  border-radius: 10px;
+  margin: 2px 0;
+  padding: 9px 35px;
+  color: #6a6482;
   font-size: 14px;
-  border-radius: 8px;
 }
+
 .sub-item:hover,
 .sub-item--active {
-  color: #1d4ed8;
-  background: #eff6ff;
+  color: #6f5ab8;
+  background: #f4f0ff;
 }
+
 .profile-main {
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
-.profile-banner {
+
+.hero-card {
+  padding: 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 20px 24px;
-  border-bottom: 1px solid #e5e7eb;
-  background: linear-gradient(135deg, #e0f2fe 0%, #eff6ff 100%);
+  gap: 16px;
+  background: linear-gradient(135deg, #efe8ff 0%, #ffeefa 100%);
 }
+
 .profile-user {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 15px;
 }
+
 .profile-avatar {
-  background: linear-gradient(135deg, #bfdbfe, #93c5fd);
-  color: #1d4ed8;
+  background: #c9bdfc;
+  color: #4f3f93;
 }
+
 .user-name {
   margin: 0;
-  font-size: 30px;
-  color: #111827;
+  font-size: 28px;
+  color: #2f2f3f;
 }
+
 .user-name-row {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.user-credit-badges {
-  display: inline-flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
 }
+
+.user-credit-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
 .credit-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 10px;
+  padding: 3px 10px;
   border-radius: 999px;
-  border: 1px solid #93c5fd;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border: 1px solid #d7cefa;
+  background: #f6f2ff;
+  color: #66539d;
   font-size: 12px;
   font-weight: 700;
-  line-height: 1.2;
 }
-.credit-badge__icon {
-  font-size: 12px;
-}
+
 .credit-help {
   position: relative;
 }
+
 .credit-help__btn {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  border: 1px solid #93c5fd;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border: 1px solid #d6cafb;
+  background: #f6f2ff;
+  color: #6754a6;
   font-size: 12px;
   font-weight: 700;
-  line-height: 18px;
-  text-align: center;
   cursor: pointer;
 }
+
 .credit-help__popover {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
-  width: 290px;
-  padding: 10px;
-  border-radius: 10px;
-  border: 1px solid #bfdbfe;
+  width: 292px;
+  padding: 11px;
+  border-radius: 12px;
+  border: 1px solid #e5dcff;
   background: #ffffff;
-  box-shadow: 0 10px 28px rgba(30, 64, 175, 0.16);
-  color: #1f2937;
+  box-shadow: 0 12px 28px rgba(111, 90, 184, 0.2);
+  color: #3f3d50;
   z-index: 20;
   opacity: 0;
   visibility: hidden;
   transform: translateY(-4px);
-  transition: all 0.15s ease;
+  transition: all 0.16s ease;
 }
+
 .credit-help:hover .credit-help__popover,
 .credit-help:focus-within .credit-help__popover {
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
 }
+
 .credit-help__line {
   margin: 0 0 6px;
   font-size: 12px;
-  color: #334155;
 }
+
 .credit-help__table {
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
 }
+
 .credit-help__table th,
 .credit-help__table td {
-  border: 1px solid #dbeafe;
+  border: 1px solid #ece4ff;
   padding: 4px 6px;
   text-align: left;
 }
+
 .credit-help__table th {
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: #f5f0ff;
 }
+
 .user-stats {
-  margin-top: 6px;
+  margin-top: 8px;
   display: flex;
-  gap: 8px;
-  font-size: 16px;
-  color: #4b5563;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  color: #6f6a83;
 }
+
+.dot {
+  color: #b8b0d7;
+}
+
 .banner-actions {
+  margin-top: 12px;
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
+
 .action-btn {
   border: none;
   border-radius: 999px;
   padding: 9px 16px;
-  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  background: #8c7cf0;
   color: #fff;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
+
 .action-btn--danger {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: #f0cfd0;
+  color: #8c3f46;
 }
-.home-btn {
-  border-radius: 999px;
+
+.hero-illustration {
+  min-width: 170px;
+  height: 130px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.42);
+  position: relative;
+  overflow: hidden;
 }
-.profile-content {
-  padding: 16px 22px 22px;
-  min-height: 380px;
-}
-.credit-head {
+
+.character {
+  position: absolute;
+  bottom: 14px;
+  width: 62px;
+  height: 62px;
+  border-radius: 18px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #e5e7eb;
+  justify-content: center;
+  font-size: 16px;
+  color: #5f4a9f;
 }
-.credit-title {
+
+.character--left {
+  left: 18px;
+  background: #d5ccfd;
+}
+
+.character--right {
+  right: 18px;
+  background: #ffd8b2;
+}
+
+.bubble {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.bubble--a {
+  width: 20px;
+  height: 20px;
+  top: 18px;
+  left: 20px;
+}
+
+.bubble--b {
+  width: 14px;
+  height: 14px;
+  top: 30px;
+  right: 45px;
+}
+
+.bubble--c {
+  width: 10px;
+  height: 10px;
+  top: 12px;
+  right: 18px;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.summary-card {
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 12px 24px rgba(140, 124, 240, 0.1);
+}
+
+.summary-card--purple {
+  background: #f2ecff;
+}
+
+.summary-card--orange {
+  background: #fff2e6;
+}
+
+.summary-card--green {
+  background: #edf9f2;
+}
+
+.summary-card__title {
   margin: 0;
-  font-size: 24px;
-  color: #111827;
+  font-size: 13px;
+  color: #6f6a83;
 }
-.credit-count {
-  font-size: 20px;
-  color: #6b7280;
+
+.summary-card__value {
+  margin: 6px 0 0;
+  font-size: 30px;
+  color: #2f2f3f;
+  font-weight: 700;
 }
+
+.summary-card__sub {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #6f6a83;
+}
+
+.summary-card__progress {
+  margin-top: 10px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.75);
+  overflow: hidden;
+}
+
+.summary-card__progress span {
+  display: block;
+  height: 100%;
+  background: #8c7cf0;
+  border-radius: 999px;
+}
+
+.profile-content {
+  padding: 20px 22px 22px;
+  min-height: 380px;
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f0ecff;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 23px;
+  color: #2f2f3f;
+}
+
+.section-count {
+  color: #938cb0;
+  font-size: 14px;
+}
+
 .review-tabs {
   margin-top: 14px;
   display: flex;
@@ -1116,35 +1356,39 @@ onMounted(async () => {
   gap: 10px;
   flex-wrap: wrap;
 }
+
 .review-tab {
-  border: 1px solid #e2e8f0;
+  border: 1px solid #ece6ff;
   border-radius: 10px;
   padding: 8px 14px;
-  background: #f1f5f9;
-  color: #111827;
+  background: #faf8ff;
+  color: #3b3652;
   font-size: 15px;
   cursor: pointer;
 }
+
 .review-tab--active {
-  border-color: #bfdbfe;
-  background: #dbeafe;
-  color: #1d4ed8;
+  border-color: #d8cbff;
+  background: #f1ebff;
+  color: #6f5ab8;
   font-weight: 700;
 }
+
 .review-list {
   margin-top: 14px;
   display: flex;
   flex-direction: column;
-  gap: 0;
 }
+
 .review-item {
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #f1edff;
   padding: 12px 0;
 }
 
 .review-item:last-child {
   border-bottom: none;
 }
+
 .review-item__top {
   display: flex;
   align-items: flex-start;
@@ -1174,85 +1418,95 @@ onMounted(async () => {
 .review-user {
   font-size: 14px;
   font-weight: 600;
-  color: #111827;
+  color: #2f2f3f;
 }
 
 .review-tag {
-  margin-right: 8px;
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  background: #e5edff;
-  color: #1d4ed8;
+  background: #eee7ff;
+  color: #6751a8;
   font-size: 12px;
   font-weight: 700;
   padding: 2px 8px;
 }
+
 .review-time {
   display: block;
   margin-top: 2px;
   font-size: 12px;
-  color: #6b7280;
+  color: #8f89ab;
 }
+
 .review-content {
   margin: 0;
   font-size: 14px;
-  color: #374151;
-  line-height: 1.5;
+  color: #4b4662;
+  line-height: 1.55;
 }
+
 .pending-list {
   margin-top: 14px;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
+
 .pending-item {
-  border: 1px solid #dbeafe;
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 14px;
-  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  background: #f7f3ff;
 }
+
 .pending-item__head {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
 }
+
 .pending-item__title {
   margin: 0;
   font-size: 16px;
-  color: #1f2937;
+  color: #2f2f3f;
 }
+
 .pending-item__title--link {
   border: none;
   padding: 0;
   background: transparent;
   cursor: pointer;
 }
+
 .pending-item__title--link:hover {
-  color: #1d4ed8;
+  color: #6f5ab8;
 }
+
 .pending-item__status {
   border-radius: 999px;
   padding: 2px 10px;
   font-size: 12px;
-  color: #1d4ed8;
-  background: #e5edff;
+  color: #6751a8;
+  background: #ece5ff;
 }
+
 .pending-item__meta {
   margin-top: 8px;
   display: flex;
   flex-wrap: wrap;
   gap: 8px 16px;
-  color: #4b5563;
+  color: #6f6a83;
   font-size: 13px;
 }
+
 .pending-item__actions {
   margin-top: 12px;
   display: flex;
   align-items: center;
   gap: 10px;
 }
+
 .pending-btn {
   border: none;
   border-radius: 999px;
@@ -1261,49 +1515,55 @@ onMounted(async () => {
   font-weight: 600;
   cursor: pointer;
 }
+
 .pending-btn--confirm {
   color: #ffffff;
-  background: linear-gradient(135deg, #2563eb, #3b82f6);
-  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.3);
+  background: #8c7cf0;
 }
+
 .pending-btn--cancel {
-  color: #b91c1c;
-  background: #fee2e2;
+  color: #8b4d4f;
+  background: #f6dcde;
 }
+
 .pending-empty {
-  border-radius: 12px;
-  padding: 18px;
+  border-radius: 14px;
+  padding: 20px;
   text-align: center;
-  color: #6b7280;
-  background: #f8fafc;
-  border: 1px dashed #cbd5e1;
+  color: #8e88aa;
+  background: #faf8ff;
+  border: 1px dashed #e3dbff;
 }
+
 .section-list {
   margin-top: 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
+
 .section-item {
-  border: 1px solid #dbeafe;
-  border-radius: 12px;
-  padding: 12px;
+  border-radius: 14px;
+  padding: 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  background: #f8fbff;
+  background: #f7f3ff;
 }
+
 .section-item__title {
   margin: 0;
   font-size: 15px;
-  color: #1f2937;
+  color: #2f2f3f;
 }
+
 .section-item__meta {
   margin: 6px 0 0;
-  color: #6b7280;
+  color: #8e88aa;
   font-size: 12px;
 }
+
 .section-item__actions {
   display: flex;
   align-items: center;
@@ -1311,69 +1571,77 @@ onMounted(async () => {
   flex-wrap: wrap;
   justify-content: flex-end;
 }
+
 .section-item__btn {
   border: none;
   border-radius: 999px;
   padding: 8px 14px;
   color: #ffffff;
-  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  background: #8c7cf0;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.3);
 }
+
 .section-item__btn--edit {
-  background: linear-gradient(135deg, #0ea5e9, #3b82f6);
+  background: #6bb9ff;
 }
+
 .section-item__btn--danger {
-  background: linear-gradient(135deg, #ef4444, #f87171);
+  background: #f19aa3;
 }
+
 .section-item__btn--shelf {
-  background: linear-gradient(135deg, #16a34a, #22c55e);
+  background: #72c8a0;
 }
-.section-head {
-  display: flex;
-  align-items: center;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #e5e7eb;
-}
-.section-title {
-  margin: 0;
-  font-size: 24px;
-  color: #111827;
-}
+
 .edit-avatar-row {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-bottom: 16px;
 }
+
 .avatar-input {
   display: none;
 }
+
 .edit-error {
   margin: 0;
-  color: #dc2626;
+  color: #d14557;
   font-size: 13px;
 }
+
+@media (max-width: 1160px) {
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 980px) {
-  .profile-layout {
-    grid-template-columns: minmax(0, 1fr);
+  .profile-page {
     padding: 12px;
   }
-  .profile-sidebar {
-    border-radius: 14px;
+
+  .profile-layout {
+    grid-template-columns: minmax(0, 1fr);
   }
-  .profile-banner {
+
+  .profile-sidebar {
+    position: static;
+  }
+
+  .hero-card {
     flex-direction: column;
     align-items: flex-start;
   }
-  .banner-actions {
+
+  .hero-illustration {
     width: 100%;
-    justify-content: flex-end;
   }
-  .user-name {
-    font-size: 24px;
+
+  .summary-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>
