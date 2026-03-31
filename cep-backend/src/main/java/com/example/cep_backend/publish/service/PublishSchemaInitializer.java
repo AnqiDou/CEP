@@ -18,12 +18,7 @@ public class PublishSchemaInitializer {
 
     @PostConstruct
     public void ensurePublishSchema() {
-        jdbcTemplate.execute("""
-                IF COL_LENGTH('dbo.items', 'publisher_user_id') IS NULL
-                BEGIN
-                    ALTER TABLE items ADD publisher_user_id BIGINT NULL;
-                END;
-                """);
+        jdbcTemplate.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS publisher_user_id BIGINT NULL");
 
         jdbcTemplate.execute("""
                 UPDATE i
@@ -34,29 +29,23 @@ public class PublishSchemaInitializer {
                   AND d.publisher_user_id IS NOT NULL;
                 """);
 
-        jdbcTemplate.execute("""
-                IF NOT EXISTS (
-                    SELECT 1
-                    FROM sys.foreign_keys
-                    WHERE name = 'fk_items_publisher'
-                )
-                BEGIN
-                    ALTER TABLE items
-                    ADD CONSTRAINT fk_items_publisher FOREIGN KEY (publisher_user_id) REFERENCES users (id);
-                END;
-                """);
+        Integer fkCount = jdbcTemplate.queryForObject(
+                """
+                        SELECT COUNT(1)
+                        FROM information_schema.table_constraints
+                        WHERE constraint_schema = DATABASE()
+                          AND table_name = 'items'
+                          AND constraint_name = 'fk_items_publisher'
+                          AND constraint_type = 'FOREIGN KEY'
+                        """,
+                Integer.class);
+        if (fkCount == null || fkCount == 0) {
+            jdbcTemplate.execute(
+                    "ALTER TABLE items ADD CONSTRAINT fk_items_publisher FOREIGN KEY (publisher_user_id) REFERENCES users (id)");
+        }
 
-        jdbcTemplate.execute("""
-                IF NOT EXISTS (
-                    SELECT 1
-                    FROM sys.indexes
-                    WHERE name = 'idx_items_publisher'
-                      AND object_id = OBJECT_ID('dbo.items')
-                )
-                BEGIN
-                    CREATE INDEX idx_items_publisher ON items (publisher_user_id, created_at DESC);
-                END;
-                """);
+        jdbcTemplate.execute(
+                "CREATE INDEX IF NOT EXISTS idx_items_publisher ON items (publisher_user_id, created_at DESC)");
 
         log.info("Publish schema ensured: items.publisher_user_id");
     }

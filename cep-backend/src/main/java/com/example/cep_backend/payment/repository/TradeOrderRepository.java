@@ -52,10 +52,11 @@ public class TradeOrderRepository {
                     i.title AS item_title,
                     i.price,
                     (
-                        SELECT TOP 1 p.photo_url
+                        SELECT p.photo_url
                         FROM item_photos p
                         WHERE p.item_id = i.id
                         ORDER BY p.sort_order ASC, p.id ASC
+                        LIMIT 1
                     ) AS cover_photo_url
                 FROM items i
                 LEFT JOIN item_details d ON d.item_id = i.id

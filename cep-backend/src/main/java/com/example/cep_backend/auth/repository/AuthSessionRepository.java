@@ -42,10 +42,11 @@ public class AuthSessionRepository {
 
     public Optional<AuthSessionRecord> findByRefreshTokenHash(String refreshTokenHash) {
         String sql = """
-                SELECT TOP 1 s.id, s.user_id, u.email, u.username, s.refresh_expires_at, s.access_expires_at, s.revoked
+                SELECT s.id, s.user_id, u.email, u.username, s.refresh_expires_at, s.access_expires_at, s.revoked
                 FROM auth_sessions s
                 INNER JOIN users u ON u.id = s.user_id
                 WHERE s.refresh_token_hash = ?
+                LIMIT 1
                 """;
         List<AuthSessionRecord> result = jdbcTemplate.query(sql, rowMapper, refreshTokenHash);
         if (result.isEmpty()) {
@@ -56,10 +57,11 @@ public class AuthSessionRepository {
 
     public Optional<AuthSessionRecord> findByAccessTokenHash(String accessTokenHash) {
         String sql = """
-                SELECT TOP 1 s.id, s.user_id, u.email, u.username, s.refresh_expires_at, s.access_expires_at, s.revoked
+                SELECT s.id, s.user_id, u.email, u.username, s.refresh_expires_at, s.access_expires_at, s.revoked
                 FROM auth_sessions s
                 INNER JOIN users u ON u.id = s.user_id
                 WHERE s.access_token_hash = ?
+                LIMIT 1
                 """;
         List<AuthSessionRecord> result = jdbcTemplate.query(sql, rowMapper, accessTokenHash);
         if (result.isEmpty()) {

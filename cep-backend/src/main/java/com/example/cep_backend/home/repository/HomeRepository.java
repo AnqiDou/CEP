@@ -67,7 +67,7 @@ public class HomeRepository {
             int limit) {
         List<Object> args = new ArrayList<>();
         String sql = buildBaseItemSql(keyword, categoryId, args, false) + " ORDER BY " + orderBy + " " + order
-                + " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+                + " LIMIT ?, ?";
         args.add(offset);
         args.add(limit);
         return jdbcTemplate.query(sql, itemRowMapper, args.toArray());
@@ -85,19 +85,19 @@ public class HomeRepository {
                     i.price,
                     i.campus,
                     i.badge,
-                    p.photo_url,
+                    (
+                        SELECT ip.photo_url
+                        FROM item_photos ip
+                        WHERE ip.item_id = i.id
+                        ORDER BY ip.sort_order ASC, ip.id ASC
+                        LIMIT 1
+                    ) AS photo_url,
                     i.created_at
                 FROM items i
                 INNER JOIN item_categories c ON c.id = i.category_id
-                OUTER APPLY (
-                    SELECT TOP 1 ip.photo_url
-                    FROM item_photos ip
-                    WHERE ip.item_id = i.id
-                    ORDER BY ip.sort_order ASC, ip.id ASC
-                ) p
                 WHERE i.status = 'PUBLISHED'
                 ORDER BY (i.favorite_count * 6 + i.view_count) DESC, i.created_at DESC
-                OFFSET 0 ROWS FETCH NEXT ? ROWS ONLY
+                LIMIT ?
                 """;
         return jdbcTemplate.query(sql, itemRowMapper, limit);
     }
@@ -107,7 +107,7 @@ public class HomeRepository {
                 SELECT keyword, search_count
                 FROM search_keywords
                 ORDER BY search_count DESC, updated_at DESC
-                OFFSET 0 ROWS FETCH NEXT ? ROWS ONLY
+                LIMIT ?
                 """;
         return jdbcTemplate.query(sql, hotKeywordRowMapper, limit);
     }
@@ -139,7 +139,13 @@ public class HomeRepository {
                         i.price,
                         i.campus,
                         i.badge,
-                        p.photo_url,
+                        (
+                            SELECT ip.photo_url
+                            FROM item_photos ip
+                            WHERE ip.item_id = i.id
+                            ORDER BY ip.sort_order ASC, ip.id ASC
+                            LIMIT 1
+                        ) AS photo_url,
                         i.created_at
                     """);
         }
@@ -147,12 +153,6 @@ public class HomeRepository {
         sql.append("""
                 FROM items i
                 INNER JOIN item_categories c ON c.id = i.category_id
-                OUTER APPLY (
-                    SELECT TOP 1 ip.photo_url
-                    FROM item_photos ip
-                    WHERE ip.item_id = i.id
-                    ORDER BY ip.sort_order ASC, ip.id ASC
-                ) p
                 WHERE i.status = 'PUBLISHED'
                 """);
 

@@ -59,15 +59,15 @@ public class ProfileSchemaInitializer {
         }
         String ddl = """
                 CREATE TABLE user_profiles (
-                    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
                     user_id BIGINT NOT NULL UNIQUE,
-                    college NVARCHAR(80) NULL,
-                    campus NVARCHAR(50) NULL,
+                    college VARCHAR(80) NULL,
+                    campus VARCHAR(50) NULL,
                     credit_score DECIMAL(3, 1) NULL,
-                    note NVARCHAR(200) NULL,
-                    avatar_url NVARCHAR(500) NULL,
-                    created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    updated_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    note VARCHAR(200) NULL,
+                    avatar_url VARCHAR(500) NULL,
+                    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     CONSTRAINT fk_user_profiles_user FOREIGN KEY (user_id) REFERENCES users (id)
                 )
                 """;
@@ -77,7 +77,7 @@ public class ProfileSchemaInitializer {
 
     private void ensureUserProfilesColumns() throws SQLException {
         if (!columnExists(TABLE_USER_PROFILES, "avatar_url")) {
-            jdbcTemplate.execute("ALTER TABLE user_profiles ADD avatar_url NVARCHAR(500) NULL");
+            jdbcTemplate.execute("ALTER TABLE user_profiles ADD COLUMN avatar_url VARCHAR(500) NULL");
         }
     }
 
@@ -87,10 +87,10 @@ public class ProfileSchemaInitializer {
         }
         String ddl = """
                 CREATE TABLE user_follows (
-                    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
                     user_id BIGINT NOT NULL,
                     target_user_id BIGINT NOT NULL,
-                    created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     CONSTRAINT uq_user_follows UNIQUE (user_id, target_user_id),
                     CONSTRAINT fk_user_follows_user FOREIGN KEY (user_id) REFERENCES users (id),
                     CONSTRAINT fk_user_follows_target FOREIGN KEY (target_user_id) REFERENCES users (id)
@@ -106,10 +106,10 @@ public class ProfileSchemaInitializer {
         }
         String ddl = """
                 CREATE TABLE user_favorites (
-                    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
                     user_id BIGINT NOT NULL,
                     item_id BIGINT NOT NULL,
-                    created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     CONSTRAINT uq_user_favorites UNIQUE (user_id, item_id),
                     CONSTRAINT fk_user_favorites_user FOREIGN KEY (user_id) REFERENCES users (id),
                     CONSTRAINT fk_user_favorites_item FOREIGN KEY (item_id) REFERENCES items (id)
@@ -125,14 +125,14 @@ public class ProfileSchemaInitializer {
         }
         String ddl = """
                 CREATE TABLE user_credit_reviews (
-                    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
                     order_id BIGINT NULL,
                     rater_user_id BIGINT NOT NULL,
                     target_user_id BIGINT NOT NULL,
-                    target_role NVARCHAR(20) NOT NULL,
-                    rating NVARCHAR(10) NOT NULL,
-                    content NVARCHAR(300) NULL,
-                    created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    target_role VARCHAR(20) NOT NULL,
+                    rating VARCHAR(10) NOT NULL,
+                    content VARCHAR(300) NULL,
+                    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     CONSTRAINT fk_user_credit_reviews_order FOREIGN KEY (order_id) REFERENCES trade_orders (id),
                     CONSTRAINT fk_user_credit_reviews_rater FOREIGN KEY (rater_user_id) REFERENCES users (id),
                     CONSTRAINT fk_user_credit_reviews_target FOREIGN KEY (target_user_id) REFERENCES users (id)
@@ -150,12 +150,11 @@ public class ProfileSchemaInitializer {
             jdbcTemplate.execute("ALTER TABLE trade_orders ADD buyer_user_id BIGINT NULL");
         }
         if (!columnExists(TABLE_TRADE_ORDERS, "seller_user_id")) {
-            jdbcTemplate.execute("ALTER TABLE trade_orders ADD seller_user_id BIGINT NULL");
+            jdbcTemplate.execute("ALTER TABLE trade_orders ADD COLUMN seller_user_id BIGINT NULL");
             jdbcTemplate.execute("""
-                    UPDATE o
-                    SET o.seller_user_id = d.publisher_user_id
-                    FROM trade_orders o
+                    UPDATE trade_orders o
                     INNER JOIN item_details d ON d.item_id = o.item_id
+                    SET o.seller_user_id = d.publisher_user_id
                     WHERE o.seller_user_id IS NULL
                     """);
         }

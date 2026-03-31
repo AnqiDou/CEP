@@ -216,38 +216,28 @@ public class PublishRepository {
                 itemId);
 
         String upsertDetailSql = """
-                UPDATE item_details
-                SET publisher_user_id = ?,
-                    purchase_date = ?,
-                    usage_duration = ?,
-                    updated_at = ?
-                WHERE item_id = ?;
-
-                IF @@ROWCOUNT = 0
-                BEGIN
-                    INSERT INTO item_details (
-                        item_id,
-                        publisher_user_id,
-                        purchase_date,
-                        usage_duration,
-                        item_condition,
-                        accessories,
-                        detail_note,
-                        trade_location,
-                        original_price,
-                        created_at,
-                        updated_at
-                    ) VALUES (?, ?, ?, ?, '', '', '', '', NULL, ?, ?)
-                END
+                INSERT INTO item_details (
+                    item_id,
+                    publisher_user_id,
+                    purchase_date,
+                    usage_duration,
+                    item_condition,
+                    accessories,
+                    detail_note,
+                    trade_location,
+                    original_price,
+                    created_at,
+                    updated_at
+                ) VALUES (?, ?, ?, ?, '', '', '', '', NULL, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    publisher_user_id = VALUES(publisher_user_id),
+                    purchase_date = VALUES(purchase_date),
+                    usage_duration = VALUES(usage_duration),
+                    updated_at = VALUES(updated_at)
                 """;
         Timestamp timestampNow = Timestamp.valueOf(now);
         jdbcTemplate.update(
                 upsertDetailSql,
-                userId,
-                purchaseDate,
-                usageDuration,
-                timestampNow,
-                itemId,
                 itemId,
                 userId,
                 purchaseDate,
@@ -264,11 +254,10 @@ public class PublishRepository {
 
     public int markDeleted(Long userId, Long itemId, LocalDateTime now) {
         String sql = """
-                UPDATE i
+                UPDATE items i
+                LEFT JOIN item_details d ON d.item_id = i.id
                 SET i.status = 'DELETED',
                     i.updated_at = ?
-                FROM items i
-                LEFT JOIN item_details d ON d.item_id = i.id
                 WHERE COALESCE(i.publisher_user_id, d.publisher_user_id) = ?
                   AND i.id = ?
                   AND i.status <> 'DELETED'
@@ -278,11 +267,10 @@ public class PublishRepository {
 
     public int updateStatus(Long userId, Long itemId, String status, LocalDateTime now) {
         String sql = """
-                UPDATE i
+                UPDATE items i
+                LEFT JOIN item_details d ON d.item_id = i.id
                 SET i.status = ?,
                     i.updated_at = ?
-                FROM items i
-                LEFT JOIN item_details d ON d.item_id = i.id
                 WHERE COALESCE(i.publisher_user_id, d.publisher_user_id) = ?
                   AND i.id = ?
                   AND i.status <> 'DELETED'

@@ -81,11 +81,12 @@ public class ProfileRepository {
 
     public void ensureUserProfile(Long userId) {
         String sql = """
-                IF NOT EXISTS (SELECT 1 FROM user_profiles WHERE user_id = ?)
-                BEGIN
-                    INSERT INTO user_profiles (user_id, created_at, updated_at)
-                    VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                END
+                INSERT INTO user_profiles (user_id, created_at, updated_at)
+                SELECT ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                FROM DUAL
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM user_profiles WHERE user_id = ?
+                )
                 """;
         jdbcTemplate.update(sql, userId, userId);
     }
@@ -141,10 +142,11 @@ public class ProfileRepository {
                     i.campus,
                     i.created_at,
                     (
-                        SELECT TOP 1 p.photo_url
+                        SELECT p.photo_url
                         FROM item_photos p
                         WHERE p.item_id = i.id
                         ORDER BY p.sort_order ASC, p.id ASC
+                        LIMIT 1
                     ) AS photo_url
                 FROM items i
                 LEFT JOIN item_details d ON d.item_id = i.id
@@ -198,10 +200,11 @@ public class ProfileRepository {
                     i.campus,
                     f.created_at,
                     (
-                        SELECT TOP 1 p.photo_url
+                        SELECT p.photo_url
                         FROM item_photos p
                         WHERE p.item_id = i.id
                         ORDER BY p.sort_order ASC, p.id ASC
+                        LIMIT 1
                     ) AS photo_url
                 FROM user_favorites f
                 INNER JOIN items i ON i.id = f.item_id
@@ -236,7 +239,7 @@ public class ProfileRepository {
     }
 
     public Long findUserIdByUsername(String username) {
-        String sql = "SELECT TOP 1 id FROM users WHERE username = ?";
+        String sql = "SELECT id FROM users WHERE username = ? LIMIT 1";
         List<Long> list = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getLong("id"), username);
         return list.isEmpty() ? null : list.getFirst();
     }
@@ -282,10 +285,11 @@ public class ProfileRepository {
                         i.price,
                         'onsale' AS status,
                         (
-                            SELECT TOP 1 p.photo_url
+                            SELECT p.photo_url
                             FROM item_photos p
                             WHERE p.item_id = i.id
                             ORDER BY p.sort_order ASC, p.id ASC
+                            LIMIT 1
                         ) AS image,
                         i.created_at
                     FROM items i
@@ -317,10 +321,11 @@ public class ProfileRepository {
                             i.price,
                             'onsale' AS status,
                             (
-                                SELECT TOP 1 p.photo_url
+                                SELECT p.photo_url
                                 FROM item_photos p
                                 WHERE p.item_id = i.id
                                 ORDER BY p.sort_order ASC, p.id ASC
+                                LIMIT 1
                             ) AS image,
                             i.created_at
                         FROM items i
@@ -358,13 +363,12 @@ public class ProfileRepository {
 
     public void followUser(Long userId, Long targetUserId) {
         String sql = """
-                IF NOT EXISTS (
+                INSERT INTO user_follows (user_id, target_user_id, created_at)
+                SELECT ?, ?, CURRENT_TIMESTAMP
+                FROM DUAL
+                WHERE NOT EXISTS (
                     SELECT 1 FROM user_follows WHERE user_id = ? AND target_user_id = ?
                 )
-                BEGIN
-                    INSERT INTO user_follows (user_id, target_user_id, created_at)
-                    VALUES (?, ?, CURRENT_TIMESTAMP)
-                END
                 """;
         jdbcTemplate.update(sql, userId, targetUserId, userId, targetUserId);
     }

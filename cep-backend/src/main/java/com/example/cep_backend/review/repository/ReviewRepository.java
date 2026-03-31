@@ -22,7 +22,7 @@ public class ReviewRepository {
 
     public ReviewTaskDetail findReviewTaskDetail(Long orderId, Long reviewerUserId) {
         String sql = """
-                SELECT TOP 1
+                SELECT
                     t.order_id,
                     t.reviewer_user_id,
                     t.target_user_id,
@@ -36,6 +36,7 @@ public class ReviewRepository {
                 INNER JOIN trade_orders o ON o.id = t.order_id
                 LEFT JOIN users u ON u.id = t.target_user_id
                 WHERE t.order_id = ? AND t.reviewer_user_id = ?
+                LIMIT 1
                 """;
         List<ReviewTaskDetail> list = jdbcTemplate.query(sql, (rs, rowNum) -> new ReviewTaskDetail(
                 rs.getLong("order_id"),
@@ -123,11 +124,12 @@ public class ReviewRepository {
 
     private Long findConversationId(Long itemId, Long buyerUserId, Long sellerUserId) {
         String sql = """
-                SELECT TOP 1 id
+                SELECT id
                 FROM message_conversations
                 WHERE item_id = ?
                   AND buyer_user_id = ?
                   AND seller_user_id = ?
+                LIMIT 1
                 """;
         List<Long> ids = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getLong("id"), itemId, buyerUserId, sellerUserId);
         return ids.isEmpty() ? null : ids.getFirst();
@@ -206,31 +208,30 @@ public class ReviewRepository {
 
     private void createReviewTaskIfMissing(Long orderId, Long reviewerUserId, Long targetUserId, String targetRole) {
         String sql = """
-                IF NOT EXISTS (
+                INSERT INTO trade_review_tasks (
+                    order_id,
+                    reviewer_user_id,
+                    target_user_id,
+                    target_role,
+                    status,
+                    created_at,
+                    updated_at
+                )
+                SELECT ?, ?, ?, ?, 'PENDING', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                FROM DUAL
+                WHERE NOT EXISTS (
                     SELECT 1
                     FROM trade_review_tasks
                     WHERE order_id = ? AND reviewer_user_id = ?
                 )
-                BEGIN
-                    INSERT INTO trade_review_tasks (
-                        order_id,
-                        reviewer_user_id,
-                        target_user_id,
-                        target_role,
-                        status,
-                        created_at,
-                        updated_at
-                    )
-                    VALUES (?, ?, ?, ?, 'PENDING', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                END
                 """;
         jdbcTemplate.update(sql,
                 orderId,
                 reviewerUserId,
-                orderId,
-                reviewerUserId,
                 targetUserId,
-                targetRole);
+                targetRole,
+                orderId,
+                reviewerUserId);
     }
 
     public record ReviewTaskDetail(

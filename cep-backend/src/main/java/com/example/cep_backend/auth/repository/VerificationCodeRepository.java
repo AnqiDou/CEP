@@ -33,10 +33,11 @@ public class VerificationCodeRepository {
 
     public Optional<LocalDateTime> findLastCreateTime(String email, String purpose) {
         String sql = """
-                SELECT TOP 1 created_at
+                SELECT created_at
                 FROM email_verification_codes
                 WHERE email = ? AND purpose = ?
                 ORDER BY created_at DESC
+                LIMIT 1
                 """;
         List<LocalDateTime> result = jdbcTemplate.query(sql,
                 (rs, rowNum) -> rs.getObject("created_at", LocalDateTime.class),
@@ -50,10 +51,11 @@ public class VerificationCodeRepository {
 
     public Optional<VerificationCodeRecord> findLatestUnUsedCode(String email, String purpose, LocalDateTime now) {
         String sql = """
-                SELECT TOP 1 id, code, used, expires_at
+                SELECT id, code, used, expires_at
                 FROM email_verification_codes
                 WHERE email = ? AND purpose = ? AND used = 0 AND expires_at > ?
                 ORDER BY created_at DESC
+                LIMIT 1
                 """;
 
         List<VerificationCodeRecord> result = jdbcTemplate.query(sql, codeRowMapper, email, purpose, now);

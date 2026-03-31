@@ -66,7 +66,7 @@ public class AdminRepository {
 
     public java.math.BigDecimal sumTodaySales() {
         String sql = """
-                SELECT ISNULL(SUM(amount), 0)
+                SELECT IFNULL(SUM(amount), 0)
                 FROM trade_orders
                 WHERE CAST(created_at AS DATE) = CAST(CURRENT_TIMESTAMP AS DATE)
                   AND status = 'PAID'
@@ -118,11 +118,11 @@ public class AdminRepository {
                     p.note AS phone,
                     u.email,
                     u.created_at,
-                    CASE WHEN u.status = 'DISABLED' THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END AS disabled,
+                    CASE WHEN u.status = 'DISABLED' THEN 1 ELSE 0 END AS disabled,
                     (
                         SELECT COUNT(1) FROM items i
                         WHERE COALESCE(i.publisher_user_id, (
-                            SELECT TOP 1 d.publisher_user_id FROM item_details d WHERE d.item_id = i.id
+                            SELECT d.publisher_user_id FROM item_details d WHERE d.item_id = i.id ORDER BY d.id DESC LIMIT 1
                         )) = u.id
                           AND i.status <> 'DELETED'
                     ) AS item_count,
@@ -185,9 +185,11 @@ public class AdminRepository {
                 FROM items i
                 INNER JOIN item_categories c ON c.id = i.category_id
                 LEFT JOIN users u ON u.id = COALESCE(i.publisher_user_id, (
-                    SELECT TOP 1 d.publisher_user_id
+                    SELECT d.publisher_user_id
                     FROM item_details d
                     WHERE d.item_id = i.id
+                    ORDER BY d.id DESC
+                    LIMIT 1
                 ))
                 WHERE i.status <> 'DELETED'
                   AND (? = '' OR i.title LIKE ? OR c.name LIKE ?)

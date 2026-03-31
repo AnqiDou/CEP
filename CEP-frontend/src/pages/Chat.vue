@@ -3,14 +3,19 @@
     <main class="chat-main card">
       <aside class="session-panel">
         <header class="session-panel__header">
+          <p class="session-panel__kicker">Campus Messenger</p>
           <h2 class="session-panel__title">消息</h2>
+          <p class="session-panel__subtitle">柔和高效地管理你的校园会话</p>
         </header>
 
         <div class="session-filters">
           <button
             :class="[
+              'session-filter',
               'session-filter-btn',
-              sessionFilter === 'all' ? 'session-filter-btn--active' : '',
+              sessionFilter === 'all'
+                ? ['session-filter-btn--active', 'session-filter--active']
+                : '',
             ]"
             @click="sessionFilter = 'all'"
             type="button"
@@ -19,8 +24,11 @@
           </button>
           <button
             :class="[
+              'session-filter',
               'session-filter-btn',
-              sessionFilter === 'unread' ? 'session-filter-btn--active' : '',
+              sessionFilter === 'unread'
+                ? ['session-filter-btn--active', 'session-filter--active']
+                : '',
             ]"
             @click="sessionFilter = 'unread'"
             type="button"
@@ -29,8 +37,11 @@
           </button>
           <button
             :class="[
+              'session-filter',
               'session-filter-btn',
-              sessionFilter === 'read' ? 'session-filter-btn--active' : '',
+              sessionFilter === 'read'
+                ? ['session-filter-btn--active', 'session-filter--active']
+                : '',
             ]"
             @click="sessionFilter = 'read'"
             type="button"
@@ -87,6 +98,16 @@
             当前筛选下暂无会话
           </div>
         </div>
+
+        <footer class="session-panel__foot">
+          <div class="soft-mini-card">
+            <p class="soft-mini-card__label">今日提醒</p>
+            <p class="soft-mini-card__value">{{ unreadTotal }} 条未读消息</p>
+            <div class="soft-mini-card__bar">
+              <span :style="{ width: unreadProgress + '%' }"></span>
+            </div>
+          </div>
+        </footer>
       </aside>
 
       <section class="conversation-panel">
@@ -231,7 +252,14 @@
         </template>
 
         <section v-else class="conversation-empty">
-          <div class="empty-illustration">💬</div>
+          <div class="empty-illustration">
+            <div class="empty-cloud"></div>
+            <div class="empty-character">
+              <span class="empty-character__head"></span>
+              <span class="empty-character__body"></span>
+            </div>
+            <div class="empty-bubble"></div>
+          </div>
           <h3 class="conversation-empty__title">尚未选择任何联系人</h3>
           <p class="conversation-empty__desc">快点左侧列表聊起来吧～</p>
         </section>
@@ -331,7 +359,8 @@ const normalizeMessage = (item) => ({
   text: typeof item?.text === "string" ? item.text : "",
   imageUrl: typeof item?.imageUrl === "string" ? item.imageUrl : "",
   time: typeof item?.time === "string" ? item.time : "",
-  messageType: typeof item?.messageType === "string" ? item.messageType : "TEXT",
+  messageType:
+    typeof item?.messageType === "string" ? item.messageType : "TEXT",
   reviewOrderId:
     Number.isInteger(item?.reviewOrderId) && item.reviewOrderId > 0
       ? item.reviewOrderId
@@ -382,6 +411,15 @@ const activeConversation = computed(() =>
     (conversation) => conversation.id === selectedConversationId.value
   )
 );
+
+const unreadTotal = computed(() =>
+  conversationList.value.reduce(
+    (total, conversation) => total + (conversation.unread || 0),
+    0
+  )
+);
+
+const unreadProgress = computed(() => Math.min(100, unreadTotal.value * 10));
 
 const getNowTime = () => {
   const date = new Date();
@@ -632,9 +670,13 @@ const scheduleReconnect = () => {
 };
 
 const appendMessageToConversation = (conversationId, message) => {
-  const target = conversationList.value.find((item) => item.id === conversationId);
+  const target = conversationList.value.find(
+    (item) => item.id === conversationId
+  );
   if (!target) return;
-  const exists = target.messages.some((item) => String(item.id) === String(message.id));
+  const exists = target.messages.some(
+    (item) => String(item.id) === String(message.id)
+  );
   if (!exists) {
     target.messages.push(message);
   }
@@ -648,7 +690,9 @@ const handleWsMessageCreated = async (payload) => {
   }
 
   const conversationId = String(rawConversation.conversationId);
-  const conversation = upsertConversation(normalizeConversation(rawConversation));
+  const conversation = upsertConversation(
+    normalizeConversation(rawConversation)
+  );
   if (!conversation) return;
 
   appendMessageToConversation(conversationId, normalizeMessage(rawMessage));
@@ -736,57 +780,74 @@ onBeforeUnmount(() => {
 }
 
 .chat-main {
-  max-width: 1280px;
+  max-width: 1420px;
   margin: 0 auto;
   min-height: 100vh;
   display: grid;
   grid-template-columns: 360px minmax(0, 1fr);
-  background: #ffffff;
+  gap: 18px;
+  background: transparent;
 }
 
 .card {
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 20px 44px rgba(140, 124, 240, 0.12);
 }
 
 .session-panel {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  border-right: 1px solid #e5e7eb;
-  background: #f8fbff;
+  border-radius: 26px;
+  background: linear-gradient(160deg, #ffffff 0%, #f8f6ff 100%);
+  box-shadow: 0 12px 30px rgba(142, 126, 229, 0.14);
 }
 
 .session-panel__header {
-  padding: 20px 16px 10px;
+  padding: 24px 18px 12px;
+}
+
+.session-panel__kicker {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8f82c8;
 }
 
 .session-panel__title {
   margin: 0;
-  font-size: 34px;
+  font-size: 40px;
   line-height: 1.1;
   font-weight: 800;
-  color: #111827;
+  color: #2f2952;
+}
+
+.session-panel__subtitle {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #8a83ab;
 }
 
 .session-filters {
   display: flex;
   gap: 8px;
-  padding: 0 16px 12px;
+  padding: 0 18px 14px;
 }
 
 .session-filter-btn {
-  border: 1px solid #dbeafe;
+  border: 1px solid #ddd7f7;
   border-radius: 999px;
-  padding: 6px 12px;
+  padding: 7px 13px;
   font-size: 13px;
-  color: #1d4ed8;
-  background: #ffffff;
+  color: #7e71bf;
+  background: #fbfaff;
   cursor: pointer;
 }
 
 .session-filter-btn--active {
-  background: #dbeafe;
-  border-color: #93c5fd;
+  background: linear-gradient(145deg, #d8d0ff, #f4d9ef);
+  border-color: #c7bbf9;
+  color: #503f9b;
   font-weight: 700;
 }
 
@@ -794,25 +855,27 @@ onBeforeUnmount(() => {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 0 10px 12px;
+  padding: 0 12px 12px;
 }
 
 .session-item {
-  padding: 8px;
-  border-radius: 12px;
+  padding: 10px;
+  border-radius: 16px;
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr);
   gap: 8px;
   cursor: pointer;
-  transition: background 0.12s ease;
+  transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
 }
 
 .session-item:hover {
-  background: #edf4ff;
+  background: #f4f0ff;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(140, 124, 240, 0.12);
 }
 
 .session-item--active {
-  background: #e5edff;
+  background: linear-gradient(145deg, #efe9ff, #faeff8);
 }
 
 .session-item__avatar {
@@ -822,8 +885,8 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #bfdbfe, #93c5fd);
-  color: #1d4ed8;
+  background: linear-gradient(135deg, #cbc0ff, #f0d9ff);
+  color: #5e4eb6;
   font-size: 24px;
   font-weight: 700;
 }
@@ -853,7 +916,7 @@ onBeforeUnmount(() => {
 .session-item__item {
   margin: 2px 0 0;
   font-size: 12px;
-  color: #2563eb;
+  color: #6c5eb8;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -870,7 +933,7 @@ onBeforeUnmount(() => {
   margin: 0;
   flex: 1;
   font-size: 12px;
-  color: #4b5563;
+  color: #6f6a8f;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -881,7 +944,7 @@ onBeforeUnmount(() => {
   height: 20px;
   border-radius: 999px;
   padding: 0 6px;
-  background: #ef4444;
+  background: linear-gradient(150deg, #ff9fb8, #ff8fb2);
   color: #ffffff;
   font-size: 11px;
   font-weight: 700;
@@ -894,19 +957,60 @@ onBeforeUnmount(() => {
   margin-top: 24px;
   text-align: center;
   font-size: 13px;
-  color: #6b7280;
+  color: #847ca8;
+}
+
+.session-panel__foot {
+  padding: 0 16px 16px;
+}
+
+.soft-mini-card {
+  background: linear-gradient(150deg, #f4f0ff, #fff6fb);
+  border-radius: 16px;
+  padding: 12px;
+  box-shadow: 0 8px 18px rgba(140, 124, 240, 0.12);
+}
+
+.soft-mini-card__label {
+  margin: 0;
+  font-size: 12px;
+  color: #8f87b1;
+}
+
+.soft-mini-card__value {
+  margin: 6px 0 10px;
+  font-size: 14px;
+  color: #4a3f87;
+  font-weight: 700;
+}
+
+.soft-mini-card__bar {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: #ece7ff;
+  overflow: hidden;
+}
+
+.soft-mini-card__bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #9f8fff, #ffc4a8);
 }
 
 .conversation-panel {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #ffffff;
+  border-radius: 26px;
+  background: linear-gradient(155deg, #ffffff 0%, #fcfaff 100%);
+  box-shadow: 0 12px 30px rgba(142, 126, 229, 0.14);
 }
 
 .conversation-topbar {
-  padding: 14px 18px;
-  border-bottom: 1px solid #e5e7eb;
+  padding: 16px 18px;
+  border-bottom: 1px solid #ece8fb;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -931,6 +1035,7 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: 22px;
   line-height: 1.2;
+  color: #31295a;
 }
 
 .conversation-item-row {
@@ -943,7 +1048,7 @@ onBeforeUnmount(() => {
 }
 
 .conversation-item-row:hover {
-  background: #f8fbff;
+  background: #f6f3ff;
 }
 
 .conversation-item-thumb {
@@ -961,7 +1066,7 @@ onBeforeUnmount(() => {
 .conversation-item-title {
   margin: 0;
   font-size: 15px;
-  color: #2563eb;
+  color: #6353b6;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -970,14 +1075,14 @@ onBeforeUnmount(() => {
 .conversation-item-sub {
   margin: 2px 0 0;
   font-size: 12px;
-  color: #6b7280;
+  color: #8a82ab;
 }
 
 .conversation-home-btn {
-  border: 1px solid #dbeafe;
+  border: 1px solid #d9cffd;
   border-radius: 999px;
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: linear-gradient(140deg, #f5f0ff, #fff5f8);
+  color: #6252b5;
   padding: 7px 16px;
   font-size: 14px;
   font-weight: 600;
@@ -989,7 +1094,7 @@ onBeforeUnmount(() => {
   min-height: 0;
   overflow-y: auto;
   padding: 18px;
-  background: #fdfefe;
+  background: radial-gradient(circle at 15% 0%, #f4efff 0%, #fefeff 55%);
 }
 
 .message-item {
@@ -1003,14 +1108,14 @@ onBeforeUnmount(() => {
 
 .message-bubble {
   max-width: min(70%, 620px);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 10px 12px;
-  background: #e5edff;
-  color: #1f2937;
+  background: #eee8ff;
+  color: #332f52;
 }
 
 .message-item--self .message-bubble {
-  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  background: linear-gradient(135deg, #8f7fee, #ca93df);
   color: #ffffff;
 }
 
@@ -1040,13 +1145,13 @@ onBeforeUnmount(() => {
 }
 
 .review-invite-btn {
-  border: 1px solid #bfdbfe;
+  border: 1px solid #cfc1fd;
   border-radius: 999px;
   padding: 6px 12px;
   font-size: 12px;
   font-weight: 700;
-  color: #1d4ed8;
-  background: #eff6ff;
+  color: #5f4eb0;
+  background: #f3edff;
   cursor: pointer;
 }
 
@@ -1058,9 +1163,9 @@ onBeforeUnmount(() => {
 }
 
 .composer {
-  border-top: 1px solid #dbeafe;
+  border-top: 1px solid #ebe6fb;
   padding: 12px;
-  background: #ffffff;
+  background: #fffeff;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -1076,9 +1181,9 @@ onBeforeUnmount(() => {
 .tool-btn {
   width: 34px;
   height: 34px;
-  border: 1px solid #d1d5db;
+  border: 1px solid #d9d2f8;
   border-radius: 10px;
-  background: #ffffff;
+  background: #fcfbff;
   cursor: pointer;
   font-size: 18px;
   display: inline-flex;
@@ -1088,7 +1193,7 @@ onBeforeUnmount(() => {
 
 .tool-btn--emoji {
   font-size: 22px;
-  color: #111827;
+  color: #53459a;
 }
 
 .tool-btn--upload {
@@ -1114,13 +1219,13 @@ onBeforeUnmount(() => {
   height: 74px;
   border-radius: 10px;
   object-fit: cover;
-  border: 1px solid #dbeafe;
+  border: 1px solid #d8cff9;
 }
 
 .remove-image-btn {
   border: none;
-  background: #fee2e2;
-  color: #b91c1c;
+  background: #ffe8f0;
+  color: #be5279;
   border-radius: 999px;
   padding: 6px 12px;
   cursor: pointer;
@@ -1137,18 +1242,18 @@ onBeforeUnmount(() => {
   min-height: 88px;
   max-height: 180px;
   resize: vertical;
-  border: 1px solid #dbeafe;
+  border: 1px solid #e1dafb;
   border-radius: 10px;
   padding: 10px 12px;
-  background: #f8fbff;
+  background: #fbf9ff;
   outline: none;
   font-size: 14px;
   line-height: 1.5;
 }
 
 .composer-input:focus {
-  border-color: #60a5fa;
-  box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.16);
+  border-color: #b7a8f5;
+  box-shadow: 0 0 0 4px rgba(165, 148, 241, 0.2);
 }
 
 .emoji-panel {
@@ -1156,11 +1261,11 @@ onBeforeUnmount(() => {
   left: 12px;
   bottom: calc(100% + 8px);
   z-index: 20;
-  border: 1px solid #dbeafe;
+  border: 1px solid #ddd5f8;
   border-radius: 10px;
   padding: 4px;
-  background: #f8fbff;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+  background: #fbf9ff;
+  box-shadow: 0 10px 24px rgba(142, 126, 229, 0.22);
   max-width: 260px;
 }
 
@@ -1183,25 +1288,72 @@ onBeforeUnmount(() => {
   justify-content: center;
   flex-direction: column;
   gap: 10px;
-  color: #6b7280;
+  color: #7f78a1;
 }
 
 .empty-illustration {
-  width: 86px;
-  height: 86px;
+  width: 180px;
+  height: 130px;
+  border-radius: 28px;
+  position: relative;
+  background: linear-gradient(145deg, #f2ebff, #fff4ef);
+  box-shadow: 0 12px 30px rgba(140, 124, 240, 0.2);
+}
+
+.empty-cloud {
+  position: absolute;
+  width: 90px;
+  height: 34px;
+  left: 20px;
+  top: 22px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.empty-character {
+  position: absolute;
+  left: 40px;
+  bottom: 18px;
+  width: 72px;
+  height: 72px;
+}
+
+.empty-character__head {
+  position: absolute;
+  left: 22px;
+  top: 0;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #fff7d1;
-  font-size: 42px;
+  background: linear-gradient(145deg, #fff1d9, #ffdcb9);
+}
+
+.empty-character__body {
+  position: absolute;
+  left: 14px;
+  bottom: 0;
+  width: 46px;
+  height: 40px;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #9e8df6, #c39ae5);
+}
+
+.empty-bubble {
+  position: absolute;
+  right: 20px;
+  top: 36px;
+  width: 38px;
+  height: 30px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #ffffff, #eee6ff);
+  box-shadow: inset 0 0 0 1px #e0d7fb;
 }
 
 .conversation-empty__title {
   margin: 0;
   font-size: 32px;
   line-height: 1.2;
-  color: #111827;
+  color: #2c2452;
 }
 
 .conversation-empty__desc {
@@ -1215,10 +1367,10 @@ onBeforeUnmount(() => {
   padding: 11px 22px;
   font-size: 14px;
   font-weight: 600;
-  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  background: linear-gradient(135deg, #8f7fee, #c995e6);
   color: #ffffff;
   cursor: pointer;
-  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.33);
+  box-shadow: 0 8px 18px rgba(140, 124, 240, 0.35);
 }
 
 @media (max-width: 1080px) {
@@ -1232,8 +1384,7 @@ onBeforeUnmount(() => {
   }
 
   .session-panel {
-    border-right: none;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid #ece7fa;
   }
 
   .conversation-empty__title {

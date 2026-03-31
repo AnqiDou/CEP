@@ -1,0 +1,456 @@
+:root {
+  --soft-bg: #f7f8ff;
+  --soft-surface: #ffffff;
+  --soft-surface-alt: #f8f4ff;
+  --soft-text: #3b3657;
+  --soft-text-secondary: #746f94;
+  --soft-primary: #8c7cf0;
+  --soft-primary-2: #c6b9ff;
+  --soft-accent-green: #95d7ba;
+  --soft-accent-yellow: #f7d983;
+  --soft-accent-orange: #ffc197;
+  --soft-danger: #ff7f9f;
+  --soft-shadow: 0 10px 30px rgba(145, 127, 228, 0.14);
+  --soft-shadow-sm: 0 6px 16px rgba(145, 127, 228, 0.12);
+  --soft-radius-xl: 24px;
+  --soft-radius-lg: 18px;
+  --soft-radius-md: 14px;
+}
+
+html,
+body,
+#app {
+  background:
+    radial-gradient(
+      circle at 15% 10%,
+      rgba(198, 185, 255, 0.35),
+      transparent 32%
+    ),
+    radial-gradient(
+      circle at 85% 8%,
+      rgba(255, 193, 151, 0.2),
+      transparent 30%
+    ),
+    radial-gradient(
+      circle at 50% 100%,
+      rgba(149, 215, 186, 0.2),
+      transparent 36%
+    ),
+    var(--soft-bg);
+  color: var(--soft-text);
+}
+
+.profile-page,
+.chat-page,
+.other-profile-page,
+.item-detail-page,
+.confirm-page,
+.method-page,
+.wechat-page,
+.result-page,
+.review-page,
+.admin-page,
+.doc-page {
+  min-height: 100vh;
+  padding: 28px;
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+}
+
+.profile-page::before,
+.chat-page::before,
+.other-profile-page::before,
+.item-detail-page::before,
+.confirm-page::before,
+.method-page::before,
+.wechat-page::before,
+.result-page::before,
+.review-page::before,
+.admin-page::before,
+.doc-page::before {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 0;
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  background: linear-gradient(
+    140deg,
+    rgba(198, 185, 255, 0.42),
+    rgba(255, 217, 131, 0.42)
+  );
+  box-shadow: var(--soft-shadow-sm);
+}
+
+.profile-page > *,
+.chat-page > *,
+.other-profile-page > *,
+.item-detail-page > *,
+.confirm-page > *,
+.method-page > *,
+.wechat-page > *,
+.result-page > *,
+.review-page > *,
+.admin-page > *,
+.doc-page > * {
+  position: relative;
+  z-index: 1;
+}
+
+.profile-page::before {
+  content: "🧑‍🎓";
+}
+
+.chat-page::before {
+  content: "💬";
+}
+
+.other-profile-page::before {
+  content: "🧸";
+}
+
+.item-detail-page::before {
+  content: "📦";
+}
+
+.confirm-page::before {
+  content: "📝";
+}
+
+.method-page::before {
+  content: "💳";
+}
+
+.wechat-page::before {
+  content: "🪄";
+}
+
+.result-page::before {
+  content: "🎉";
+}
+
+.review-page::before {
+  content: "🌟";
+}
+
+.admin-page::before {
+  content: "🛡️";
+}
+
+.doc-page::before {
+  content: "📘";
+}
+
+.profile-page .card,
+.chat-page .card,
+.other-profile-page .card,
+.item-detail-page .card,
+.confirm-page .card,
+.method-page .card,
+.admin-page .card,
+.review-page .review-card,
+.result-page .result-card,
+.wechat-page .wechat-card,
+.confirm-page .state-card,
+.method-page .state-card,
+.item-detail-page .state-card,
+.doc-page .doc-card {
+  border: none !important;
+  border-radius: var(--soft-radius-xl);
+  background: linear-gradient(145deg, #ffffff 0%, #fcf9ff 70%, #f6f7ff 100%);
+  box-shadow: var(--soft-shadow);
+}
+
+.profile-page .profile-banner,
+.chat-page .conversation-topbar,
+.other-profile-page .seller-cover,
+.admin-page .brand,
+.result-page .result-card,
+.review-page .review-head,
+.confirm-page .page-title,
+.method-page .page-title,
+.wechat-page .wechat-head {
+  position: relative;
+  overflow: hidden;
+}
+
+.profile-page .profile-banner::after,
+.chat-page .conversation-topbar::after,
+.other-profile-page .seller-cover::after,
+.admin-page .brand::after,
+.result-page .result-card::after,
+.review-page .review-head::after,
+.confirm-page .page-title::after,
+.method-page .page-title::after,
+.wechat-page .wechat-head::after {
+  content: "";
+  position: absolute;
+  right: -40px;
+  top: -40px;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: linear-gradient(
+    145deg,
+    rgba(140, 124, 240, 0.16),
+    rgba(255, 193, 151, 0.18)
+  );
+}
+
+.profile-page .menu-item,
+.profile-page .sub-item,
+.profile-page .action-btn,
+.chat-page .session-filter,
+.chat-page .tool-btn,
+.chat-page .primary-btn,
+.other-profile-page .follow-btn,
+.other-profile-page .seller-tab,
+.other-profile-page .status-tab,
+.other-profile-page .price-sort-btn,
+.item-detail-page .primary-btn,
+.item-detail-page .secondary-btn,
+.confirm-page .primary-btn,
+.confirm-page .secondary-btn,
+.method-page .pay-btn,
+.method-page .secondary-btn,
+.wechat-page .confirm-btn,
+.wechat-page .outline-btn,
+.result-page .primary-btn,
+.result-page .secondary-btn,
+.review-page .primary-btn,
+.review-page .ghost-btn,
+.admin-page .primary-btn,
+.admin-page .text-btn,
+.admin-page .logout-btn,
+.admin-page .menu-item {
+  border-radius: 999px;
+  border: none;
+  box-shadow: var(--soft-shadow-sm);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.profile-page .menu-item:hover,
+.profile-page .sub-item:hover,
+.profile-page .action-btn:hover,
+.chat-page .session-filter:hover,
+.chat-page .tool-btn:hover,
+.chat-page .primary-btn:hover,
+.other-profile-page .follow-btn:hover,
+.other-profile-page .seller-tab:hover,
+.other-profile-page .status-tab:hover,
+.other-profile-page .price-sort-btn:hover,
+.item-detail-page .primary-btn:hover,
+.item-detail-page .secondary-btn:hover,
+.confirm-page .primary-btn:hover,
+.confirm-page .secondary-btn:hover,
+.method-page .pay-btn:hover,
+.method-page .secondary-btn:hover,
+.wechat-page .confirm-btn:hover,
+.wechat-page .outline-btn:hover,
+.result-page .primary-btn:hover,
+.result-page .secondary-btn:hover,
+.review-page .primary-btn:hover,
+.review-page .ghost-btn:hover,
+.admin-page .primary-btn:hover,
+.admin-page .text-btn:hover,
+.admin-page .logout-btn:hover,
+.admin-page .menu-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(140, 124, 240, 0.2);
+}
+
+.profile-page .menu-item--active,
+.profile-page .sub-item--active,
+.chat-page .session-filter--active,
+.other-profile-page .seller-tab--active,
+.other-profile-page .status-tab--active,
+.other-profile-page .price-sort-btn--active,
+.admin-page .menu-item--active,
+.method-page .channel-option--active {
+  background: linear-gradient(
+    120deg,
+    var(--soft-primary) 0%,
+    var(--soft-primary-2) 100%
+  ) !important;
+  color: #fff !important;
+}
+
+.profile-page .action-btn,
+.chat-page .primary-btn,
+.item-detail-page .primary-btn,
+.confirm-page .primary-btn,
+.method-page .pay-btn,
+.wechat-page .confirm-btn,
+.result-page .primary-btn,
+.review-page .primary-btn,
+.admin-page .primary-btn,
+.admin-page .menu-item--active {
+  background: linear-gradient(
+    120deg,
+    var(--soft-primary) 0%,
+    var(--soft-primary-2) 100%
+  );
+  color: #fff;
+}
+
+.profile-page .action-btn--danger,
+.admin-page .text-btn--danger,
+.admin-page .logout-btn {
+  background: linear-gradient(120deg, #ff9ab4 0%, #ffb7cc 100%);
+  color: #fff;
+}
+
+.chat-page .composer-input,
+.confirm-page input,
+.confirm-page textarea,
+.method-page input,
+.wechat-page input,
+.review-page .review-input,
+.admin-page .toolbar-input,
+.admin-page .toolbar-select,
+.admin-page .notice-input,
+.profile-page .el-input__wrapper,
+.profile-page .el-textarea__inner,
+.profile-page .el-select__wrapper,
+.doc-page .doc-card {
+  border-radius: var(--soft-radius-md) !important;
+  border: 1px solid rgba(198, 185, 255, 0.55) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  background: #fff;
+}
+
+.chat-page .session-item,
+.chat-page .message-bubble,
+.other-profile-page .goods-card,
+.other-profile-page .review-item,
+.item-detail-page .summary-meta__item,
+.profile-page .review-item,
+.profile-page .pending-item,
+.profile-page .section-item,
+.admin-page .metric-card,
+.admin-page .setting-block,
+.confirm-page .item-card,
+.confirm-page .address-card,
+.confirm-page .submit-card,
+.method-page .order-card,
+.method-page .channel-card,
+.review-page .item-row {
+  border-radius: var(--soft-radius-lg);
+  background: linear-gradient(160deg, #ffffff 0%, #fbf9ff 100%);
+  box-shadow: var(--soft-shadow-sm);
+  border: 1px solid rgba(198, 185, 255, 0.28);
+}
+
+.profile-page .credit-badge,
+.item-detail-page .summary-meta__label,
+.review-page .review-subtitle,
+.confirm-page .field span,
+.method-page .order-row span:first-child,
+.admin-page .metric-card__label,
+.admin-page .pill,
+.doc-page .doc-meta {
+  color: var(--soft-text-secondary) !important;
+}
+
+.chat-page .session-item__badge,
+.other-profile-page .seller-badge,
+.item-detail-page .summary-price,
+.confirm-page .item-price,
+.method-page .price,
+.result-page .amount,
+.admin-page .metric-card__value {
+  color: var(--soft-primary) !important;
+}
+
+.chat-page .empty-illustration,
+.other-profile-page .empty-state::before,
+.profile-page .pending-empty::before,
+.admin-page .table-wrap:empty::before,
+.result-page .success-icon {
+  content: "🧸";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(
+    145deg,
+    rgba(140, 124, 240, 0.18),
+    rgba(255, 193, 151, 0.2)
+  );
+  box-shadow: var(--soft-shadow-sm);
+}
+
+.other-profile-page .empty-state,
+.profile-page .pending-empty,
+.chat-page .conversation-empty,
+.result-page .result-card,
+.review-page .review-card,
+.confirm-page .state-card,
+.method-page .state-card,
+.wechat-page .wechat-card,
+.item-detail-page .state-card {
+  text-align: center;
+}
+
+.admin-page .dashboard-grid,
+.confirm-page .confirm-main,
+.method-page .method-main,
+.wechat-page .wechat-main,
+.result-page .result-main,
+.review-page .review-main,
+.item-detail-page .detail-main,
+.other-profile-page .other-profile-main,
+.chat-page .chat-main,
+.profile-page .profile-layout {
+  gap: 22px;
+}
+
+.profile-page .profile-layout,
+.chat-page .chat-main,
+.admin-page {
+  border-radius: var(--soft-radius-xl);
+}
+
+.doc-page .doc-card {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 28px;
+  line-height: 1.85;
+}
+
+.doc-page h1,
+.confirm-page .page-title,
+.method-page .page-title,
+.review-page .review-title,
+.item-detail-page .summary-title,
+.admin-page .brand h1 {
+  color: #4b3f89;
+  letter-spacing: 0.3px;
+}
+
+@media (max-width: 1100px) {
+  .profile-page,
+  .chat-page,
+  .other-profile-page,
+  .item-detail-page,
+  .confirm-page,
+  .method-page,
+  .wechat-page,
+  .result-page,
+  .review-page,
+  .admin-page,
+  .doc-page {
+    padding: 16px;
+  }
+}

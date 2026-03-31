@@ -53,10 +53,11 @@ public class MessageRepository {
                     c.item_id,
                     i.title AS item_title,
                     (
-                        SELECT TOP 1 p.photo_url
+                        SELECT p.photo_url
                         FROM item_photos p
                         WHERE p.item_id = c.item_id
                         ORDER BY p.sort_order ASC, p.id ASC
+                        LIMIT 1
                     ) AS item_image,
                     CASE WHEN c.buyer_user_id = ? THEN c.unread_buyer ELSE c.unread_seller END AS unread_count,
                     c.last_message,
@@ -93,10 +94,11 @@ public class MessageRepository {
                     c.item_id,
                     i.title AS item_title,
                     (
-                        SELECT TOP 1 p.photo_url
+                        SELECT p.photo_url
                         FROM item_photos p
                         WHERE p.item_id = c.item_id
                         ORDER BY p.sort_order ASC, p.id ASC
+                        LIMIT 1
                     ) AS item_image,
                     CASE WHEN c.buyer_user_id = ? THEN c.unread_buyer ELSE c.unread_seller END AS unread_count,
                     c.last_message,
@@ -133,7 +135,7 @@ public class MessageRepository {
 
     public ConversationParticipants findConversationParticipantsForUser(Long conversationId, Long userId) {
         String sql = """
-                SELECT TOP 1
+                SELECT
                     id,
                     item_id,
                     buyer_user_id,
@@ -141,6 +143,7 @@ public class MessageRepository {
                 FROM message_conversations
                 WHERE id = ?
                   AND (buyer_user_id = ? OR seller_user_id = ?)
+                LIMIT 1
                 """;
         List<ConversationParticipants> list = jdbcTemplate.query(sql,
                 (rs, rowNum) -> new ConversationParticipants(
@@ -156,10 +159,12 @@ public class MessageRepository {
 
     public Long findItemSellerUserId(Long itemId) {
         String sql = """
-                SELECT TOP 1 COALESCE(i.publisher_user_id, d.publisher_user_id) AS seller_user_id
+                SELECT COALESCE(i.publisher_user_id, d.publisher_user_id) AS seller_user_id
                 FROM items i
                 LEFT JOIN item_details d ON d.item_id = i.id
                 WHERE i.id = ?
+                ORDER BY d.id DESC
+                LIMIT 1
                 """;
         List<Long> list = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getObject("seller_user_id", Long.class), itemId);
         if (list.isEmpty()) {
@@ -170,11 +175,12 @@ public class MessageRepository {
 
     public Long findConversationIdByItemAndPair(Long itemId, Long buyerUserId, Long sellerUserId) {
         String sql = """
-                SELECT TOP 1 id
+                SELECT id
                 FROM message_conversations
                 WHERE item_id = ?
                   AND buyer_user_id = ?
                   AND seller_user_id = ?
+                LIMIT 1
                 """;
         List<Long> list = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getLong("id"), itemId, buyerUserId, sellerUserId);
         return list.isEmpty() ? null : list.getFirst();
@@ -343,7 +349,7 @@ public class MessageRepository {
 
     public MessageItemDto findMessageItemForUser(Long messageId, Long currentUserId) {
         String sql = """
-                SELECT TOP 1
+                SELECT
                     m.id,
                     m.sender_user_id,
                     m.message_type,
@@ -367,6 +373,7 @@ public class MessageRepository {
                     AND t.reviewer_user_id = ?
                 WHERE m.id = ?
                   AND (c.buyer_user_id = ? OR c.seller_user_id = ?)
+                LIMIT 1
                 """;
         List<MessageItemDto> list = jdbcTemplate.query(sql, (rs, rowNum) -> {
             Timestamp timestamp = rs.getTimestamp("created_at");
