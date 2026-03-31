@@ -27,6 +27,9 @@ const router = createRouter({
       path: "/",
       name: "home",
       component: Home,
+      meta: {
+        title: "校园易物平台",
+      },
     },
     {
       path: "/profile",
@@ -34,62 +37,96 @@ const router = createRouter({
       component: Profile,
       meta: {
         requiresAuth: true,
+        title: "个人中心",
       },
     },
     {
       path: "/publish",
       name: "publish",
       component: Publish,
+      meta: {
+        title: "发布闲置",
+      },
     },
     {
       path: "/item/:id",
       name: "item-detail",
       component: ItemDetail,
+      meta: {
+        title: "商品详情",
+      },
     },
     {
       path: "/chat",
       name: "chat",
       component: Chat,
+      meta: {
+        title: "聊天消息",
+      },
     },
     {
       path: "/user/:name",
       name: "other-profile",
       component: OtherProfile,
+      meta: {
+        title: "用户主页",
+      },
     },
     {
       path: "/terms",
       name: "terms",
       component: Terms,
+      meta: {
+        title: "用户协议",
+      },
     },
     {
       path: "/privacy",
       name: "privacy",
       component: Privacy,
+      meta: {
+        title: "隐私政策",
+      },
     },
     {
       path: "/trade/confirm",
       name: "confirm-order",
       component: ConfirmOrder,
+      meta: {
+        title: "确认订单",
+      },
     },
     {
       path: "/trade/pay-method",
       name: "payment-method",
       component: PaymentMethod,
+      meta: {
+        title: "选择支付方式",
+      },
     },
     {
       path: "/trade/wechat-pay",
       name: "wechat-pay",
       component: WechatPay,
+      meta: {
+        title: "微信支付",
+      },
     },
     {
       path: "/trade/result",
       name: "payment-result",
       component: PaymentResult,
+      meta: {
+        title: "支付结果",
+      },
     },
     {
       path: "/trade/review",
       name: "trade-review",
       component: TradeReview,
+      meta: {
+        title: "交易评价",
+      },
     },
     {
       path: "/admin",
@@ -98,6 +135,7 @@ const router = createRouter({
       meta: {
         requiresAuth: true,
         requiresAdmin: true,
+        title: "管理后台",
       },
     },
   ],
@@ -128,6 +166,14 @@ router.beforeEach(async (to) => {
   }
 
   return true;
+});
+
+router.afterEach((to) => {
+  const pageTitle = to.meta?.title;
+  document.title =
+    typeof pageTitle === "string" && pageTitle.trim()
+      ? pageTitle
+      : "校园易物平台";
 });
 
 export default router;

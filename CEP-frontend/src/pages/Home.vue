@@ -1,21 +1,9 @@
 <template>
-  <div class="home">
-    <!-- 顶部导航：平台入口 + 核心功能引导 -->
+  <div ref="homeScrollRef" class="home" @scroll.passive="handleHomeScroll">
+    <!-- 顶部导航 -->
     <header class="home-header">
       <div class="home-header__left">
         <div class="logo">校园易物</div>
-        <div class="tagline">校园闲置 · 安全易物</div>
-      </div>
-      <div class="home-header__center">
-        <div class="search-bar">
-          <input
-            v-model="keyword"
-            class="search-bar__input"
-            type="text"
-            placeholder="搜索闲置好物 / 关键字"
-          />
-          <button class="search-bar__btn" @click="handleSearch">搜索</button>
-        </div>
       </div>
       <div class="home-header__right">
         <button
@@ -41,67 +29,60 @@
       </div>
     </header>
 
-    <main class="home-main">
-      <!-- 左侧分类导航 -->
-      <aside class="category-nav">
-        <h3 class="section-title">分类导航</h3>
-        <ul class="category-list">
-          <li
+    <section class="home-hero">
+      <div class="home-hero__content">
+        <h2 class="home-hero__title">校园二手交易，安全可靠</h2>
+        <p class="home-hero__subtitle">
+          毕业生闲置处理，新生低价淘好物，仅限校内学生认证交易
+        </p>
+
+        <div class="search-bar home-hero__search">
+          <input
+            v-model="keyword"
+            class="search-bar__input"
+            type="text"
+            placeholder="搜二手闲置、书籍、电子产品..."
+          />
+          <button class="search-bar__btn" @click="handleSearch">搜索</button>
+        </div>
+
+        <nav class="category-tabs" aria-label="分类导航">
+          <button
             v-for="cat in categories"
             :key="cat.id"
+            type="button"
             :class="[
-              'category-item',
-              activeCategoryId === cat.id ? 'category-item--active' : '',
+              'category-pill',
+              activeCategoryId === cat.id ? 'category-pill--active' : '',
             ]"
             @click="selectCategory(cat.id)"
           >
-            <div class="category-item__name">
-              {{ cat.name }}
-            </div>
-            <div class="category-item__desc">
-              {{ cat.desc }}
-            </div>
-          </li>
-        </ul>
-      </aside>
+            {{ cat.name }}
+          </button>
+        </nav>
+      </div>
+    </section>
 
-      <!-- 中间推荐区：热门推荐 -->
+    <main class="home-main">
       <section class="content">
-        <!-- 热门推荐区 -->
         <section class="block block--featured">
-          <div class="block__header">
-            <div>
-              <h3 class="section-title">{{ blockTitle }}</h3>
-              <p v-if="blockDesc" class="block__desc">{{ blockDesc }}</p>
-            </div>
-            <div v-if="!isHotMode" class="block__tabs">
+          <header class="block-header">
+            <h3 class="section-title">🔥 {{ blockTitle }}</h3>
+            <div class="sort-actions">
               <button
                 v-for="option in sortOptions"
                 :key="option.id"
-                :class="[
-                  'tab-btn',
-                  isSortActive(option) ? 'tab-btn--active' : '',
-                ]"
+                class="sort-btn"
+                :class="isSortActive(option) ? 'sort-btn--active' : ''"
+                type="button"
                 @click="applySort(option)"
               >
                 {{ option.label }}
               </button>
             </div>
-          </div>
+          </header>
 
-          <div v-if="activeCategory" class="display-words">
-            <span class="display-words__label">显示词：</span>
-            <button
-              v-for="word in activeCategory.tags"
-              :key="word"
-              class="tag-btn"
-              @click="quickSearch(word)"
-            >
-              {{ word }}
-            </button>
-          </div>
-
-          <div :class="['card-grid', isHotMode ? 'card-grid--featured' : '']">
+          <div ref="cardGridRef" class="card-grid">
             <article
               v-for="item in displayedItems"
               :key="item.id"
@@ -124,20 +105,31 @@
                 <h4 class="item-card__title" :title="item.title">
                   {{ item.title }}
                 </h4>
-                <div class="item-card__meta">
-                  <span class="item-card__price">￥{{ item.price }}</span>
-                  <span v-if="item.campus" class="item-card__origin">{{
-                    item.campus
-                  }}</span>
-                </div>
-                <p class="item-card__desc">
+                <p v-if="item.desc" class="item-card__desc" :title="item.desc">
                   {{ item.desc }}
                 </p>
-                <div class="item-card__footer">
-                  <span class="item-card__time">{{ item.time }}</span>
+                <div class="item-card__price-row">
+                  <span class="item-card__price">￥{{ item.price }}</span>
+                </div>
+                <div class="item-card__seller">
+                  <el-avatar
+                    :size="24"
+                    :src="item.sellerAvatarUrl"
+                    class="item-card__seller-avatar"
+                  >
+                    <el-icon><UserFilled /></el-icon>
+                  </el-avatar>
+                  <span class="item-card__credit">{{
+                    item.sellerCreditText
+                  }}</span>
                 </div>
               </div>
             </article>
+          </div>
+
+          <div v-if="displayedItems.length > 0" class="list-status">
+            <span v-if="isLoadingMore">加载中...</span>
+            <span v-else-if="!hasMoreItems">已经到底了</span>
           </div>
 
           <div v-if="homeError" class="empty-state">{{ homeError }}</div>
@@ -495,7 +487,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { ChatDotRound, UserFilled } from "@element-plus/icons-vue";
@@ -599,18 +591,34 @@ const categories = ref([]);
 const hotItems = ref([]);
 const listItems = ref([]);
 const homeError = ref("");
-const activeCategoryId = ref(null);
-const sortBy = ref("time");
+const HOT_CATEGORY_ID = "hot";
+const HOT_BATCH_SIZE = 8;
+const LIST_PAGE_SIZE = 12;
+const activeCategoryId = ref(HOT_CATEGORY_ID);
+const sortBy = ref("price");
 const sortOrder = ref("desc");
+const hotLimit = ref(HOT_BATCH_SIZE);
+const hotHasMore = ref(true);
+const listPage = ref(1);
+const listHasMore = ref(true);
+const isLoadingMore = ref(false);
+const cardGridRef = ref(null);
+const homeScrollRef = ref(null);
 
 const sortOptions = [
-  { id: "time-desc", sortBy: "time", sortOrder: "desc", label: "最新发布" },
-  { id: "price-asc", sortBy: "price", sortOrder: "asc", label: "价格从低到高" },
+  {
+    id: "price-asc",
+    sortBy: "price",
+    sortOrder: "asc",
+    label: "价格升序",
+    icon: "↑",
+  },
   {
     id: "price-desc",
     sortBy: "price",
     sortOrder: "desc",
-    label: "价格从高到低",
+    label: "价格降序",
+    icon: "↓",
   },
 ];
 
@@ -619,25 +627,54 @@ const activeCategory = computed(() =>
 );
 
 const isHotMode = computed(
-  () => !activeCategoryId.value && !searchedKeyword.value.trim()
+  () =>
+    activeCategoryId.value === HOT_CATEGORY_ID && !searchedKeyword.value.trim()
 );
 
 const blockTitle = computed(() => {
-  if (activeCategory.value) return `${activeCategory.value.name} · 分类物品`;
   if (searchedKeyword.value.trim())
     return `搜索结果：${searchedKeyword.value.trim()}`;
+  if (isHotMode.value) return "热门推荐";
+  if (activeCategory.value) return activeCategory.value.name;
   return "热门推荐";
 });
 
 const blockDesc = computed(() => {
-  if (activeCategory.value) return "已按所选分类展示对应物品与显示词";
   if (searchedKeyword.value.trim()) return "已根据关键词筛选相关物品";
-  return "未搜索或未选择分类时，默认展示热门推荐";
+  return "";
 });
 
 const displayedItems = computed(() => {
   return isHotMode.value ? hotItems.value : listItems.value;
 });
+
+const hasMoreItems = computed(() =>
+  isHotMode.value ? hotHasMore.value : listHasMore.value
+);
+
+const resolveSellerAvatarUrl = (item) => {
+  const candidates = [
+    item.sellerAvatarUrl,
+    item.publisherAvatarUrl,
+    item.avatar,
+  ];
+  const target = candidates.find(
+    (value) => typeof value === "string" && value.trim()
+  );
+  return typeof target === "string" ? target.trim() : "";
+};
+
+const resolveSellerCreditText = (item) => {
+  const rawCredit = item.sellerCredit ?? item.publisherCredit ?? item.credit;
+  if (typeof rawCredit === "number" && Number.isFinite(rawCredit)) {
+    return `卖家信用${rawCredit.toFixed(1)}`;
+  }
+  if (typeof rawCredit === "string" && rawCredit.trim()) {
+    const creditText = rawCredit.trim();
+    return creditText.includes("信用") ? creditText : `卖家信用${creditText}`;
+  }
+  return "卖家信用良好";
+};
 
 const formatRelativeTime = (createdAt) => {
   const parsed = new Date(createdAt);
@@ -664,71 +701,177 @@ const mapHomeItem = (item) => ({
     typeof item.campus === "string" && item.campus.trim() !== "未填写"
       ? item.campus.trim()
       : "",
-  desc: item.description,
+  desc:
+    typeof item.description === "string" && item.description.trim()
+      ? item.description.trim()
+      : "",
   time: formatRelativeTime(item.createdAt),
   badge:
     typeof item.badge === "string" && item.badge.trim() !== "未填写"
       ? item.badge.trim()
       : "",
+  sellerAvatarUrl: resolveSellerAvatarUrl(item),
+  sellerCreditText: resolveSellerCreditText(item),
 });
 
 const loadCategories = async () => {
   const responseBody = await fetchHomeCategories();
-  categories.value = responseBody.data.map((item) => ({
+  const remoteCategories = responseBody.data.map((item) => ({
     id: item.id,
     name: item.name,
     desc: item.description,
     tags: item.tags,
   }));
+  categories.value = [
+    {
+      id: HOT_CATEGORY_ID,
+      name: "热门推荐",
+      desc: "",
+      tags: [],
+    },
+    ...remoteCategories,
+  ];
 };
 
-const loadHotItems = async () => {
-  const responseBody = await fetchHotItems(8);
-  hotItems.value = (responseBody.data || []).map(mapHomeItem);
+const loadHotItems = async ({ append = false } = {}) => {
+  if (!append) {
+    hotLimit.value = HOT_BATCH_SIZE;
+    hotHasMore.value = true;
+  } else {
+    if (!hotHasMore.value) {
+      return;
+    }
+    hotLimit.value += HOT_BATCH_SIZE;
+  }
+
+  const responseBody = await fetchHotItems(hotLimit.value);
+  const mappedItems = (responseBody.data || []).map(mapHomeItem);
+  hotHasMore.value = mappedItems.length >= hotLimit.value;
+  hotItems.value = mappedItems;
+
+  if (sortBy.value === "price") {
+    const factor = sortOrder.value === "asc" ? 1 : -1;
+    hotItems.value = [...hotItems.value].sort((a, b) => {
+      const priceA = Number(a?.price ?? 0);
+      const priceB = Number(b?.price ?? 0);
+      return (priceA - priceB) * factor;
+    });
+  }
 };
 
-const loadListItems = async () => {
+const loadListItems = async ({ append = false } = {}) => {
+  if (!append) {
+    listPage.value = 1;
+    listHasMore.value = true;
+  } else if (!listHasMore.value) {
+    return;
+  }
+
+  const nextPage = append ? listPage.value + 1 : 1;
   const responseBody = await fetchHomeItems({
     keyword: searchedKeyword.value.trim(),
     categoryId: activeCategoryId.value,
     sortBy: sortBy.value,
     sortOrder: sortOrder.value,
-    page: 1,
-    size: 12,
+    page: nextPage,
+    size: LIST_PAGE_SIZE,
   });
-  listItems.value = (responseBody.data?.items || []).map(mapHomeItem);
+  const incomingItems = (responseBody.data?.items || []).map(mapHomeItem);
+  listItems.value = append
+    ? [...listItems.value, ...incomingItems]
+    : incomingItems;
+  listPage.value = nextPage;
+  listHasMore.value = incomingItems.length >= LIST_PAGE_SIZE;
+};
+
+const scrollGridToTop = () => {
+  nextTick(() => {
+    homeScrollRef.value?.scrollTo({ top: 0, behavior: "auto" });
+  });
+};
+
+const loadMoreItems = async () => {
+  if (isLoadingMore.value || !hasMoreItems.value || homeError.value) {
+    return;
+  }
+  isLoadingMore.value = true;
+  try {
+    if (isHotMode.value) {
+      await loadHotItems({ append: true });
+    } else {
+      await loadListItems({ append: true });
+    }
+  } catch (error) {
+    homeError.value = error.message || "加载更多失败";
+  } finally {
+    isLoadingMore.value = false;
+  }
+};
+
+const handleHomeScroll = async () => {
+  const element = homeScrollRef.value;
+  if (!element) {
+    return;
+  }
+  const reachBottom =
+    element.scrollTop + element.clientHeight >= element.scrollHeight - 80;
+  if (reachBottom) {
+    await loadMoreItems();
+  }
+};
+
+const ensureScrollableContent = async () => {
+  await nextTick();
+  let guard = 0;
+  while (
+    homeScrollRef.value &&
+    homeScrollRef.value.scrollHeight <= homeScrollRef.value.clientHeight + 2 &&
+    hasMoreItems.value &&
+    guard < 8
+  ) {
+    await loadMoreItems();
+    await nextTick();
+    guard += 1;
+  }
 };
 
 const handleSearch = async () => {
   const value = keyword.value.trim();
   searchedKeyword.value = value;
   homeError.value = "";
-  if (!value && !activeCategoryId.value) {
+  if (!value && activeCategoryId.value === HOT_CATEGORY_ID) {
+    scrollGridToTop();
+    await ensureScrollableContent();
     return;
   }
   try {
-    await loadListItems();
+    await loadListItems({ append: false });
+    scrollGridToTop();
+    await ensureScrollableContent();
   } catch (error) {
     homeError.value = error.message || "获取物品列表失败";
   }
 };
 
-const quickSearch = async (word) => {
-  keyword.value = word;
-  searchedKeyword.value = word;
-  await handleSearch();
-};
-
 const selectCategory = async (id) => {
-  activeCategoryId.value = activeCategoryId.value === id ? null : id;
+  activeCategoryId.value = id;
   searchedKeyword.value = "";
   keyword.value = "";
   homeError.value = "";
-  if (!activeCategoryId.value) {
+  if (activeCategoryId.value === HOT_CATEGORY_ID) {
+    try {
+      await loadHotItems({ append: false });
+      scrollGridToTop();
+      await ensureScrollableContent();
+    } catch (error) {
+      homeError.value = error.message || "获取热门推荐失败";
+    }
     return;
   }
   try {
-    await loadListItems();
+    await loadListItems({ append: false });
+    scrollGridToTop();
+    await ensureScrollableContent();
   } catch (error) {
     homeError.value = error.message || "获取物品列表失败";
   }
@@ -741,11 +884,16 @@ const applySort = async (option) => {
   sortBy.value = option.sortBy;
   sortOrder.value = option.sortOrder;
   if (isHotMode.value) {
+    await loadHotItems({ append: false });
+    scrollGridToTop();
+    await ensureScrollableContent();
     return;
   }
   homeError.value = "";
   try {
-    await loadListItems();
+    await loadListItems({ append: false });
+    scrollGridToTop();
+    await ensureScrollableContent();
   } catch (error) {
     homeError.value = error.message || "获取物品列表失败";
   }
@@ -1101,6 +1249,7 @@ onMounted(async () => {
   homeError.value = "";
   try {
     await Promise.all([loadCategories(), loadHotItems()]);
+    await ensureScrollableContent();
   } catch (error) {
     homeError.value = error.message || "首页数据加载失败";
     ElMessage.error(homeError.value);
@@ -1124,9 +1273,10 @@ onBeforeUnmount(() => {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  background: #f5f7fb;
-  color: #1f2933;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #f7f7fc;
+  color: #2f3150;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
 }
@@ -1135,47 +1285,37 @@ onBeforeUnmount(() => {
   position: sticky;
   top: 0;
   z-index: 10;
-  display: grid;
-  grid-template-columns: 260px 1fr 260px;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  padding: 16px 40px;
-  background: #ffffff;
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+  padding: 14px 40px;
+  background: rgba(255, 255, 255, 0.88);
+  border-bottom: 1px solid #efedf8;
+  backdrop-filter: blur(10px);
 }
 
 .home-header__left {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 0;
 }
 
 .logo {
-  font-size: 22px;
+  font-size: 34px;
   font-weight: 700;
-  color: #2563eb;
-}
-
-.tagline {
-  font-size: 12px;
-  color: #6b7280;
-}
-
-.home-header__center {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 0 24px;
+  line-height: 1;
+  letter-spacing: 0.5px;
+  color: #8c7cf0;
 }
 
 .search-bar {
-  width: min(100%, 680px);
-  max-width: 680px;
-  margin: 0 auto;
   display: flex;
-  border-radius: 999px;
-  background: #f3f4f6;
-  padding: 3px;
-  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.4);
+  align-items: center;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 4px;
+  border: 1px solid rgba(201, 190, 246, 0.65);
+  box-shadow: 0 12px 30px rgba(140, 124, 240, 0.16);
 }
 
 .search-bar__input {
@@ -1183,21 +1323,23 @@ onBeforeUnmount(() => {
   border: none;
   outline: none;
   background: transparent;
-  padding: 8px 14px 8px 18px;
-  font-size: 14px;
+  padding: 11px 14px 11px 18px;
+  font-size: 17px;
+  color: #433f67;
 }
 
 .search-bar__input::placeholder {
-  color: #9ca3af;
+  color: #a8a1c8;
 }
 
 .search-bar__btn {
-  min-width: 88px;
+  min-width: 130px;
+  height: 48px;
   border: none;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  border-radius: 12px;
+  background: #8c7cf0;
   color: #ffffff;
-  font-size: 14px;
+  font-size: 20px;
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.2s ease;
@@ -1205,7 +1347,7 @@ onBeforeUnmount(() => {
 
 .search-bar__btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.32);
+  box-shadow: 0 10px 24px rgba(140, 124, 240, 0.28);
 }
 
 .home-header__right {
@@ -1217,7 +1359,7 @@ onBeforeUnmount(() => {
 
 .home-header__right .ghost-btn,
 .home-header__right .primary-btn {
-  height: 44px;
+  height: 40px;
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -1226,25 +1368,27 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   padding: 0;
   border-radius: 50%;
+  border-color: #e4e0f8;
+  color: #716a98;
 }
 
 .login-btn {
-  border-color: #bfdbfe;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border-color: #e6e2f8;
+  background: #f6f3ff;
+  color: #6a6296;
 }
 
 .message-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border-color: #bfdbfe;
-  color: #1d4ed8;
-  background: #eff6ff;
+  border-color: #e6e2f8;
+  color: #6a6296;
+  background: #f6f3ff;
 }
 
 .message-btn :deep(svg) {
@@ -1254,100 +1398,112 @@ onBeforeUnmount(() => {
 .primary-btn {
   border: none;
   border-radius: 999px;
-  padding: 7px 18px;
+  padding: 7px 16px;
   font-size: 14px;
   font-weight: 600;
-  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  background: #8c7cf0;
   color: #ffffff;
   cursor: pointer;
-  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.33);
+  box-shadow: 0 8px 18px rgba(140, 124, 240, 0.26);
 }
 
 .ghost-btn {
   border-radius: 999px;
-  padding: 7px 16px;
+  padding: 7px 14px;
   font-size: 14px;
-  border: 1px solid #d1d5db;
+  border: 1px solid #e6e2f8;
   background: #ffffff;
-  color: #374151;
+  color: #655f8b;
   cursor: pointer;
+}
+
+.home-hero {
+  margin: 0 0 14px;
+  padding: 34px 40px 24px;
+  background: linear-gradient(
+    112deg,
+    #e3f6ea 0%,
+    #fff4cc 15%,
+    #ffe8d7 30%,
+    #ebe8ff 54%,
+    #f3ecff 76%,
+    #ffeaf4 100%
+  );
+}
+
+.home-hero__content {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.home-hero__title {
+  margin: 0;
+  text-align: center;
+  color: #433f67;
+  font-size: 46px;
+  font-weight: 700;
+}
+
+.home-hero__subtitle {
+  margin: 12px 0 0;
+  text-align: center;
+  color: #726d97;
+  font-size: 17px;
+}
+
+.home-hero__search {
+  width: min(100%, 840px);
+  margin: 24px auto 16px;
 }
 
 .home-main {
   flex: 1;
-  display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
-  align-items: stretch;
-  gap: 16px;
   min-height: 0;
-  overflow: hidden;
-  padding: 16px 40px 12px;
-}
-
-.category-nav {
-  height: 100%;
-  overflow: auto;
-  background: #ffffff;
-  border-radius: 14px;
-  padding: 14px 12px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
-}
-
-.section-title {
-  font-size: 15px;
-  font-weight: 600;
-  margin-bottom: 10px;
-}
-
-.category-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.category-item {
-  padding: 8px 10px;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: background 0.15s ease, transform 0.1s ease;
-}
-
-.category-item:hover {
-  background: #f3f4ff;
-  transform: translateX(2px);
-}
-
-.category-item--active {
-  background: #e0ebff;
-}
-
-.category-item__name {
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 2px;
-}
-
-.category-item__desc {
-  font-size: 12px;
-  color: #6b7280;
+  overflow: visible;
+  padding: 0 40px 20px;
 }
 
 .content {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
-  overflow: hidden;
-  gap: 16px;
+}
+
+.category-tabs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  padding: 8px 2px 0;
+}
+
+.category-pill {
+  border: 1px solid rgba(163, 149, 233, 0.32);
+  border-radius: 999px;
+  padding: 7px 15px;
+  font-size: 14px;
+  color: #675f92;
+  background: rgba(255, 255, 255, 0.62);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.category-pill:hover {
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.category-pill--active {
+  background: linear-gradient(135deg, #ffffff 0%, #f8f4ff 100%);
+  border-color: #d4c8f8;
+  color: #6b5ac9;
+  font-weight: 700;
 }
 
 .block {
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 14px 16px 16px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
 }
 
 .block--featured {
@@ -1355,70 +1511,79 @@ onBeforeUnmount(() => {
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  overflow: visible;
 }
 
-.block__header {
+.section-title {
+  margin: 0;
+  font-size: 31px;
+  font-weight: 600;
+  color: #3f3a68;
+}
+
+.block-header {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 10px;
+  gap: 12px;
+  margin-bottom: 18px;
 }
 
-.block__desc {
-  margin: -2px 0 0;
-  font-size: 12px;
-  color: #6b7280;
-}
-
-.block__tabs {
-  display: flex;
+.sort-actions {
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
 }
 
-.tab-btn {
-  border-radius: 999px;
-  border: 1px solid transparent;
-  padding: 4px 10px;
-  font-size: 12px;
-  background: #f3f4f6;
-  color: #4b5563;
+.sort-btn {
+  border: 1px solid #e0e4f2;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #495274;
+  font-size: 14px;
+  padding: 7px 12px;
   cursor: pointer;
 }
 
-.tab-btn--active {
-  background: #e0ebff;
-  border-color: #2563eb;
-  color: #1d4ed8;
+.sort-btn--active {
+  border-color: #b8a9f7;
+  color: #6d5ccf;
+  background: #f1edff;
 }
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   align-content: start;
-  gap: 10px;
-  overflow-y: auto;
-  min-height: 0;
-}
-
-.card-grid--featured {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 16px;
+  flex: 0 0 auto;
+  min-height: auto;
+  overflow-y: visible;
+  padding-right: 0;
 }
 
 .item-card {
   display: flex;
+  flex-direction: column;
   gap: 10px;
   padding: 12px;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
+  border-radius: 14px;
+  border: 1px solid #eaecf5;
+  background: #ffffff;
   cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.item-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 26px rgba(135, 123, 207, 0.16);
 }
 
 .item-card__thumb {
-  width: 104px;
-  border-radius: 10px;
-  background: #bfdbfe;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ebe8ff 0%, #f7ecff 100%);
   position: relative;
   overflow: hidden;
 }
@@ -1432,14 +1597,14 @@ onBeforeUnmount(() => {
 
 .item-card__badge {
   position: absolute;
-  top: 6px;
-  left: 6px;
+  top: 8px;
+  left: 8px;
   z-index: 1;
-  padding: 2px 6px;
-  font-size: 10px;
+  padding: 4px 8px;
+  font-size: 12px;
   border-radius: 999px;
-  background: #f97316;
-  color: #ffffff;
+  background: #ffffff;
+  color: #4e5473;
 }
 
 .item-card__body {
@@ -1447,47 +1612,77 @@ onBeforeUnmount(() => {
   flex-direction: column;
   flex: 1;
   min-width: 0;
+  gap: 6px;
 }
 
 .item-card__title {
-  font-size: 14px;
+  font-size: 30px;
   font-weight: 600;
-  margin-bottom: 4px;
+  margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.item-card__meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
+.item-card__desc {
+  margin: 0;
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.item-card__price-row {
+  margin-top: auto;
 }
 
 .item-card__price {
-  font-size: 15px;
+  font-size: 39px;
   font-weight: 700;
-  color: #ef4444;
+  color: #6a5ad0;
 }
 
-.item-card__origin {
-  font-size: 12px;
-  color: #6b7280;
-}
-
-.item-card__desc {
-  font-size: 12px;
-  color: #6b7280;
-  margin-bottom: 6px;
-}
-
-.item-card__footer {
+.item-card__seller {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #8a90a8;
+}
+
+.item-card__seller-avatar {
+  flex-shrink: 0;
+  border: 1px solid #dbeafe;
+}
+
+.item-card__credit {
+  color: #8a90a8;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.list-status {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 10px;
   font-size: 12px;
-  color: #9ca3af;
+  color: #94a3b8;
+}
+
+.empty-state {
+  margin-top: 12px;
+  padding: 24px 12px;
+  border-radius: 12px;
+  text-align: center;
+  color: #6b7280;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
 }
 
 .display-words {
@@ -1512,16 +1707,6 @@ onBeforeUnmount(() => {
   background: #e5edff;
   color: #2563eb;
   cursor: pointer;
-}
-
-.empty-state {
-  margin-top: 12px;
-  padding: 24px 12px;
-  border-radius: 12px;
-  text-align: center;
-  color: #6b7280;
-  background: #f8fafc;
-  border: 1px dashed #cbd5e1;
 }
 
 .login-modal-mask {
@@ -1678,26 +1863,76 @@ onBeforeUnmount(() => {
 
 @media (max-width: 1024px) {
   .home-header {
-    grid-template-columns: 1fr;
-    row-gap: 8px;
+    padding: 12px 16px;
   }
 
-  .home-header__center {
-    order: 3;
-    padding: 0;
+  .home-header__left {
+    gap: 14px;
+  }
+
+  .logo {
+    font-size: 26px;
+  }
+
+  .home-hero {
+    padding: 22px 16px 18px;
+  }
+
+  .home-hero__title {
+    font-size: 34px;
+  }
+
+  .home-hero__subtitle {
+    font-size: 14px;
   }
 
   .home-main {
-    grid-template-columns: minmax(0, 1fr);
+    padding-left: 16px;
+    padding-right: 16px;
   }
 
   .home-header__right {
     justify-content: flex-start;
     flex-wrap: wrap;
   }
+
+  .card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .section-title,
+  .item-card__title {
+    font-size: 24px;
+  }
+
+  .item-card__price {
+    font-size: 30px;
+  }
 }
 
 @media (max-width: 640px) {
+  .card-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .home-header {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .home-hero__title {
+    font-size: 28px;
+  }
+
+  .search-bar__btn {
+    min-width: 94px;
+    font-size: 16px;
+  }
+
+  .item-card__price {
+    font-size: 27px;
+  }
+
   .login-modal {
     padding: 18px;
     border-radius: 16px;

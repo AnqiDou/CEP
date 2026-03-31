@@ -253,8 +253,11 @@ import { ElMessage } from "element-plus";
 import { useRoute, useRouter } from "vue-router";
 import { Picture } from "@element-plus/icons-vue";
 import {
+  buildMessageWebSocketUrl,
+  createOrGetDirectConversation,
   fetchConversationMessages,
   fetchMessageConversations,
+  markConversationRead,
 } from "../service/chat/chatApiService";
 import data from "emoji-mart-vue-fast/data/all.json";
 import { Picker, EmojiIndex } from "emoji-mart-vue-fast/src";
@@ -284,7 +287,9 @@ const emojiCategories = [
   "symbols",
   "flags",
 ];
-const replyTimers = new Set();
+const socketRef = ref(null);
+const reconnectTimerRef = ref(null);
+const isManualClose = ref(false);
 const isLoadingConversations = ref(false);
 const isLoadingMessages = ref(false);
 
@@ -319,6 +324,40 @@ const normalizeConversation = (raw) => ({
   updatedAt: Date.now(),
   messages: [],
 });
+
+const normalizeMessage = (item) => ({
+  id: item?.id ?? Date.now(),
+  from: item?.from === "self" ? "self" : "other",
+  text: typeof item?.text === "string" ? item.text : "",
+  imageUrl: typeof item?.imageUrl === "string" ? item.imageUrl : "",
+  time: typeof item?.time === "string" ? item.time : "",
+  messageType: typeof item?.messageType === "string" ? item.messageType : "TEXT",
+  reviewOrderId:
+    Number.isInteger(item?.reviewOrderId) && item.reviewOrderId > 0
+      ? item.reviewOrderId
+      : null,
+  reviewStatus: typeof item?.reviewStatus === "string" ? item.reviewStatus : "",
+});
+
+const upsertConversation = (normalizedConversation) => {
+  if (!normalizedConversation?.id) return null;
+  const list = conversationList.value;
+  const index = list.findIndex((item) => item.id === normalizedConversation.id);
+  if (index < 0) {
+    list.unshift(normalizedConversation);
+    return normalizedConversation;
+  }
+
+  const existing = list[index];
+  const merged = {
+    ...existing,
+    ...normalizedConversation,
+    messages: existing.messages || [],
+  };
+  list.splice(index, 1);
+  list.unshift(merged);
+  return merged;
+};
 
 const sortedConversations = computed(() => [...conversationList.value]);
 
@@ -374,6 +413,7 @@ const selectConversation = (conversationId) => {
   if (current) {
     current.unread = 0;
   }
+  markConversationRead(conversationId).catch(() => {});
 };
 
 const loadConversations = async () => {
@@ -406,21 +446,7 @@ const loadMessages = async (conversationId) => {
   try {
     const responseBody = await fetchConversationMessages(conversationId);
     const messages = Array.isArray(responseBody?.data) ? responseBody.data : [];
-    current.messages = messages.map((item) => ({
-      id: item?.id ?? Date.now(),
-      from: item?.from === "self" ? "self" : "other",
-      text: typeof item?.text === "string" ? item.text : "",
-      imageUrl: typeof item?.imageUrl === "string" ? item.imageUrl : "",
-      time: typeof item?.time === "string" ? item.time : "",
-      messageType:
-        typeof item?.messageType === "string" ? item.messageType : "TEXT",
-      reviewOrderId:
-        Number.isInteger(item?.reviewOrderId) && item.reviewOrderId > 0
-          ? item.reviewOrderId
-          : null,
-      reviewStatus:
-        typeof item?.reviewStatus === "string" ? item.reviewStatus : "",
-    }));
+    current.messages = messages.map(normalizeMessage);
   } catch (error) {
     ElMessage.error(error.message || "加载消息失败");
   } finally {
@@ -448,55 +474,26 @@ const goToReview = (orderId) => {
 };
 
 const ensureConversationFromQuery = () => {
-  const sellerName = String(route.query.sellerName || "").trim();
   const sellerUserIdRaw = Number(route.query.sellerUserId);
-  const sellerUserId =
-    Number.isInteger(sellerUserIdRaw) && sellerUserIdRaw > 0
-      ? sellerUserIdRaw
-      : null;
-  const itemTitle = String(route.query.itemTitle || "").trim();
+  const sellerUserId = Number.isInteger(sellerUserIdRaw) ? sellerUserIdRaw : 0;
   const itemIdRaw = Number(route.query.itemId);
-  const itemId = Number.isFinite(itemIdRaw) && itemIdRaw > 0 ? itemIdRaw : null;
-
-  if (!sellerName && !itemTitle) {
+  const itemId = Number.isInteger(itemIdRaw) ? itemIdRaw : 0;
+  if (sellerUserId <= 0 || itemId <= 0) {
     return;
   }
 
-  const existing = conversationList.value.find(
-    (conversation) =>
-      conversation.sellerName === sellerName &&
-      conversation.itemTitle === itemTitle
-  );
-
-  if (existing) {
-    selectConversation(existing.id);
-    return;
-  }
-
-  const now = getNowTime();
-  const id = String(Date.now());
-  conversationList.value.unshift({
-    id,
-    sellerUserId,
-    sellerName: sellerName || "卖家同学",
-    itemId,
-    itemTitle: itemTitle || "校园闲置物品",
-    itemImage: "",
-    unread: 0,
-    lastMessage: "你好，物品还在，欢迎咨询交易细节。",
-    lastTime: "刚刚",
-    updatedAt: Date.now(),
-    messages: [
-      {
-        id: Date.now(),
-        from: "other",
-        text: "你好，物品还在，欢迎咨询交易细节。",
-        imageUrl: "",
-        time: now,
-      },
-    ],
-  });
-  selectConversation(id);
+  createOrGetDirectConversation({ peerUserId: sellerUserId, itemId })
+    .then((responseBody) => {
+      const raw = responseBody?.data;
+      if (!raw) return;
+      const conversation = upsertConversation(normalizeConversation(raw));
+      if (conversation?.id) {
+        selectConversation(conversation.id);
+      }
+    })
+    .catch((error) => {
+      ElMessage.error(error.message || "创建会话失败");
+    });
 };
 
 watch(
@@ -508,8 +505,7 @@ watch(
   ],
   () => {
     ensureConversationFromQuery();
-  },
-  { immediate: true }
+  }
 );
 
 const goToItemDetail = () => {
@@ -605,53 +601,129 @@ const sendMessage = () => {
     return;
   }
 
-  const now = getNowTime();
-  current.messages.push({
-    id: Date.now(),
-    from: "self",
-    text,
-    imageUrl: pendingImageUrl.value,
-    time: now,
-  });
-  current.lastMessage = text || "[图片]";
-  current.lastTime = now;
-  current.updatedAt = Date.now();
-  current.unread = 0;
+  const socket = socketRef.value;
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    ElMessage.warning("消息通道连接中，请稍后重试");
+    return;
+  }
+
+  socket.send(
+    JSON.stringify({
+      action: "SEND_MESSAGE",
+      conversationId: Number(current.id),
+      text,
+      imageUrl: pendingImageUrl.value,
+    })
+  );
+
   draft.value = "";
   pendingImageUrl.value = "";
   showEmojiPanel.value = false;
+};
 
-  const timer = window.setTimeout(() => {
-    const replyText = "收到，我这边看到了，今晚可以在二食堂门口面交。";
-    const replyNow = getNowTime();
-    current.messages.push({
-      id: Date.now() + 1,
-      from: "other",
-      text: replyText,
-      imageUrl: "",
-      time: replyNow,
-    });
-    current.lastMessage = replyText;
-    current.lastTime = replyNow;
-    current.updatedAt = Date.now();
+const scheduleReconnect = () => {
+  if (isManualClose.value || reconnectTimerRef.value) {
+    return;
+  }
+  reconnectTimerRef.value = window.setTimeout(() => {
+    reconnectTimerRef.value = null;
+    connectWebSocket();
+  }, 3000);
+};
 
-    replyTimers.delete(timer);
-  }, 700);
+const appendMessageToConversation = (conversationId, message) => {
+  const target = conversationList.value.find((item) => item.id === conversationId);
+  if (!target) return;
+  const exists = target.messages.some((item) => String(item.id) === String(message.id));
+  if (!exists) {
+    target.messages.push(message);
+  }
+};
 
-  replyTimers.add(timer);
+const handleWsMessageCreated = async (payload) => {
+  const rawConversation = payload?.conversation;
+  const rawMessage = payload?.message;
+  if (!rawConversation?.conversationId || !rawMessage) {
+    return;
+  }
+
+  const conversationId = String(rawConversation.conversationId);
+  const conversation = upsertConversation(normalizeConversation(rawConversation));
+  if (!conversation) return;
+
+  appendMessageToConversation(conversationId, normalizeMessage(rawMessage));
+
+  if (selectedConversationId.value === conversationId) {
+    conversation.unread = 0;
+    await markConversationRead(conversationId).catch(() => {});
+    scrollToBottom();
+  }
+};
+
+const connectWebSocket = async () => {
+  if (isManualClose.value) {
+    return;
+  }
+  try {
+    const wsUrl = await buildMessageWebSocketUrl();
+    const socket = new WebSocket(wsUrl);
+    socketRef.value = socket;
+
+    socket.onopen = () => {
+      if (reconnectTimerRef.value) {
+        window.clearTimeout(reconnectTimerRef.value);
+        reconnectTimerRef.value = null;
+      }
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data || "{}");
+        const eventType = String(payload?.eventType || "").toUpperCase();
+        if (eventType === "MESSAGE_CREATED") {
+          handleWsMessageCreated(payload);
+          return;
+        }
+        if (eventType === "ERROR") {
+          ElMessage.warning(payload?.message || "消息发送失败");
+        }
+      } catch {
+        // ignore invalid payload
+      }
+    };
+
+    socket.onclose = () => {
+      socketRef.value = null;
+      scheduleReconnect();
+    };
+
+    socket.onerror = () => {
+      scheduleReconnect();
+    };
+  } catch {
+    scheduleReconnect();
+  }
 };
 
 onMounted(() => {
   window.addEventListener("click", handleClickOutsideEmojiPanel);
-  loadConversations();
+  loadConversations().finally(() => {
+    ensureConversationFromQuery();
+  });
+  connectWebSocket();
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener("click", handleClickOutsideEmojiPanel);
-  replyTimers.forEach((timer) => {
-    window.clearTimeout(timer);
-  });
-  replyTimers.clear();
+  if (reconnectTimerRef.value) {
+    window.clearTimeout(reconnectTimerRef.value);
+    reconnectTimerRef.value = null;
+  }
+  isManualClose.value = true;
+  if (socketRef.value) {
+    socketRef.value.close();
+    socketRef.value = null;
+  }
   clearPendingImage();
 });
 </script>

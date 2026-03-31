@@ -40,3 +40,27 @@ export const fetchConversationMessages = async (conversationId) =>
   requestJson(`${MESSAGE_API_BASE}/conversations/${conversationId}/messages`, {
     headers: await withAuthHeaders(),
   });
+
+export const createOrGetDirectConversation = async ({ peerUserId, itemId }) =>
+  requestJson(`${MESSAGE_API_BASE}/conversations/direct`, {
+    method: "POST",
+    headers: await withAuthHeaders({
+      "Content-Type": "application/json",
+    }),
+    body: JSON.stringify({ peerUserId, itemId }),
+  });
+
+export const markConversationRead = async (conversationId) =>
+  requestJson(`${MESSAGE_API_BASE}/conversations/${conversationId}/read`, {
+    method: "POST",
+    headers: await withAuthHeaders(),
+  });
+
+export const buildMessageWebSocketUrl = async () => {
+  const accessToken = await ensureValidAccessToken();
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const host = window.location.hostname;
+  const port = import.meta.env.VITE_BACKEND_PORT || "8080";
+  const path = "/ws/messages";
+  return `${protocol}//${host}:${port}${path}?accessToken=${encodeURIComponent(accessToken)}`;
+};
