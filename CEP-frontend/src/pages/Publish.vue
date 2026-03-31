@@ -1,134 +1,185 @@
 <template>
   <div class="publish-page">
-    <header class="publish-header">
-      <div>
-        <h1 class="publish-title">发布闲置</h1>
-        <p class="publish-subtitle">完善信息后可快速发布</p>
-      </div>
-      <div class="publish-header__actions">
-        <button
-          type="button"
-          class="primary-btn publish-header__submit"
-          :disabled="submitting"
-          @click="handleSubmit"
-        >
-          {{ submitting ? "发布中..." : "提交发布" }}
-        </button>
-        <button class="ghost-btn" @click="goBackHome">返回首页</button>
-      </div>
-    </header>
-
     <main class="publish-main">
-      <section class="form-card">
-        <form class="publish-form" @submit.prevent="handleSubmit">
-          <label class="form-field">
-            <span class="form-label">物品名称 *</span>
-            <input
-              v-model="form.name"
-              class="form-input"
-              type="text"
-              required
-              placeholder="例如：九成新机械键盘"
-            />
-          </label>
+      <aside class="left-rail soft-card">
+        <h2 class="rail-title">发布导航</h2>
+        <ul class="left-nav-list">
+          <li class="left-nav-item is-active">
+            <span class="left-nav-icon">📝</span>
+            <div>
+              <p class="left-nav-text">填写信息</p>
+              <p class="left-nav-sub">名称 / 分类 / 价格</p>
+            </div>
+          </li>
+          <li class="left-nav-item">
+            <span class="left-nav-icon">📸</span>
+            <div>
+              <p class="left-nav-text">上传图片</p>
+              <p class="left-nav-sub">最多 6 张高清实拍图</p>
+            </div>
+          </li>
+          <li class="left-nav-item">
+            <span class="left-nav-icon">🚀</span>
+            <div>
+              <p class="left-nav-text">提交发布</p>
+              <p class="left-nav-sub">审核后即可展示</p>
+            </div>
+          </li>
+        </ul>
+      </aside>
 
-          <label class="form-field">
-            <span class="form-label">分类</span>
-            <select v-model="form.category" class="form-input form-select">
-              <option disabled value="">请选择分类</option>
-              <option
-                v-for="category in categories"
-                :key="category.value"
-                :value="category.value"
-              >
-                {{ category.label }}
-              </option>
-            </select>
-          </label>
+      <section class="center-rail">
+        <header class="publish-header soft-card">
+          <div>
+            <h1 class="publish-title">发布闲置</h1>
+            <p class="publish-subtitle">完善信息后可快速发布</p>
+          </div>
+          <div class="publish-header__actions">
+            <button
+              type="button"
+              class="primary-btn publish-header__submit"
+              :disabled="submitting"
+              @click="handleSubmit"
+            >
+              {{ submitting ? "发布中..." : "提交发布" }}
+            </button>
+            <button class="ghost-btn" @click="goBackHome">返回首页</button>
+          </div>
+        </header>
 
-          <label class="form-field">
-            <span class="form-label">价格（元） *</span>
-            <input
-              v-model="form.price"
-              class="form-input"
-              type="number"
-              min="0"
-              step="0.01"
-              required
-              placeholder="例如：99.00"
-            />
-          </label>
-
-          <div class="form-grid">
+        <section class="form-card soft-card">
+          <form class="publish-form" @submit.prevent="handleSubmit">
             <label class="form-field">
-              <span class="form-label">购买时间</span>
+              <span class="form-label">物品名称 *</span>
               <input
-                v-model="form.purchaseDate"
-                class="form-input"
-                type="date"
-              />
-            </label>
-
-            <label class="form-field">
-              <span class="form-label">使用时长</span>
-              <input
-                v-model="form.usageDuration"
+                v-model="form.name"
                 class="form-input"
                 type="text"
-                placeholder="例如：8个月"
+                required
+                placeholder="例如：九成新机械键盘"
               />
             </label>
-          </div>
 
-          <label class="form-field">
-            <span class="form-label">描述</span>
-            <textarea
-              v-model="form.description"
-              class="form-input form-textarea"
-              placeholder="补充成色、功能、交易方式等信息"
-            />
-          </label>
-
-          <div class="form-field">
-            <span class="form-label">照片上传</span>
-            <label class="upload-area" for="item-photos">
-              <input
-                id="item-photos"
-                class="upload-input"
-                type="file"
-                accept="image/*"
-                multiple
-                @change="handleFileChange"
-              />
-              <span class="upload-text">点击或拖拽上传（支持多图预览）</span>
-              <span class="upload-hint">建议上传清晰实拍图，最多 6 张</span>
-            </label>
-
-            <div v-if="photoPreviews.length" class="preview-grid">
-              <article
-                v-for="(photo, index) in photoPreviews"
-                :key="photo.id"
-                class="preview-card"
-              >
-                <img
-                  :src="photo.url"
-                  :alt="`预览图${index + 1}`"
-                  class="preview-image"
-                />
-                <button
-                  type="button"
-                  class="preview-remove"
-                  @click="removePhoto(photo.id)"
+            <label class="form-field">
+              <span class="form-label">分类</span>
+              <select v-model="form.category" class="form-input form-select">
+                <option disabled value="">请选择分类</option>
+                <option
+                  v-for="category in categories"
+                  :key="category.value"
+                  :value="category.value"
                 >
-                  移除
-                </button>
-              </article>
-            </div>
-          </div>
+                  {{ category.label }}
+                </option>
+              </select>
+            </label>
 
-          <p v-if="submitMessage" class="submit-message">{{ submitMessage }}</p>
-        </form>
+            <label class="form-field">
+              <span class="form-label">价格（元） *</span>
+              <input
+                v-model="form.price"
+                class="form-input"
+                type="number"
+                min="0"
+                step="0.01"
+                required
+                placeholder="例如：99.00"
+              />
+            </label>
+
+            <div class="form-grid">
+              <label class="form-field">
+                <span class="form-label">购买时间</span>
+                <el-date-picker
+                  v-model="form.purchaseDate"
+                  class="form-input publish-date-picker"
+                  type="date"
+                  format="YYYY年MM月DD日"
+                  value-format="YYYY-MM-DD"
+                  placeholder="请选择购买日期"
+                  popper-class="publish-date-popper"
+                />
+              </label>
+
+              <label class="form-field">
+                <span class="form-label">使用时长</span>
+                <input
+                  v-model="form.usageDuration"
+                  class="form-input"
+                  type="text"
+                  placeholder="例如：8个月"
+                />
+              </label>
+            </div>
+
+            <label class="form-field">
+              <span class="form-label">描述</span>
+              <textarea
+                v-model="form.description"
+                class="form-input form-textarea"
+                placeholder="补充成色、功能、交易方式等信息"
+              />
+            </label>
+
+            <div class="form-field">
+              <span class="form-label">照片上传</span>
+              <label class="upload-area" for="item-photos">
+                <input
+                  id="item-photos"
+                  class="upload-input"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  @change="handleFileChange"
+                />
+                <span class="upload-text">点击或拖拽上传（支持多图预览）</span>
+                <span class="upload-hint">建议上传清晰实拍图，最多 6 张</span>
+              </label>
+
+              <div v-if="photoPreviews.length" class="preview-grid">
+                <article
+                  v-for="(photo, index) in photoPreviews"
+                  :key="photo.id"
+                  class="preview-card"
+                >
+                  <img
+                    :src="photo.url"
+                    :alt="`预览图${index + 1}`"
+                    class="preview-image"
+                  />
+                  <button
+                    type="button"
+                    class="preview-remove"
+                    @click="removePhoto(photo.id)"
+                  >
+                    移除
+                  </button>
+                </article>
+              </div>
+            </div>
+
+            <p v-if="submitMessage" class="submit-message">
+              {{ submitMessage }}
+            </p>
+          </form>
+        </section>
       </section>
+
+      <aside class="right-rail">
+        <section class="status-card soft-card">
+          <h3 class="rail-title">当前进度</h3>
+          <p class="status-line">图片数量：{{ photoPreviews.length }} / 6</p>
+          <div class="status-progress">
+            <span
+              class="status-progress__bar"
+              :style="{
+                width: `${Math.min((photoPreviews.length / 6) * 100, 100)}%`,
+              }"
+            ></span>
+          </div>
+          <p class="status-tip">建议至少上传 3 张真实细节图，提升成交率</p>
+        </section>
+      </aside>
     </main>
   </div>
 </template>
@@ -335,65 +386,146 @@ onBeforeUnmount(() => {
 <style scoped>
 .publish-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #eef4ff 0%, #f8fbff 36%, #f3f6fb 100%);
-  color: #1f2937;
-}
-
-.publish-header {
-  max-width: 1160px;
-  margin: 0 auto;
-  padding: 28px 24px 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 14px;
-}
-
-.publish-header__actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.publish-title {
-  margin: 0;
-  font-size: 30px;
-  color: #1d4ed8;
-}
-
-.publish-subtitle {
-  margin: 10px 0 0;
-  font-size: 14px;
-  color: #64748b;
+  padding: 24px;
+  background: radial-gradient(
+      circle at 12% 16%,
+      rgba(198, 185, 255, 0.52),
+      transparent 32%
+    ),
+    radial-gradient(
+      circle at 84% 8%,
+      rgba(255, 204, 227, 0.44),
+      transparent 28%
+    ),
+    linear-gradient(180deg, #fbfbff 0%, #f6f4ff 48%, #f8f9ff 100%);
+  background-attachment: fixed;
+  color: #443b63;
+  box-sizing: border-box;
 }
 
 .publish-main {
-  max-width: 1160px;
+  max-width: 1320px;
   margin: 0 auto;
-  padding: 0 24px 28px;
-  display: block;
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 300px;
+  gap: 20px;
+  align-items: start;
 }
 
-.form-card {
-  border-radius: 16px;
+.soft-card {
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 18px 36px rgba(140, 124, 240, 0.13),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+.left-rail {
+  padding: 18px 14px;
+  position: sticky;
+  top: 18px;
+}
+
+.rail-title {
+  margin: 0 0 14px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #6656b6;
+}
+
+.left-nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.left-nav-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 14px;
+  background: #f8f5ff;
+}
+
+.left-nav-item.is-active {
+  background: linear-gradient(140deg, #ece7ff 0%, #ffeef7 100%);
+}
+
+.left-nav-icon {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
   background: #ffffff;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
 }
 
-.form-card {
-  padding: 22px;
+.left-nav-text {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #5f4fa8;
 }
 
-.publish-form {
+.left-nav-sub {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: #948ab7;
+}
+
+.center-rail {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
+.publish-header {
+  padding: 20px 22px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+}
+
+.publish-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.publish-title {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #6452b5;
+}
+
+.publish-subtitle {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: #9388b5;
+}
+
+.form-card {
+  padding: 24px;
+}
+
+.publish-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 14px;
 }
 
 .form-field {
@@ -405,18 +537,20 @@ onBeforeUnmount(() => {
 .form-label {
   font-size: 14px;
   font-weight: 600;
+  color: #635790;
 }
 
 .form-input {
   min-height: 44px;
-  border: 1px solid #dbeafe;
-  border-radius: 12px;
+  border: 1px solid #ebe5ff;
+  border-radius: 14px;
   padding: 10px 14px;
-  background: #f8fbff;
+  background: #fdfcff;
   font-size: 14px;
-  color: #1f2937;
+  color: #4a3f6c;
   outline: none;
   box-sizing: border-box;
+  transition: all 0.2s ease;
 }
 
 .form-input[type="number"]::-webkit-outer-spin-button,
@@ -431,12 +565,46 @@ onBeforeUnmount(() => {
 }
 
 .form-input:focus {
-  border-color: #60a5fa;
-  box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.16);
+  border-color: #c6b9ff;
+  box-shadow: 0 0 0 4px rgba(198, 185, 255, 0.34);
 }
 
 .form-select {
   appearance: none;
+}
+
+:deep(.publish-date-picker) {
+  width: 100%;
+}
+
+:deep(.publish-date-picker .el-input__wrapper) {
+  min-height: 44px;
+  border-radius: 14px;
+  border: 1px solid #ebe5ff;
+  background: #fdfcff;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+:deep(.publish-date-picker .el-input__inner) {
+  color: #4a3f6c;
+  cursor: pointer;
+}
+
+:deep(.publish-date-picker .el-input__prefix),
+:deep(.publish-date-picker .el-input__suffix),
+:deep(.publish-date-picker .el-input__icon) {
+  cursor: pointer;
+}
+
+:deep(.publish-date-picker .el-input__wrapper:hover) {
+  border-color: #d7cbff;
+}
+
+:deep(.publish-date-picker.is-focus .el-input__wrapper),
+:deep(.publish-date-picker .el-input__wrapper.is-focus) {
+  border-color: #c6b9ff;
+  box-shadow: 0 0 0 4px rgba(198, 185, 255, 0.34);
 }
 
 .form-textarea {
@@ -446,15 +614,15 @@ onBeforeUnmount(() => {
 
 .upload-area {
   position: relative;
-  border: 1px dashed #93c5fd;
-  border-radius: 12px;
+  border: 1px dashed #c8bbff;
+  border-radius: 16px;
   padding: 20px 14px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  background: #f8fbff;
+  background: linear-gradient(145deg, #f9f6ff 0%, #fff8fc 100%);
   cursor: pointer;
 }
 
@@ -466,13 +634,13 @@ onBeforeUnmount(() => {
 }
 
 .upload-text {
-  color: #1d4ed8;
+  color: #6754b9;
   font-weight: 600;
 }
 
 .upload-hint {
   font-size: 12px;
-  color: #64748b;
+  color: #9c92be;
 }
 
 .preview-grid {
@@ -483,10 +651,11 @@ onBeforeUnmount(() => {
 }
 
 .preview-card {
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
-  border: 1px solid #dbeafe;
-  background: #f8fbff;
+  border: 1px solid #ede7ff;
+  background: #fefcff;
+  box-shadow: 0 8px 20px rgba(140, 124, 240, 0.12);
 }
 
 .preview-image {
@@ -500,8 +669,8 @@ onBeforeUnmount(() => {
   width: 100%;
   border: none;
   padding: 8px;
-  background: #e5edff;
-  color: #1d4ed8;
+  background: #efe9ff;
+  color: #6754b9;
   font-size: 12px;
   cursor: pointer;
 }
@@ -509,7 +678,7 @@ onBeforeUnmount(() => {
 .submit-message {
   margin: 0;
   font-size: 13px;
-  color: #2563eb;
+  color: #6b5ab5;
 }
 
 .primary-btn {
@@ -518,23 +687,159 @@ onBeforeUnmount(() => {
   padding: 10px 20px;
   font-size: 15px;
   font-weight: 600;
-  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  background: linear-gradient(135deg, #8c7cf0 0%, #c6b9ff 58%, #ffbfd9 100%);
   color: #ffffff;
   cursor: pointer;
-  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.33);
+  box-shadow: 0 10px 20px rgba(140, 124, 240, 0.34);
+}
+
+.publish-header__submit {
+  background: #8c7cf0;
+  box-shadow: 0 10px 20px rgba(140, 124, 240, 0.36);
+}
+
+.primary-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .ghost-btn {
   border-radius: 999px;
   padding: 8px 16px;
   font-size: 14px;
-  border: 1px solid #d1d5db;
+  border: 1px solid #e3dcff;
   background: #ffffff;
-  color: #374151;
+  color: #61548f;
   cursor: pointer;
 }
 
+.right-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: sticky;
+  top: 18px;
+}
+
+.status-card {
+  padding: 16px;
+}
+
+.status-line {
+  margin: 0;
+  color: #7465af;
+  font-size: 13px;
+}
+
+.status-progress {
+  margin-top: 10px;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: #eee9ff;
+  overflow: hidden;
+}
+
+.status-progress__bar {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #8c7cf0, #fcb0cd);
+  transition: width 0.25s ease;
+}
+
+.status-tip {
+  margin: 10px 0 0;
+  color: #9a8fbd;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+:deep(.publish-date-popper) {
+  border: 1px solid #ece5ff;
+  border-radius: 18px;
+  padding: 10px;
+  box-shadow: 0 16px 34px rgba(140, 124, 240, 0.2);
+}
+
+:deep(.publish-date-popper .el-picker-panel__body-wrapper),
+:deep(.publish-date-popper .el-picker-panel__body) {
+  background: linear-gradient(180deg, #fdfbff 0%, #f9f6ff 100%);
+}
+
+:deep(.publish-date-popper .el-date-picker__header-label),
+:deep(.publish-date-popper .el-picker-panel__icon-btn) {
+  color: #6656b6;
+  cursor: pointer;
+}
+
+:deep(.publish-date-popper .el-date-table th) {
+  color: #8d82b3;
+}
+
+:deep(.publish-date-popper .el-date-table td.available) {
+  color: #4a3f6c;
+}
+
+:deep(
+    .publish-date-popper
+      .el-date-table
+      td.current:not(.disabled)
+      .el-date-table-cell__text
+  ) {
+  color: #ffffff;
+  background: linear-gradient(135deg, #8c7cf0 0%, #c6b9ff 100%);
+  border-radius: 9px;
+}
+
+:deep(.publish-date-popper .el-date-table td.today .el-date-table-cell__text) {
+  color: #7a67cd;
+}
+
+:deep(
+    .publish-date-popper
+      .el-date-table
+      td.available:hover
+      .el-date-table-cell__text
+  ),
+:deep(
+    .publish-date-popper
+      .el-date-table
+      td.available.in-range
+      .el-date-table-cell__text
+  ) {
+  background: #efe9ff;
+  color: #6150ab;
+  border-radius: 9px;
+}
+
+:deep(.publish-date-popper .el-picker-panel__footer .el-button) {
+  border-radius: 999px;
+}
+
+:deep(.publish-date-popper .el-picker-panel__footer .el-button--text) {
+  color: #7464bb;
+}
+
+:deep(.publish-date-popper .el-picker-panel__footer .el-button--default) {
+  border-color: #d9ceff;
+  color: #6150ab;
+}
+
 @media (max-width: 960px) {
+  .publish-page {
+    padding: 16px;
+  }
+
+  .publish-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .left-rail,
+  .right-rail {
+    position: static;
+  }
+
   .publish-header {
     flex-direction: column;
     align-items: flex-start;
@@ -543,18 +848,24 @@ onBeforeUnmount(() => {
   .publish-header__actions {
     width: 100%;
     justify-content: flex-start;
+    flex-wrap: wrap;
   }
 }
 
 @media (max-width: 680px) {
-  .publish-header,
-  .publish-main {
-    padding-left: 14px;
-    padding-right: 14px;
+  .publish-page {
+    padding: 12px;
   }
 
   .publish-title {
     font-size: 26px;
+  }
+
+  .publish-header,
+  .form-card,
+  .left-rail,
+  .status-card {
+    border-radius: 18px;
   }
 
   .form-grid {
