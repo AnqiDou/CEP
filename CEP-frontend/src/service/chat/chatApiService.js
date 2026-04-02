@@ -58,6 +58,20 @@ export const markConversationRead = async (conversationId) =>
 
 export const buildMessageWebSocketUrl = async () => {
   const accessToken = await ensureValidAccessToken();
+  const wsBaseUrl = (import.meta.env.VITE_WS_BASE_URL || "").trim();
+  if (wsBaseUrl) {
+    const base = wsBaseUrl.endsWith("/")
+      ? wsBaseUrl.slice(0, wsBaseUrl.length - 1)
+      : wsBaseUrl;
+    return `${base}/ws/messages?accessToken=${encodeURIComponent(accessToken)}`;
+  }
+
+  if (import.meta.env.PROD) {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const host = window.location.host;
+    return `${protocol}//${host}/ws/messages?accessToken=${encodeURIComponent(accessToken)}`;
+  }
+
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   const host = window.location.hostname;
   const port = import.meta.env.VITE_BACKEND_PORT || "8080";

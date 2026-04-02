@@ -43,7 +43,7 @@
               hasMultiplePhotos ? '' : 'gallery-wrap--single',
             ]"
           >
-            <div v-if="hasMultiplePhotos" class="gallery-list">
+            <div v-if="hasMultiplePhotos" class="gallery-list soft-panel">
               <button
                 v-for="(photo, index) in item.photos"
                 :key="photo"
@@ -58,7 +58,7 @@
               </button>
             </div>
 
-            <div class="gallery-main-box">
+            <div class="gallery-main-box soft-panel">
               <img
                 v-if="activePhoto"
                 :src="activePhoto"
@@ -70,10 +70,39 @@
           </div>
 
           <div class="summary">
-            <div class="summary-price-row">
-              <span class="summary-price">￥{{ displayPrice }}</span>
+            <div class="summary-hero soft-gradient-panel">
+              <div>
+                <p class="summary-tip">闲置好物</p>
+                <div class="summary-price-row">
+                  <span class="summary-price">￥{{ displayPrice }}</span>
+                </div>
+                <h1 class="summary-title">{{ item.title }}</h1>
+                <p class="summary-subtitle">
+                  {{ item.category }} · 校园安心交易
+                </p>
+              </div>
+              <div class="mini-illustration" aria-hidden="true">
+                <span class="mini-illustration__emoji">🧸</span>
+              </div>
             </div>
-            <h1 class="summary-title">{{ item.title }}</h1>
+
+            <div class="feature-grid">
+              <article
+                v-for="feature in featureCards"
+                :key="feature.title"
+                class="feature-card"
+              >
+                <p class="feature-icon">{{ feature.icon }}</p>
+                <p class="feature-title">{{ feature.title }}</p>
+                <p class="feature-subtitle">{{ feature.subtitle }}</p>
+                <div class="feature-track">
+                  <span
+                    class="feature-progress"
+                    :style="{ width: `${feature.progress}%` }"
+                  />
+                </div>
+              </article>
+            </div>
 
             <div class="summary-scroll">
               <div class="summary-meta">
@@ -93,7 +122,7 @@
 
             <div class="summary-actions">
               <button class="secondary-btn" type="button" @click="startChat">
-                聊天
+                聊天咨询
               </button>
               <button class="primary-btn" type="button" @click="applyTrade">
                 申请交易
@@ -288,6 +317,27 @@ const detailRows = computed(() => {
   return rows.filter((row) => normalizeOptionalText(row.value));
 });
 
+const featureCards = computed(() => [
+  {
+    icon: "🌸",
+    title: "成色状态",
+    subtitle: item.value.usageDuration || "信息已完善",
+    progress: item.value.usageDuration ? 76 : 62,
+  },
+  {
+    icon: "🫧",
+    title: "描述完整度",
+    subtitle: item.value.description ? "细节清晰" : "基础信息",
+    progress: item.value.description ? 88 : 58,
+  },
+  {
+    icon: "🍯",
+    title: "卖家信用",
+    subtitle: `${item.value.publisher.credit.toFixed(1)} 分`,
+    progress: Math.min(100, Math.max(40, item.value.publisher.credit * 20)),
+  },
+]);
+
 const activePhoto = ref("");
 const isFavorite = ref(false);
 
@@ -360,115 +410,122 @@ const toggleFavorite = () => {
 <style scoped>
 .item-detail-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #eef4ff 0%, #f8fbff 36%, #f3f6fb 100%);
-  color: #1f2937;
+  background: #f8f8fc;
+  color: #4a4464;
 }
 
 .detail-main {
-  max-width: 1160px;
+  max-width: 1220px;
   margin: 0 auto;
-  padding-left: 24px;
-  padding-right: 24px;
+  padding: 38px 30px 56px;
 }
 
 .card {
-  border-radius: 16px;
+  border-radius: 26px;
+  background: #fcfbff;
+  box-shadow: 0 16px 42px rgba(156, 140, 192, 0.14);
+}
+
+.soft-panel {
+  border-radius: 22px;
   background: #ffffff;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 10px 24px rgba(165, 149, 201, 0.12);
+}
+
+.soft-gradient-panel {
+  border-radius: 24px;
+  padding: 20px 22px;
+  background: linear-gradient(135deg, #c6b9ff 0%, #dbc8ff 45%, #f2dff7 100%);
+  box-shadow: 0 14px 26px rgba(180, 160, 223, 0.22);
 }
 
 .state-card {
-  margin-bottom: 14px;
-  padding: 22px 20px;
+  margin-bottom: 20px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .state-card--error {
-  border: 1px solid #fecaca;
+  border: 1px solid #f5d6de;
 }
 
 .state-title {
   margin: 0;
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .state-desc {
   margin: 0;
-  color: #6b7280;
-}
-
-.detail-main {
-  padding-top: 24px;
-  padding-bottom: 28px;
+  color: #756f8f;
 }
 
 .seller-bar {
-  margin-bottom: 14px;
-  padding: 14px 16px;
+  margin-bottom: 20px;
+  padding: 18px 22px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
 }
 
 .seller-info {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .seller-home-btn {
   margin-left: auto;
-  border: 1px solid #bfdbfe;
+  border: none;
   border-radius: 999px;
-  background: #eff6ff;
-  color: #1d4ed8;
-  padding: 6px 12px;
+  background: #efeaff;
+  color: #5f4ca2;
+  padding: 8px 14px;
   font-size: 13px;
   cursor: pointer;
 }
 
 .seller-avatar {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #bfdbfe, #93c5fd);
-  color: #1d4ed8;
+  background: linear-gradient(135deg, #e2d7ff, #f5e9ff);
+  color: #6f56bf;
   font-size: 20px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .seller-name {
   margin: 0;
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .seller-meta,
 .seller-note {
   margin: 4px 0 0;
-  color: #6b7280;
+  color: #7f789f;
   font-size: 13px;
 }
 
 .detail-top {
-  padding: 18px;
+  padding: 24px;
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
-  gap: 18px;
+  gap: 24px;
   align-items: stretch;
 }
 
 .gallery-wrap {
   display: grid;
-  grid-template-columns: 126px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 14px;
 }
 
 .gallery-wrap--single {
@@ -476,16 +533,16 @@ const toggleFavorite = () => {
 }
 
 .gallery-main-box {
-  border-radius: 14px;
+  border-radius: 22px;
   overflow: hidden;
-  border: 1px solid #dbeafe;
-  background: #ffffff;
+  padding: 10px;
 }
 
 .gallery-main {
   width: 100%;
   aspect-ratio: 4 / 5;
   object-fit: cover;
+  border-radius: 16px;
 }
 
 .gallery-empty {
@@ -494,23 +551,25 @@ const toggleFavorite = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #9ca3af;
+  color: #9f98bb;
   font-size: 16px;
-  background: #f8fbff;
+  background: #f6f2ff;
+  border-radius: 16px;
 }
 
 .gallery-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  padding: 10px;
 }
 
 .gallery-thumb {
-  border: 1px solid #dbeafe;
-  border-radius: 10px;
+  border: 2px solid transparent;
+  border-radius: 14px;
   overflow: hidden;
   padding: 0;
-  background: #ffffff;
+  background: #f8f5ff;
   cursor: pointer;
 }
 
@@ -522,41 +581,121 @@ const toggleFavorite = () => {
 }
 
 .gallery-thumb--active {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  border-color: #b8a2ff;
+  box-shadow: 0 8px 18px rgba(184, 162, 255, 0.35);
+}
+
+.summary {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.summary-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.summary-tip {
+  margin: 0;
+  font-size: 12px;
+  color: #65589d;
 }
 
 .summary-title {
-  margin: 8px 0 0;
-  font-size: 38px;
+  margin: 6px 0 0;
+  font-size: 34px;
   line-height: 1.25;
-  color: #111827;
+  color: #2f2950;
+}
+
+.summary-subtitle {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #6d6298;
 }
 
 .summary-price-row {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 8px;
 }
 
 .summary-price {
   margin: 0;
-  font-size: 46px;
-  font-weight: 700;
-  color: #f97316;
+  font-size: 42px;
+  font-weight: 600;
+  color: #6a57b3;
 }
 
-.summary-origin-price {
-  color: #9ca3af;
-  font-size: 18px;
-  text-decoration: line-through;
+.mini-illustration {
+  width: 68px;
+  height: 68px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mini-illustration__emoji {
+  font-size: 32px;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.feature-card {
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(166, 151, 203, 0.14);
+  padding: 12px;
+}
+
+.feature-icon {
+  margin: 0;
+  font-size: 20px;
+}
+
+.feature-title {
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #473f6c;
+}
+
+.feature-subtitle {
+  margin: 4px 0 8px;
+  font-size: 12px;
+  color: #867fad;
+}
+
+.feature-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: #ece5ff;
+  overflow: hidden;
+}
+
+.feature-progress {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: #b29bff;
 }
 
 .summary-meta {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  color: #374151;
+  gap: 8px;
+  color: #4f496f;
   font-size: 13px;
 }
 
@@ -571,44 +710,33 @@ const toggleFavorite = () => {
 }
 
 .summary-meta__label {
-  width: 72px;
+  width: 76px;
   flex-shrink: 0;
-  color: #6b7280;
+  color: #8e86b0;
 }
 
 .summary-meta__value {
-  color: #1f2937;
+  color: #514b70;
   line-height: 1.6;
 }
 
 .summary-scroll {
-  margin-top: 12px;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  border-radius: 12px;
-  border: 1px solid #dbeafe;
-  padding: 10px 12px;
-  background: #f8fbff;
+  border-radius: 18px;
+  padding: 14px;
+  background: #f6f2ff;
 }
 
 .summary-actions {
-  margin-top: auto;
-  padding-top: 14px;
   display: flex;
   align-items: center;
-  gap: 10px;
-}
-
-.summary {
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+  gap: 12px;
 }
 
 .primary-btn,
-.secondary-btn,
-.ghost-btn {
+.secondary-btn {
   border-radius: 999px;
   font-size: 14px;
   font-weight: 600;
@@ -617,26 +745,26 @@ const toggleFavorite = () => {
 
 .primary-btn {
   border: none;
-  padding: 10px 28px;
+  padding: 11px 28px;
   color: #ffffff;
-  background: linear-gradient(135deg, #2563eb, #3b82f6);
-  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.3);
+  background: #8f7ff0;
+  box-shadow: 0 10px 18px rgba(143, 127, 240, 0.35);
 }
 
 .secondary-btn {
-  border: 1px solid #bfdbfe;
-  padding: 9px 24px;
-  color: #1d4ed8;
-  background: #eff6ff;
+  border: none;
+  padding: 11px 24px;
+  color: #605092;
+  background: #efeaff;
 }
 
 .favorite-icon-btn {
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  border: 1px solid #d1d5db;
-  background: #ffffff;
-  color: #6b7280;
+  border: none;
+  background: #f2ecff;
+  color: #8379ae;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -645,9 +773,8 @@ const toggleFavorite = () => {
 }
 
 .favorite-icon-btn--active {
-  border-color: #f59e0b;
-  background: #fff7ed;
-  color: #f59e0b;
+  background: #ffeecf;
+  color: #ca8a03;
 }
 
 @media (max-width: 980px) {
@@ -655,19 +782,22 @@ const toggleFavorite = () => {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .feature-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .summary-title {
     font-size: 30px;
   }
 
   .summary-price {
-    font-size: 40px;
+    font-size: 36px;
   }
 }
 
 @media (max-width: 680px) {
   .detail-main {
-    padding-left: 14px;
-    padding-right: 14px;
+    padding: 20px 14px 36px;
   }
 
   .gallery-wrap {
@@ -678,6 +808,14 @@ const toggleFavorite = () => {
     order: 2;
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .feature-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .summary-actions {
+    flex-wrap: wrap;
   }
 
   .seller-bar {

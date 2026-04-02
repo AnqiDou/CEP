@@ -799,7 +799,7 @@ onBeforeUnmount(() => {
   height: 100%;
   min-height: 0;
   border-radius: 26px;
-  background: linear-gradient(160deg, #ffffff 0%, #f8f6ff 100%);
+  background: #ffffff;
   box-shadow: 0 12px 30px rgba(142, 126, 229, 0.14);
 }
 
@@ -841,12 +841,12 @@ onBeforeUnmount(() => {
   padding: 7px 13px;
   font-size: 13px;
   color: #7e71bf;
-  background: #fbfaff;
+  background: #ffffff;
   cursor: pointer;
 }
 
 .session-filter-btn--active {
-  background: linear-gradient(145deg, #d8d0ff, #f4d9ef);
+  background: #ffffff;
   border-color: #c7bbf9;
   color: #503f9b;
   font-weight: 700;
@@ -865,18 +865,19 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr);
   gap: 8px;
+  background: #ffffff;
   cursor: pointer;
   transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
 }
 
 .session-item:hover {
-  background: #f4f0ff;
+  background: #ffffff;
   transform: translateY(-1px);
   box-shadow: 0 8px 16px rgba(140, 124, 240, 0.12);
 }
 
 .session-item--active {
-  background: linear-gradient(145deg, #efe9ff, #faeff8);
+  background: #ffffff;
 }
 
 .session-item__avatar {
@@ -1083,7 +1084,7 @@ onBeforeUnmount(() => {
 .conversation-home-btn {
   border: 1px solid #d9cffd;
   border-radius: 999px;
-  background: linear-gradient(140deg, #f5f0ff, #fff5f8);
+  background: #ffffff;
   color: #6252b5;
   padding: 7px 16px;
   font-size: 14px;
@@ -1096,7 +1097,7 @@ onBeforeUnmount(() => {
   min-height: 0;
   overflow-y: auto;
   padding: 18px;
-  background: radial-gradient(circle at 15% 0%, #f4efff 0%, #fefeff 55%);
+  background: #ffffff;
 }
 
 .message-item {
@@ -1153,7 +1154,7 @@ onBeforeUnmount(() => {
   font-size: 12px;
   font-weight: 700;
   color: #5f4eb0;
-  background: #f3edff;
+  background: #ffffff;
   cursor: pointer;
 }
 
@@ -1185,7 +1186,7 @@ onBeforeUnmount(() => {
   height: 34px;
   border: 1px solid #d9d2f8;
   border-radius: 10px;
-  background: #fcfbff;
+  background: #ffffff;
   cursor: pointer;
   font-size: 18px;
   display: inline-flex;
@@ -1226,7 +1227,7 @@ onBeforeUnmount(() => {
 
 .remove-image-btn {
   border: none;
-  background: #ffe8f0;
+  background: #ffffff;
   color: #be5279;
   border-radius: 999px;
   padding: 6px 12px;
@@ -1369,10 +1370,11 @@ onBeforeUnmount(() => {
   padding: 11px 22px;
   font-size: 14px;
   font-weight: 600;
-  background: linear-gradient(135deg, #8f7fee, #c995e6);
-  color: #ffffff;
+  background: #ffffff;
+  color: #6252b5;
   cursor: pointer;
-  box-shadow: 0 8px 18px rgba(140, 124, 240, 0.35);
+  box-shadow: 0 6px 14px rgba(140, 124, 240, 0.16);
+  border: 1px solid #d9cffd;
 }
 
 @media (max-width: 1080px) {

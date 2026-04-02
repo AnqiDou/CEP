@@ -148,35 +148,16 @@
                 >
                   退出登录
                 </button>
-                <el-button class="home-btn" plain @click="goHome"
-                  ><el-icon><House /></el-icon>返回首页</el-button
+                <button
+                  class="action-btn action-btn--home"
+                  type="button"
+                  @click="goHome"
                 >
+                  返回首页
+                </button>
               </div>
             </div>
           </div>
-
-          <div class="hero-illustration" aria-hidden="true">
-            <div class="character character--left">◕‿◕</div>
-            <div class="character character--right">•ᴗ•</div>
-            <span class="bubble bubble--a"></span>
-            <span class="bubble bubble--b"></span>
-            <span class="bubble bubble--c"></span>
-          </div>
-        </section>
-
-        <section class="summary-grid">
-          <article
-            v-for="card in overviewCards"
-            :key="card.title"
-            :class="['summary-card', 'summary-card--' + card.tone]"
-          >
-            <p class="summary-card__title">{{ card.title }}</p>
-            <p class="summary-card__value">{{ card.value }}</p>
-            <p class="summary-card__sub">{{ card.sub }}</p>
-            <div class="summary-card__progress">
-              <span :style="{ width: card.progress + '%' }"></span>
-            </div>
-          </article>
         </section>
 
         <section class="profile-content soft-card">
@@ -443,7 +424,6 @@ import {
   ArrowDown,
   ArrowRight,
   Goods,
-  House,
   Star,
   Tickets,
   User,
@@ -550,38 +530,6 @@ const reviewTabs = computed(() => [
   { key: "good", label: `好评 ${reviewStats.good}` },
   { key: "bad", label: `差评 ${reviewStats.bad}` },
 ]);
-
-const overviewCards = computed(() => {
-  const publishCount = sectionItemMap["trade-published"]?.length || 0;
-  const soldCount = sectionItemMap["trade-sold"]?.length || 0;
-  const totalTrade = publishCount + soldCount + pendingTrades.value.length;
-  return [
-    {
-      title: "待处理事项",
-      value: pendingTrades.value.length,
-      sub: "需要优先完成",
-      progress: Math.min(100, pendingTrades.value.length * 20),
-      tone: "purple",
-    },
-    {
-      title: "收到评价",
-      value: reviewStats.total,
-      sub: `好评 ${reviewStats.good} · 差评 ${reviewStats.bad}`,
-      progress:
-        reviewStats.total > 0
-          ? Math.round((reviewStats.good / reviewStats.total) * 100)
-          : 0,
-      tone: "orange",
-    },
-    {
-      title: "交易记录",
-      value: totalTrade,
-      sub: `已发布 ${publishCount} · 已卖出 ${soldCount}`,
-      progress: Math.min(100, totalTrade * 10),
-      tone: "green",
-    },
-  ];
-});
 
 const filteredReviewList = computed(() => {
   if (activeReviewTab.value === "good") {
@@ -962,6 +910,7 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
   gap: 20px;
+  align-items: start;
 }
 
 .soft-card {
@@ -976,8 +925,8 @@ onMounted(async () => {
   flex-direction: column;
   gap: 10px;
   align-self: start;
-  position: sticky;
-  top: 20px;
+  position: static;
+  margin-top: 0;
 }
 
 .sidebar-title {
@@ -1053,15 +1002,22 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  margin-top: 0;
 }
 
 .hero-card {
   padding: 24px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 16px;
   background: linear-gradient(135deg, #efe8ff 0%, #ffeefa 100%);
+}
+
+.hero-illustration,
+.character,
+.bubble {
+  display: none !important;
 }
 
 .profile-user {
@@ -1208,121 +1164,10 @@ onMounted(async () => {
   color: #8c3f46;
 }
 
-.hero-illustration {
-  min-width: 170px;
-  height: 130px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.42);
-  position: relative;
-  overflow: hidden;
-}
-
-.character {
-  position: absolute;
-  bottom: 14px;
-  width: 62px;
-  height: 62px;
-  border-radius: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  color: #5f4a9f;
-}
-
-.character--left {
-  left: 18px;
-  background: #d5ccfd;
-}
-
-.character--right {
-  right: 18px;
-  background: #ffd8b2;
-}
-
-.bubble {
-  position: absolute;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.75);
-}
-
-.bubble--a {
-  width: 20px;
-  height: 20px;
-  top: 18px;
-  left: 20px;
-}
-
-.bubble--b {
-  width: 14px;
-  height: 14px;
-  top: 30px;
-  right: 45px;
-}
-
-.bubble--c {
-  width: 10px;
-  height: 10px;
-  top: 12px;
-  right: 18px;
-}
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.summary-card {
-  border-radius: 18px;
-  padding: 16px;
-  box-shadow: 0 12px 24px rgba(140, 124, 240, 0.1);
-}
-
-.summary-card--purple {
-  background: #f2ecff;
-}
-
-.summary-card--orange {
-  background: #fff2e6;
-}
-
-.summary-card--green {
-  background: #edf9f2;
-}
-
-.summary-card__title {
-  margin: 0;
-  font-size: 13px;
-  color: #6f6a83;
-}
-
-.summary-card__value {
-  margin: 6px 0 0;
-  font-size: 30px;
-  color: #2f2f3f;
-  font-weight: 700;
-}
-
-.summary-card__sub {
-  margin: 6px 0 0;
-  font-size: 13px;
-  color: #6f6a83;
-}
-
-.summary-card__progress {
-  margin-top: 10px;
-  height: 6px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.75);
-  overflow: hidden;
-}
-
-.summary-card__progress span {
-  display: block;
-  height: 100%;
-  background: #8c7cf0;
-  border-radius: 999px;
+.action-btn--home {
+  border: 1px solid #d9cef8;
+  background: #f7f3ff;
+  color: #6f5ab8;
 }
 
 .profile-content {
@@ -1612,12 +1457,6 @@ onMounted(async () => {
   font-size: 13px;
 }
 
-@media (max-width: 1160px) {
-  .summary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 980px) {
   .profile-page {
     padding: 12px;
@@ -1634,14 +1473,6 @@ onMounted(async () => {
   .hero-card {
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .hero-illustration {
-    width: 100%;
-  }
-
-  .summary-grid {
-    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

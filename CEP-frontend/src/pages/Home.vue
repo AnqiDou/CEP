@@ -5,6 +5,20 @@
       <div class="home-header__left">
         <div class="logo">校园易物</div>
       </div>
+
+      <div class="home-header__center">
+        <div class="search-bar home-header__search">
+          <input
+            v-model="keyword"
+            class="search-bar__input"
+            type="text"
+            placeholder="搜二手闲置、书籍、电子产品..."
+            @keyup.enter="handleSearch"
+          />
+          <button class="search-bar__btn" @click="handleSearch">搜索</button>
+        </div>
+      </div>
+
       <div class="home-header__right">
         <button
           v-if="!isUserLoggedIn"
@@ -14,12 +28,19 @@
           登录
         </button>
         <button class="primary-btn" @click="goToPublish">发布闲置</button>
+        <button
+          class="ghost-btn icon-btn"
+          @click="goToCart"
+          aria-label="购物车"
+        >
+          <el-icon><ShoppingCart /></el-icon>
+        </button>
         <button class="ghost-btn message-btn" @click="goToChat">
+          <span class="message-btn__dot" v-if="hasUnreadMessage"></span>
           <el-icon><ChatDotRound /></el-icon>
           <span>消息</span>
         </button>
         <button
-          v-if="isUserLoggedIn"
           class="ghost-btn profile-btn"
           @click="goToProfile"
           aria-label="进入个人主页"
@@ -30,40 +51,110 @@
     </header>
 
     <section class="home-hero">
-      <div class="home-hero__content">
-        <h2 class="home-hero__title">校园二手交易，安全可靠</h2>
-        <p class="home-hero__subtitle">
-          毕业生闲置处理，新生低价淘好物，仅限校内学生认证交易
-        </p>
+      <aside class="home-ops">
+        <div class="home-ops__layout">
+          <article class="ops-card ops-card--benefit">
+            <div class="ops-benefit__content">
+              <h4>{{ opsCards.benefit.title }}</h4>
+              <p>{{ opsCards.benefit.desc }}</p>
+            </div>
+            <div class="ops-benefit__poster" aria-hidden="true">
+              <span class="ops-benefit__layer ops-benefit__layer--back"></span>
+              <span class="ops-benefit__layer ops-benefit__layer--mid"></span>
+              <span class="ops-benefit__layer ops-benefit__layer--front">
+                <span class="ops-benefit__poster-text">福利<br />放送</span>
+              </span>
+            </div>
+            <button
+              type="button"
+              class="ops-benefit__cta"
+              @click.stop="goToOpsItem(0)"
+            >
+              去看看
+            </button>
+          </article>
 
-        <div class="search-bar home-hero__search">
-          <input
-            v-model="keyword"
-            class="search-bar__input"
-            type="text"
-            placeholder="搜二手闲置、书籍、电子产品..."
-          />
-          <button class="search-bar__btn" @click="handleSearch">搜索</button>
+          <div class="home-ops__season-list">
+            <article
+              v-for="(season, index) in opsCards.seasons"
+              :key="season.id"
+              class="ops-card ops-card--season"
+              @click="goToOpsItem(index)"
+            >
+              <div class="ops-card__main">
+                <h4>{{ season.title }}</h4>
+                <p>{{ season.desc }}</p>
+              </div>
+              <div class="ops-item-preview" v-if="seasonPreviewItems[index]">
+                <div class="ops-item-preview__thumb">
+                  <img
+                    v-if="seasonPreviewItems[index].photoUrl"
+                    :src="seasonPreviewItems[index].photoUrl"
+                    :alt="seasonPreviewItems[index].title || '季节活动商品'"
+                  />
+                  <span v-else>好物</span>
+                </div>
+                <p class="ops-item-preview__title">
+                  {{ seasonPreviewItems[index].title || "精选单品" }}
+                </p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </aside>
+
+      <section class="home-hero-showcase">
+        <div class="home-hero-showcase__carousel-wrap">
+          <el-carousel
+            class="home-hero-showcase__carousel"
+            height="100%"
+            trigger="click"
+            :autoplay="true"
+            @change="handleHeroCarouselChange"
+          >
+            <el-carousel-item
+              v-for="(item, index) in heroCarouselItems"
+              :key="item.id || index"
+            >
+              <div class="home-hero-showcase__slide">
+                <img
+                  v-if="item.photoUrl"
+                  :src="item.photoUrl"
+                  :alt="item.title || '福利商品轮播图'"
+                  class="home-hero-showcase__image"
+                />
+                <div v-else class="home-hero-showcase__image-placeholder">
+                  暂无图片
+                </div>
+              </div>
+            </el-carousel-item>
+          </el-carousel>
         </div>
 
-        <nav class="category-tabs" aria-label="分类导航">
-          <button
-            v-for="cat in categories"
-            :key="cat.id"
-            type="button"
-            :class="[
-              'category-pill',
-              activeCategoryId === cat.id ? 'category-pill--active' : '',
-            ]"
-            @click="selectCategory(cat.id)"
-          >
-            {{ cat.name }}
-          </button>
-        </nav>
-      </div>
+        <article class="home-hero-showcase__info">
+          <h4 class="home-hero-showcase__title">{{ heroCurrentItem.title }}</h4>
+          <p class="home-hero-showcase__price">￥{{ heroCurrentItem.price }}</p>
+          <p class="home-hero-showcase__desc">{{ heroCurrentItem.desc }}</p>
+        </article>
+      </section>
     </section>
 
     <main class="home-main">
+      <nav class="category-tabs" aria-label="分类导航">
+        <button
+          v-for="cat in categories"
+          :key="cat.id"
+          type="button"
+          :class="[
+            'category-pill',
+            activeCategoryId === cat.id ? 'category-pill--active' : '',
+          ]"
+          @click="selectCategory(cat.id)"
+        >
+          {{ cat.name }}
+        </button>
+      </nav>
+
       <section class="content">
         <section class="block block--featured">
           <header class="block-header">
@@ -523,7 +614,11 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
-import { ChatDotRound, UserFilled } from "@element-plus/icons-vue";
+import {
+  ChatDotRound,
+  ShoppingCart,
+  UserFilled,
+} from "@element-plus/icons-vue";
 import {
   loginUser,
   registerUser,
@@ -540,6 +635,7 @@ import {
 } from "../service/common/authSessionService";
 import {
   fetchHomeCategories,
+  fetchHotKeywords,
   fetchHomeItems,
   fetchHotItems,
 } from "../service/home/homeApiService";
@@ -637,6 +733,8 @@ const listHasMore = ref(true);
 const isLoadingMore = ref(false);
 const cardGridRef = ref(null);
 const homeScrollRef = ref(null);
+const hotKeywords = ref([]);
+const hasUnreadMessage = ref(true);
 
 const sortOptions = [
   {
@@ -679,6 +777,75 @@ const blockDesc = computed(() => {
 
 const displayedItems = computed(() => {
   return isHotMode.value ? hotItems.value : listItems.value;
+});
+
+const opsCards = computed(() => ({
+  benefit: {
+    id: "ops-benefit",
+    title: "平台福利",
+    desc: "交易成功送校园积分，可兑换打印券、奶茶券等合作商家权益。",
+  },
+  seasons: [
+    {
+      id: "ops-graduate",
+      title: "毕业季「清仓市集」",
+      desc: "集中展示毕业生商品，支持快速筛选与批量降价好货。",
+    },
+    {
+      id: "ops-campus",
+      title: "校园季「开学好物」",
+      desc: "精选宿舍与学习必备，一个卡片聚焦一件高性价比单品。",
+    },
+  ],
+}));
+
+const seasonPreviewItems = computed(() => {
+  const source = hotItems.value.length ? hotItems.value : displayedItems.value;
+  return [source[0], source[1]];
+});
+
+const heroActiveIndex = ref(0);
+
+const heroCarouselItems = computed(() => {
+  const source = hotItems.value.length ? hotItems.value : displayedItems.value;
+  const validItems = source
+    .filter((item) => item && (item.photoUrl || item.title || item.desc))
+    .slice(0, 5)
+    .map((item, index) => ({
+      id: item.id ?? `hero-${index}`,
+      title: item.title || "校园精选福利",
+      price: item.price ?? "0.00",
+      desc: item.desc || "精选好物限时推荐，欢迎点击查看详情。",
+      photoUrl: item.photoUrl || "",
+    }));
+
+  if (validItems.length > 0) {
+    return validItems;
+  }
+
+  return [
+    {
+      id: "hero-fallback-1",
+      title: "校园精选福利",
+      price: "29.90",
+      desc: "福利专区每日上新，覆盖学习与生活必备好物。",
+      photoUrl: "",
+    },
+  ];
+});
+
+const heroCurrentItem = computed(() => {
+  const list = heroCarouselItems.value;
+  if (!list.length) {
+    return {
+      title: "校园精选福利",
+      price: "0.00",
+      desc: "暂无推荐商品",
+      photoUrl: "",
+    };
+  }
+  const safeIndex = Math.min(heroActiveIndex.value, list.length - 1);
+  return list[safeIndex];
 });
 
 const hasMoreItems = computed(() =>
@@ -764,6 +931,23 @@ const loadCategories = async () => {
     },
     ...remoteCategories,
   ];
+};
+
+const loadHotKeywords = async () => {
+  try {
+    const responseBody = await fetchHotKeywords(6);
+    const words = (responseBody.data || [])
+      .map((item) =>
+        typeof item.keyword === "string" ? item.keyword.trim() : ""
+      )
+      .filter(Boolean)
+      .slice(0, 6);
+    hotKeywords.value = words.length
+      ? words
+      : ["耳机", "自行车", "计算器", "考研资料", "宿舍收纳"];
+  } catch {
+    hotKeywords.value = ["耳机", "自行车", "计算器", "考研资料", "宿舍收纳"];
+  }
 };
 
 const loadHotItems = async ({ append = false } = {}) => {
@@ -886,6 +1070,25 @@ const handleSearch = async () => {
   }
 };
 
+const selectHotKeyword = async (word) => {
+  keyword.value = word;
+  await handleSearch();
+};
+
+const goToOpsItem = (index) => {
+  const source = hotItems.value.length ? hotItems.value : displayedItems.value;
+  const target = source[index];
+  if (!target?.id) {
+    ElMessage.info("当前暂无可跳转的商品");
+    return;
+  }
+  goToItemDetail(target.id);
+};
+
+const handleHeroCarouselChange = (index) => {
+  heroActiveIndex.value = Number.isFinite(index) ? index : 0;
+};
+
 const selectCategory = async (id) => {
   activeCategoryId.value = id;
   searchedKeyword.value = "";
@@ -987,6 +1190,11 @@ const goToChat = () => {
   }
   const resolved = router.resolve("/chat");
   window.open(resolved.href, "_blank");
+  hasUnreadMessage.value = false;
+};
+
+const goToCart = () => {
+  router.push("/trade/confirm");
 };
 
 const goToItemDetail = (id) => {
@@ -1281,7 +1489,7 @@ onMounted(async () => {
   await initAuthSession();
   homeError.value = "";
   try {
-    await Promise.all([loadCategories(), loadHotItems()]);
+    await Promise.all([loadCategories(), loadHotItems(), loadHotKeywords()]);
     await ensureScrollableContent();
   } catch (error) {
     homeError.value = error.message || "首页数据加载失败";
@@ -1308,7 +1516,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
-  background: #f7f7fc;
+  background: #ffffff;
   color: #2f3150;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -1319,9 +1527,10 @@ onBeforeUnmount(() => {
   top: 0;
   z-index: 10;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 14px 40px;
+  height: 85px;
+  box-sizing: border-box;
+  padding: 0 28px;
   background: rgba(255, 255, 255, 0.88);
   border-bottom: 1px solid #efedf8;
   backdrop-filter: blur(10px);
@@ -1334,11 +1543,26 @@ onBeforeUnmount(() => {
 }
 
 .logo {
-  font-size: 34px;
+  font-size: 30px;
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.5px;
   color: #8c7cf0;
+}
+
+.home-header__center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(52vw, 760px);
+}
+
+.home-header__search {
+  width: 100%;
+  box-shadow: 0 4px 14px rgba(140, 124, 240, 0.12);
 }
 
 .search-bar {
@@ -1356,8 +1580,8 @@ onBeforeUnmount(() => {
   border: none;
   outline: none;
   background: transparent;
-  padding: 11px 14px 11px 18px;
-  font-size: 17px;
+  padding: 10px 14px 10px 16px;
+  font-size: 15px;
   color: #433f67;
 }
 
@@ -1366,16 +1590,38 @@ onBeforeUnmount(() => {
 }
 
 .search-bar__btn {
-  min-width: 130px;
-  height: 48px;
+  min-width: 86px;
+  height: 40px;
   border: none;
   border-radius: 12px;
   background: #8c7cf0;
   color: #ffffff;
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.2s ease;
+}
+
+.hot-keywords {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hot-keywords__label {
+  font-size: 12px;
+  color: #8b88a9;
+}
+
+.hot-keywords__item {
+  border: 1px solid #e8e4fb;
+  border-radius: 999px;
+  background: #faf9ff;
+  color: #6f67a2;
+  font-size: 12px;
+  padding: 2px 10px;
+  cursor: pointer;
 }
 
 .search-bar__btn:hover {
@@ -1388,6 +1634,8 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
   align-items: center;
   gap: 10px;
+  padding-top: 2px;
+  margin-left: auto;
 }
 
 .home-header__right .ghost-btn,
@@ -1409,6 +1657,16 @@ onBeforeUnmount(() => {
   color: #716a98;
 }
 
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
 .login-btn {
   border-color: #e6e2f8;
   background: #f6f3ff;
@@ -1419,9 +1677,21 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  position: relative;
   border-color: #e6e2f8;
   color: #6a6296;
   background: #f6f3ff;
+}
+
+.message-btn__dot {
+  position: absolute;
+  top: 7px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff4d4f;
+  box-shadow: 0 0 0 2px #f6f3ff;
 }
 
 .message-btn :deep(svg) {
@@ -1451,49 +1721,309 @@ onBeforeUnmount(() => {
 }
 
 .home-hero {
+  --hero-showcase-height: 300px;
   margin: 0 0 14px;
-  padding: 34px 40px 24px;
-  background: linear-gradient(
-    112deg,
-    #e3f6ea 0%,
-    #fff4cc 15%,
-    #ffe8d7 30%,
-    #ebe8ff 54%,
-    #f3ecff 76%,
-    #ffeaf4 100%
-  );
+  padding: 20px 28px;
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  background: transparent;
 }
 
-.home-hero__content {
-  max-width: 980px;
-  margin: 0 auto;
+.home-ops {
+  flex: 0 0 450px;
+  min-width: 450px;
+  max-width: 450px;
+  height: var(--hero-showcase-height);
+  padding: 0;
+  background: transparent;
+  border: none;
 }
 
-.home-hero__title {
+.home-hero-showcase {
+  flex: 1;
+  min-width: 0;
+  height: var(--hero-showcase-height);
+  border-radius: 18px;
+  border: 1px solid rgba(213, 204, 251, 0.75);
+  background: rgba(255, 255, 255, 0.92);
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.home-hero-showcase__carousel-wrap {
+  width: 40%;
+  height: 100%;
+  min-width: 0;
+  background: transparent;
+}
+
+.home-hero-showcase__carousel {
+  width: 100%;
+  height: 100%;
+}
+
+.home-hero-showcase__slide {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.home-hero-showcase__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.home-hero-showcase__image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8f88b8;
+  font-size: 14px;
+}
+
+.home-hero-showcase__info {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 22px 20px;
+  box-sizing: border-box;
+}
+
+.home-hero-showcase__title {
   margin: 0;
-  text-align: center;
-  color: #433f67;
-  font-size: 46px;
+  font-size: 26px;
+  line-height: 1.3;
+  color: #3f3a68;
+}
+
+.home-hero-showcase__price {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1;
   font-weight: 700;
+  color: #6d5ccf;
 }
 
-.home-hero__subtitle {
-  margin: 12px 0 0;
+.home-hero-showcase__desc {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #6e6a90;
+}
+
+.home-ops__list {
+  display: grid;
+  gap: 10px;
+}
+
+.home-ops__layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  height: 100%;
+}
+
+.home-ops__season-list {
+  display: grid;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-height: 0;
+}
+
+.ops-card {
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #ece8ff;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.ops-card:hover {
+  border-color: #cfc3f8;
+  box-shadow: 0 10px 20px rgba(137, 122, 220, 0.12);
+  transform: translateY(-1px);
+}
+
+.ops-card h4 {
+  margin: 0;
+  font-size: 14px;
+  color: #5747ad;
+}
+
+.ops-card p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #6e6a90;
+  line-height: 1.5;
+}
+
+.ops-card--benefit {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  margin: 0;
+  background: linear-gradient(160deg, #fcfbff 0%, #f2efff 100%);
+}
+
+.ops-benefit__content {
+  margin-bottom: 10px;
+}
+
+.ops-benefit__poster {
+  position: relative;
+  width: 136px;
+  height: 110px;
+  margin: 2px auto 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ops-benefit__layer {
+  position: absolute;
+  width: 84px;
+  height: 84px;
+  border-radius: 4px;
+  border: 2px solid #6f3fd7;
+  box-shadow: 0 4px 10px rgba(86, 57, 153, 0.2);
+}
+
+.ops-benefit__layer--back {
+  background: #d6bcff;
+  transform: rotate(-8deg) translate(-8px, 2px);
+}
+
+.ops-benefit__layer--mid {
+  background: #cbb1ff;
+  transform: rotate(7deg) translate(8px, -4px);
+}
+
+.ops-benefit__layer--front {
+  background: #f7efff;
+  transform: rotate(-2deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ops-benefit__poster-text {
+  color: #6c36d2;
+  font-size: 30px;
+  line-height: 1.05;
+  font-weight: 900;
   text-align: center;
-  color: #726d97;
-  font-size: 17px;
+  letter-spacing: 1px;
+  text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff,
+    1px 1px 0 #fff, 0 3px 0 rgba(93, 45, 168, 0.32);
 }
 
-.home-hero__search {
-  width: min(100%, 840px);
-  margin: 24px auto 16px;
+.ops-benefit__cta {
+  margin: 12px auto 0;
+  height: 30px;
+  padding: 0 16px;
+  border: 1px solid #bda1ff;
+  border-radius: 999px;
+  background: #fff;
+  color: #6b42d8;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ops-benefit__cta:hover {
+  background: #f7f2ff;
+  border-color: #a684ff;
+}
+
+.ops-benefit__content h4 {
+  margin-top: 0;
+}
+
+.ops-benefit__content p {
+  margin-top: 6px;
+}
+
+.ops-card--season {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 0;
+}
+
+.ops-card__main {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.ops-item-preview {
+  flex: 0 0 76px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+
+.ops-item-preview__thumb {
+  width: 76px;
+  height: 54px;
+  border-radius: 8px;
+  border: 1px solid #ebe6ff;
+  background: #f7f4ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.ops-item-preview__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ops-item-preview__thumb span {
+  font-size: 12px;
+  color: #7b72aa;
+}
+
+.ops-item-preview__title {
+  margin: 0;
+  max-width: 76px;
+  font-size: 11px;
+  line-height: 1.25;
+  color: #7a729e;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .home-main {
   flex: 1;
   min-height: 0;
   overflow: visible;
-  padding: 0 40px 20px;
+  padding: 0 28px 20px;
 }
 
 .content {
@@ -1504,10 +2034,10 @@ onBeforeUnmount(() => {
 .category-tabs {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 9px;
   flex-wrap: wrap;
-  padding: 8px 2px 0;
+  padding: 0 0 14px;
 }
 
 .category-pill {
@@ -1663,6 +2193,7 @@ onBeforeUnmount(() => {
   color: #6b7280;
   line-height: 1.5;
   display: -webkit-box;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -1928,7 +2459,19 @@ onBeforeUnmount(() => {
 
 @media (max-width: 1024px) {
   .home-header {
+    display: grid;
+    grid-template-columns: 1fr;
+    height: auto;
     padding: 12px 16px;
+    gap: 10px;
+  }
+
+  .home-header__center,
+  .home-header__right {
+    justify-self: stretch;
+    position: static;
+    transform: none;
+    width: 100%;
   }
 
   .home-header__left {
@@ -1939,26 +2482,32 @@ onBeforeUnmount(() => {
     font-size: 26px;
   }
 
+  .home-header__right {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
   .home-hero {
-    padding: 22px 16px 18px;
+    flex-direction: column;
+    padding: 16px;
   }
 
-  .home-hero__title {
-    font-size: 34px;
+  .home-ops {
+    width: 100%;
+    max-width: none;
   }
 
-  .home-hero__subtitle {
-    font-size: 14px;
+  .home-ops__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .home-hero-showcase {
+    width: 100%;
   }
 
   .home-main {
     padding-left: 16px;
     padding-right: 16px;
-  }
-
-  .home-header__right {
-    justify-content: flex-start;
-    flex-wrap: wrap;
   }
 
   .card-grid {
@@ -1976,17 +2525,35 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 640px) {
+  .home-hero-showcase {
+    height: auto;
+    min-height: 300px;
+    flex-direction: column;
+  }
+
+  .home-hero-showcase__carousel-wrap {
+    width: 100%;
+    height: 180px;
+  }
+
+  .home-hero-showcase__title {
+    font-size: 22px;
+  }
+
+  .home-hero-showcase__price {
+    font-size: 28px;
+  }
+
   .card-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .home-header {
-    flex-wrap: wrap;
-    gap: 10px;
+  .home-header__center {
+    order: 3;
   }
 
-  .home-hero__title {
-    font-size: 28px;
+  .search-bar__input {
+    font-size: 14px;
   }
 
   .search-bar__btn {
