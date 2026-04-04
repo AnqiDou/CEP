@@ -4,15 +4,17 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public record HomeItemRecord(Long id,
-        Long categoryId,
-        String categoryCode,
-        String categoryName,
-        String title,
-        String description,
-        BigDecimal price,
-        String campus,
-        String badge,
-        String opsColumns,
-        String photoUrl,
-        LocalDateTime createdAt) {
+                Long categoryId,
+                Long publisherUserId,
+                Boolean self,
+                String categoryCode,
+                String categoryName,
+                String title,
+                String description,
+                BigDecimal price,
+                String campus,
+                String badge,
+                String opsColumns,
+                String photoUrl,
+                LocalDateTime createdAt) {
 }

@@ -1,8 +1,8 @@
 const HOME_API_BASE = "/api/home";
 
-const requestJson = async (url) => {
+const requestJson = async (url, options = {}) => {
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, options);
     const body = await response.json().catch(() => ({}));
 
     if (!response.ok || body.success === false) {
@@ -36,25 +36,44 @@ export const fetchHomeItems = ({
   keyword,
   categoryId,
   opsColumn,
+  viewerScope,
   sortBy,
   sortOrder,
   page = 1,
   size = 12,
+  accessToken,
 }) =>
   requestJson(
     `${HOME_API_BASE}/items${buildQuery({
       keyword,
       categoryId,
       opsColumn,
+      viewerScope,
       sortBy,
       sortOrder,
       page,
       size,
     })}`,
+    accessToken
+      ? {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      : undefined,
   );
 
-export const fetchHotItems = (limit = 8) =>
-  requestJson(`${HOME_API_BASE}/hot-items${buildQuery({ limit })}`);
+export const fetchHotItems = (limit = 8, { viewerScope, accessToken } = {}) =>
+  requestJson(
+    `${HOME_API_BASE}/hot-items${buildQuery({ limit, viewerScope })}`,
+    accessToken
+      ? {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      : undefined,
+  );
 
 export const fetchHotKeywords = (limit = 10) =>
   requestJson(`${HOME_API_BASE}/hot-keywords${buildQuery({ limit })}`);

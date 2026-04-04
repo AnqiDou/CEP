@@ -25,6 +25,8 @@ public class HomeRepository {
     private final RowMapper<HomeItemRecord> itemRowMapper = (rs, rowNum) -> new HomeItemRecord(
             rs.getLong("id"),
             rs.getLong("category_id"),
+            rs.getLong("publisher_user_id"),
+            rs.getBoolean("is_self"),
             rs.getString("category_code"),
             rs.getString("category_name"),
             rs.getString("title"),
@@ -53,9 +55,14 @@ public class HomeRepository {
         return jdbcTemplate.query(sql, categoryRowMapper);
     }
 
-    public long countItems(String keyword, Long categoryId, String opsColumn) {
+    public long countItems(String keyword,
+            Long categoryId,
+            String opsColumn,
+            Long currentUserId,
+            boolean selfOnly,
+            boolean othersOnly) {
         List<Object> args = new ArrayList<>();
-        String sql = buildBaseItemSql(keyword, categoryId, opsColumn, args, true);
+        String sql = buildBaseItemSql(keyword, categoryId, opsColumn, currentUserId, selfOnly, othersOnly, args, true);
         Long total = jdbcTemplate.queryForObject(sql, Long.class, args.toArray());
         return total == null ? 0 : total;
     }
@@ -63,24 +70,55 @@ public class HomeRepository {
     public List<HomeItemRecord> findItems(String keyword,
             Long categoryId,
             String opsColumn,
+            Long currentUserId,
+            boolean selfOnly,
+            boolean othersOnly,
             String orderBy,
             String order,
             int offset,
             int limit) {
         List<Object> args = new ArrayList<>();
-        String sql = buildBaseItemSql(keyword, categoryId, opsColumn, args, false) + " ORDER BY " + orderBy + " "
-                + order
-                + " LIMIT ?, ?";
+        String sql = buildBaseItemSql(keyword, categoryId, opsColumn, currentUserId, selfOnly, othersOnly, args, false)
+                + " ORDER BY is_self ASC, " + orderBy + " " + order + " LIMIT ?, ?";
         args.add(offset);
         args.add(limit);
         return jdbcTemplate.query(sql, itemRowMapper, args.toArray());
     }
 
-    public List<HomeItemRecord> findHotItems(int limit) {
+    public List<HomeItemRecord> findItemsByHotPriority(String keyword,
+            Long categoryId,
+            String opsColumn,
+            Long currentUserId,
+            boolean selfOnly,
+            boolean othersOnly,
+            int offset,
+            int limit) {
+        List<Object> args = new ArrayList<>();
+        String sql = buildBaseItemSql(keyword, categoryId, opsColumn, currentUserId, selfOnly, othersOnly, args, false)
+                + " ORDER BY is_self ASC, "
+                + "CASE "
+                + "WHEN c.code = 'daily' THEN 1 "
+                + "WHEN c.code IN ('book', 'stationery') THEN 2 "
+                + "WHEN c.code = 'digital' THEN 3 "
+                + "WHEN c.code = 'clothes' THEN 4 "
+                + "WHEN c.code = 'beauty' THEN 5 "
+                + "ELSE 6 END ASC, "
+                + "i.created_at DESC LIMIT ?, ?";
+        args.add(offset);
+        args.add(limit);
+        return jdbcTemplate.query(sql, itemRowMapper, args.toArray());
+    }
+
+    public List<HomeItemRecord> findHotItems(int limit, Long currentUserId) {
+        String isSelfExpr = currentUserId == null
+                ? "0"
+                : "CASE WHEN d.publisher_user_id = ? THEN 1 ELSE 0 END";
         String sql = """
                 SELECT
                     i.id,
                     i.category_id,
+                    d.publisher_user_id AS publisher_user_id,
+                    %s AS is_self,
                     c.code AS category_code,
                     c.name AS category_name,
                     i.title,
@@ -103,11 +141,15 @@ public class HomeRepository {
                     i.created_at
                 FROM items i
                 INNER JOIN item_categories c ON c.id = i.category_id
+                LEFT JOIN item_details d ON d.item_id = i.id
                 WHERE i.status = 'PUBLISHED'
-                ORDER BY (i.favorite_count * 6 + i.view_count) DESC, i.created_at DESC
+                ORDER BY is_self ASC, (i.favorite_count * 6 + i.view_count) DESC, i.created_at DESC
                 LIMIT ?
-                """;
-        return jdbcTemplate.query(sql, itemRowMapper, limit);
+                """.formatted(isSelfExpr);
+        if (currentUserId == null) {
+            return jdbcTemplate.query(sql, itemRowMapper, limit);
+        }
+        return jdbcTemplate.query(sql, itemRowMapper, currentUserId, limit);
     }
 
     public List<HotKeywordRecord> findHotKeywords(int limit) {
@@ -131,9 +173,18 @@ public class HomeRepository {
         jdbcTemplate.update(insertSql, keyword, now, now, now);
     }
 
-    private String buildBaseItemSql(String keyword, Long categoryId, String opsColumn, List<Object> args,
+    private String buildBaseItemSql(String keyword,
+            Long categoryId,
+            String opsColumn,
+            Long currentUserId,
+            boolean selfOnly,
+            boolean othersOnly,
+            List<Object> args,
             boolean countOnly) {
         StringBuilder sql = new StringBuilder();
+        String isSelfExpr = currentUserId == null
+                ? "0"
+                : "CASE WHEN d.publisher_user_id = ? THEN 1 ELSE 0 END";
         if (countOnly) {
             sql.append("SELECT COUNT(1) ");
         } else {
@@ -141,6 +192,8 @@ public class HomeRepository {
                     SELECT
                         i.id,
                         i.category_id,
+                        d.publisher_user_id AS publisher_user_id,
+                        %s AS is_self,
                         c.code AS category_code,
                         c.name AS category_name,
                         i.title,
@@ -161,12 +214,16 @@ public class HomeRepository {
                             LIMIT 1
                         ) AS photo_url,
                         i.created_at
-                    """);
+                    """.formatted(isSelfExpr));
+            if (currentUserId != null) {
+                args.add(currentUserId);
+            }
         }
 
         sql.append("""
                 FROM items i
                 INNER JOIN item_categories c ON c.id = i.category_id
+                LEFT JOIN item_details d ON d.item_id = i.id
                 WHERE i.status = 'PUBLISHED'
                 """);
 
@@ -187,6 +244,14 @@ public class HomeRepository {
             sql.append(
                     " AND EXISTS (SELECT 1 FROM item_ops_columns ioc WHERE ioc.item_id = i.id AND ioc.column_code = ?)");
             args.add(opsColumn);
+        }
+
+        if (selfOnly && currentUserId != null) {
+            sql.append(" AND d.publisher_user_id = ?");
+            args.add(currentUserId);
+        } else if (othersOnly && currentUserId != null) {
+            sql.append(" AND d.publisher_user_id <> ?");
+            args.add(currentUserId);
         }
         return sql.toString();
     }

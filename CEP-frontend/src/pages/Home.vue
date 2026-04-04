@@ -643,7 +643,6 @@ import {
   fetchHomeCategories,
   fetchHotKeywords,
   fetchHomeItems,
-  fetchHotItems,
 } from "../service/home/homeApiService";
 import {
   fetchMessageConversations,
@@ -734,17 +733,21 @@ const listItems = ref([]);
 const homeError = ref("");
 const HOT_CATEGORY_ID = "hot";
 const HOT_BATCH_SIZE = 8;
-const HOT_MAX_LIMIT = 20;
 const LIST_PAGE_SIZE = 12;
+const VIEWER_SCOPE_ALL = "all";
+const VIEWER_SCOPE_OTHERS = "others";
+const VIEWER_SCOPE_SELF = "self";
 const activeCategoryId = ref(HOT_CATEGORY_ID);
 const sortBy = ref("price");
 const sortOrder = ref("desc");
-const hotLimit = ref(HOT_BATCH_SIZE);
+const homeAccessToken = computed(() =>
+  isUserLoggedIn.value ? authState.accessToken : ""
+);
+const hotPage = ref(1);
+const hotViewerScope = ref(VIEWER_SCOPE_ALL);
 const hotHasMore = ref(true);
-const hotUseOverflow = ref(false);
-const hotOverflowPage = ref(0);
-const hotOverflowHasMore = ref(true);
 const listPage = ref(1);
+const listViewerScope = ref(VIEWER_SCOPE_ALL);
 const listHasMore = ref(true);
 const isLoadingMore = ref(false);
 const cardGridRef = ref(null);
@@ -980,6 +983,8 @@ const formatRelativeTime = (createdAt) => {
 const mapHomeItem = (item) => ({
   id: item.id,
   categoryId: item.categoryId,
+  publisherUserId: item.publisherUserId,
+  isSelf: Boolean(item.isSelf),
   title: item.title,
   price: item.price,
   photoUrl: typeof item.photoUrl === "string" ? item.photoUrl.trim() : "",
@@ -999,6 +1004,15 @@ const mapHomeItem = (item) => ({
   sellerAvatarUrl: resolveSellerAvatarUrl(item),
   sellerCreditText: resolveSellerCreditText(item),
 });
+
+const mergeUniqueItemsById = (existing, incoming) => {
+  const seen = new Set(existing.map((item) => item.id));
+  const deduped = incoming.filter((item) => !seen.has(item.id));
+  return [...existing, ...deduped];
+};
+
+const resolveInitialViewerScope = () =>
+  isUserLoggedIn.value ? VIEWER_SCOPE_OTHERS : VIEWER_SCOPE_ALL;
 
 const loadCategories = async () => {
   const responseBody = await fetchHomeCategories();
@@ -1038,73 +1052,53 @@ const loadHotKeywords = async () => {
 
 const loadHotItems = async ({ append = false } = {}) => {
   if (!append) {
-    hotLimit.value = HOT_BATCH_SIZE;
+    hotPage.value = 1;
+    hotViewerScope.value = resolveInitialViewerScope();
     hotHasMore.value = true;
-    hotUseOverflow.value = false;
-    hotOverflowPage.value = 0;
-    hotOverflowHasMore.value = true;
+    hotItems.value = [];
   } else {
     if (!hotHasMore.value) {
       return;
     }
+  }
 
-    if (hotUseOverflow.value) {
-      if (!hotOverflowHasMore.value) {
-        hotHasMore.value = false;
-        return;
-      }
+  const nextPage = append ? hotPage.value + 1 : 1;
+  const responseBody = await fetchHomeItems({
+    keyword: "",
+    categoryId: undefined,
+    viewerScope: hotViewerScope.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+    page: nextPage,
+    size: HOT_BATCH_SIZE,
+    accessToken: homeAccessToken.value,
+  });
+  const incomingItems = (responseBody.data?.items || []).map(mapHomeItem);
+  hotItems.value = append
+    ? mergeUniqueItemsById(hotItems.value, incomingItems)
+    : incomingItems;
+  hotPage.value = nextPage;
 
-      const nextPage = hotOverflowPage.value + 1;
-      const responseBody = await fetchHomeItems({
-        keyword: "",
-        categoryId: undefined,
-        sortBy: sortBy.value,
-        sortOrder: sortOrder.value,
-        page: nextPage,
-        size: LIST_PAGE_SIZE,
-      });
-      const incomingItems = (responseBody.data?.items || []).map(mapHomeItem);
-      const existingIds = new Set(hotItems.value.map((item) => item.id));
-      const dedupedIncoming = incomingItems.filter(
-        (item) => !existingIds.has(item.id)
-      );
-
-      hotItems.value = [...hotItems.value, ...dedupedIncoming];
-      hotOverflowPage.value = nextPage;
-      hotOverflowHasMore.value = incomingItems.length >= LIST_PAGE_SIZE;
-      hotHasMore.value = hotOverflowHasMore.value;
+  if (incomingItems.length < HOT_BATCH_SIZE) {
+    if (hotViewerScope.value === VIEWER_SCOPE_OTHERS && isUserLoggedIn.value) {
+      hotViewerScope.value = VIEWER_SCOPE_SELF;
+      hotPage.value = 0;
+      await loadHotItems({ append: true });
       return;
     }
-
-    const nextLimit = Math.min(hotLimit.value + HOT_BATCH_SIZE, HOT_MAX_LIMIT);
-    hotLimit.value = nextLimit;
-
-    if (hotLimit.value >= HOT_MAX_LIMIT) {
-      hotUseOverflow.value = true;
-      hotOverflowPage.value = 0;
-      hotOverflowHasMore.value = true;
-    }
+    hotHasMore.value = false;
+    return;
   }
 
-  const responseBody = await fetchHotItems(hotLimit.value);
-  const mappedItems = (responseBody.data || []).map(mapHomeItem);
   hotHasMore.value = true;
-  hotItems.value = mappedItems;
-
-  if (sortBy.value === "price") {
-    const factor = sortOrder.value === "asc" ? 1 : -1;
-    hotItems.value = [...hotItems.value].sort((a, b) => {
-      const priceA = Number(a?.price ?? 0);
-      const priceB = Number(b?.price ?? 0);
-      return (priceA - priceB) * factor;
-    });
-  }
 };
 
 const loadListItems = async ({ append = false } = {}) => {
   if (!append) {
     listPage.value = 1;
+    listViewerScope.value = resolveInitialViewerScope();
     listHasMore.value = true;
+    listItems.value = [];
   } else if (!listHasMore.value) {
     return;
   }
@@ -1120,17 +1114,31 @@ const loadListItems = async ({ append = false } = {}) => {
     opsColumn: isOpsListOnlyMode.value
       ? activeOpsColumn.value?.columnCode
       : undefined,
+    viewerScope: listViewerScope.value,
     sortBy: sortBy.value,
     sortOrder: sortOrder.value,
     page: nextPage,
     size: LIST_PAGE_SIZE,
+    accessToken: homeAccessToken.value,
   });
   const incomingItems = (responseBody.data?.items || []).map(mapHomeItem);
   listItems.value = append
-    ? [...listItems.value, ...incomingItems]
+    ? mergeUniqueItemsById(listItems.value, incomingItems)
     : incomingItems;
   listPage.value = nextPage;
-  listHasMore.value = incomingItems.length >= LIST_PAGE_SIZE;
+
+  if (incomingItems.length < LIST_PAGE_SIZE) {
+    if (listViewerScope.value === VIEWER_SCOPE_OTHERS && isUserLoggedIn.value) {
+      listViewerScope.value = VIEWER_SCOPE_SELF;
+      listPage.value = 0;
+      await loadListItems({ append: true });
+      return;
+    }
+    listHasMore.value = false;
+    return;
+  }
+
+  listHasMore.value = true;
 };
 
 const scrollGridToTop = () => {
@@ -2042,13 +2050,13 @@ watchEffect(() => {
 
 .ops-card h4 {
   margin: 0;
-  font-size: 14px;
+  font-size: 18px;
   color: #5747ad;
 }
 
 .ops-card p {
   margin: 6px 0 0;
-  font-size: 12px;
+  font-size: 15px;
   color: #6e6a90;
   line-height: 1.5;
 }

@@ -1,6 +1,7 @@
 package com.example.cep_backend.home.service;
 
 import com.example.cep_backend.auth.BusinessException;
+import com.example.cep_backend.auth.service.AuthService;
 import com.example.cep_backend.home.dto.HomeCategoryDto;
 import com.example.cep_backend.home.dto.HomeItemDto;
 import com.example.cep_backend.home.dto.HomeItemListDto;
@@ -21,9 +22,11 @@ public class HomeService {
     private static final int MAX_SIZE = 50;
 
     private final HomeRepository homeRepository;
+    private final AuthService authService;
 
-    public HomeService(HomeRepository homeRepository) {
+    public HomeService(HomeRepository homeRepository, AuthService authService) {
         this.homeRepository = homeRepository;
+        this.authService = authService;
     }
 
     public List<HomeCategoryDto> listCategories() {
@@ -33,22 +36,60 @@ public class HomeService {
     public HomeItemListDto searchItems(String keyword,
             Long categoryId,
             String opsColumn,
+            String viewerScope,
             String sortBy,
             String sortOrder,
             Integer page,
-            Integer size) {
+            Integer size,
+            String authorizationHeader) {
         int safePage = normalizePage(page);
         int safeSize = normalizeSize(size);
         String normalizedKeyword = normalizeKeyword(keyword);
         String normalizedOpsColumn = normalizeOpsColumn(opsColumn);
+        Long currentUserId = resolveCurrentUserId(authorizationHeader);
+        String normalizedViewerScope = normalizeViewerScope(viewerScope, currentUserId);
 
         String orderBy = resolveOrderBy(sortBy);
         String order = resolveOrder(sortOrder);
+        if (categoryId != null) {
+            orderBy = "i.created_at";
+            order = "DESC";
+        }
         int offset = (safePage - 1) * safeSize;
+        boolean selfOnly = "self".equals(normalizedViewerScope);
+        boolean othersOnly = "others".equals(normalizedViewerScope);
+        boolean hotRecommendationMode = categoryId == null
+                && normalizedKeyword.isBlank()
+                && normalizedOpsColumn.isBlank();
 
-        long total = homeRepository.countItems(normalizedKeyword, categoryId, normalizedOpsColumn);
-        List<HomeItemDto> items = homeRepository
-                .findItems(normalizedKeyword, categoryId, normalizedOpsColumn, orderBy, order, offset, safeSize)
+        long total = homeRepository.countItems(
+                normalizedKeyword,
+                categoryId,
+                normalizedOpsColumn,
+                currentUserId,
+                selfOnly,
+                othersOnly);
+        List<HomeItemDto> items = (hotRecommendationMode
+                ? homeRepository.findItemsByHotPriority(
+                        normalizedKeyword,
+                        categoryId,
+                        normalizedOpsColumn,
+                        currentUserId,
+                        selfOnly,
+                        othersOnly,
+                        offset,
+                        safeSize)
+                : homeRepository.findItems(
+                        normalizedKeyword,
+                        categoryId,
+                        normalizedOpsColumn,
+                        currentUserId,
+                        selfOnly,
+                        othersOnly,
+                        orderBy,
+                        order,
+                        offset,
+                        safeSize))
                 .stream()
                 .map(this::mapItem)
                 .toList();
@@ -61,8 +102,32 @@ public class HomeService {
     }
 
     public List<HomeItemDto> listHotItems(Integer limit) {
+        return listHotItems(limit, null, null);
+    }
+
+    public List<HomeItemDto> listHotItems(Integer limit, String viewerScope, String authorizationHeader) {
         int safeLimit = normalizeLimit(limit);
-        return homeRepository.findHotItems(safeLimit).stream().map(this::mapItem).toList();
+        Long currentUserId = resolveCurrentUserId(authorizationHeader);
+        String normalizedViewerScope = normalizeViewerScope(viewerScope, currentUserId);
+        if ("self".equals(normalizedViewerScope)) {
+            return homeRepository
+                    .findItemsByHotPriority("", null, "", currentUserId, true, false, 0, safeLimit)
+                    .stream()
+                    .map(this::mapItem)
+                    .toList();
+        }
+        if ("others".equals(normalizedViewerScope)) {
+            return homeRepository
+                    .findItemsByHotPriority("", null, "", currentUserId, false, true, 0, safeLimit)
+                    .stream()
+                    .map(this::mapItem)
+                    .toList();
+        }
+        return homeRepository
+                .findItemsByHotPriority("", null, "", currentUserId, false, false, 0, safeLimit)
+                .stream()
+                .map(this::mapItem)
+                .toList();
     }
 
     public List<HotKeywordDto> listHotKeywords(Integer limit) {
@@ -85,6 +150,8 @@ public class HomeService {
         return new HomeItemDto(
                 record.id(),
                 record.categoryId(),
+                record.publisherUserId(),
+                Boolean.TRUE.equals(record.self()),
                 record.categoryCode(),
                 record.categoryName(),
                 record.title(),
@@ -95,6 +162,17 @@ public class HomeService {
                 record.opsColumns(),
                 record.photoUrl(),
                 record.createdAt());
+    }
+
+    private Long resolveCurrentUserId(String authorizationHeader) {
+        if (authorizationHeader == null || authorizationHeader.isBlank()) {
+            return null;
+        }
+        try {
+            return authService.currentUser(authorizationHeader).userId();
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     private int normalizePage(Integer page) {
@@ -157,6 +235,20 @@ public class HomeService {
             case "asc" -> "ASC";
             case "desc" -> "DESC";
             default -> throw new BusinessException("sortOrder 仅支持 asc 或 desc");
+        };
+    }
+
+    private String normalizeViewerScope(String viewerScope, Long currentUserId) {
+        if (currentUserId == null) {
+            return "all";
+        }
+        if (viewerScope == null || viewerScope.isBlank()) {
+            return "all";
+        }
+        String value = viewerScope.trim().toLowerCase();
+        return switch (value) {
+            case "all", "self", "others" -> value;
+            default -> throw new BusinessException("viewerScope 仅支持 all、self、others");
         };
     }
 }
