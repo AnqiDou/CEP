@@ -13,10 +13,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.Month;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.List;
 import java.util.Set;
@@ -27,8 +27,18 @@ public class PublishService {
     private static final String STATUS_PUBLISHED = "PUBLISHED";
     private static final String STATUS_OFF_SHELF = "OFF_SHELF";
     private static final String STATUS_DELETED = "DELETED";
-    private static final Set<String> CAMPUS_BARGAIN_CATEGORY_CODES = Set.of("stationery", "digital", "daily");
+    private static final BigDecimal CAMPUS_BARGAIN_MAX_PRICE = BigDecimal.valueOf(15);
+    private static final Set<String> GRADUATE_CLEARANCE_CATEGORY_CODES = Set.of("book", "daily", "clothes", "sports");
     private static final Set<String> BACK_TO_SCHOOL_CATEGORY_CODES = Set.of("stationery", "daily", "digital", "book");
+    private static final List<String> GRADUATE_CLEARANCE_KEYWORDS = Arrays.asList(
+            "考研", "考公", "四六级", "教材", "复习资料",
+            "小风扇", "台灯", "电饭煲", "吹风机",
+            "床品", "衣柜", "书桌", "椅子", "行李箱");
+    private static final List<String> BACK_TO_SCHOOL_KEYWORDS = Arrays.asList(
+            "床垫", "床帘", "收纳箱", "洗漱", "暖壶",
+            "笔记本", "文具", "四六级", "计算器",
+            "军训", "书包", "水杯", "雨伞",
+            "耳机", "键盘", "鼠标", "电脑支架", "插排");
 
     private final PublishRepository publishRepository;
     private final MessageNotificationService messageNotificationService;
@@ -69,7 +79,7 @@ public class PublishService {
                     now);
             publishRepository.insertItemPhotos(itemId, photoUrls, now);
             publishRepository.insertItemDetail(itemId, userId, purchaseDate, usageDuration, now);
-            refreshItemOpsColumns(itemId, categoryId, categoryCode, price, description, usageDuration, now);
+            refreshItemOpsColumns(itemId, categoryId, categoryCode, itemName, price, description, usageDuration, now);
         } catch (DataAccessException ex) {
             throw new BusinessException("发布失败：请先确认已执行建表脚本并检查数据库字段");
         }
@@ -130,7 +140,7 @@ public class PublishService {
         publishRepository.updateItemAndDetail(userId, itemId, categoryId, itemName, price, description, purchaseDate,
                 usageDuration, now);
         publishRepository.replaceItemPhotos(itemId, photoUrls, now);
-        refreshItemOpsColumns(itemId, categoryId, categoryCode, price, description, usageDuration, now);
+        refreshItemOpsColumns(itemId, categoryId, categoryCode, itemName, price, description, usageDuration, now);
 
         messageNotificationService.notifyFavoritePriceDrop(itemId, userId, existing.price(), price);
 
@@ -182,6 +192,7 @@ public class PublishService {
                         item.id(),
                         categoryId,
                         item.categoryCode(),
+                        item.name(),
                         item.price(),
                         item.description(),
                         item.usageDuration(),
@@ -195,73 +206,73 @@ public class PublishService {
     private void refreshItemOpsColumns(Long itemId,
             Long categoryId,
             String categoryCode,
+            String itemName,
             BigDecimal price,
             String description,
             String usageDuration,
             LocalDateTime now) {
         List<String> matchedColumns = new ArrayList<>();
 
-        if (matchCampusBargain(itemId, categoryId, categoryCode, price)) {
+        if (matchCampusBargain(price)) {
             matchedColumns.add("campus-bargain");
         }
-        if (matchGraduateClearance(description)) {
+        if (matchGraduateClearance(categoryCode, itemName, description)) {
             matchedColumns.add("graduate-clearance");
         }
-        if (matchBackToSchool(categoryCode, usageDuration, now)) {
+        if (matchBackToSchool(categoryCode, itemName, description, usageDuration)) {
             matchedColumns.add("back-to-school");
         }
 
         publishRepository.replaceItemOpsColumns(itemId, matchedColumns, now);
     }
 
-    private boolean matchCampusBargain(Long itemId, Long categoryId, String categoryCode, BigDecimal price) {
-        if (categoryId == null || price == null || categoryCode == null) {
-            return false;
-        }
-        String normalizedCategoryCode = categoryCode.trim().toLowerCase(Locale.ROOT);
-        if (!CAMPUS_BARGAIN_CATEGORY_CODES.contains(normalizedCategoryCode)) {
-            return false;
-        }
-
-        BigDecimal avgPrice = publishRepository.findPublishedAveragePriceByCategoryId(categoryId, itemId);
-        if (avgPrice == null) {
-            return false;
-        }
-        return price.compareTo(avgPrice) < 0;
+    private boolean matchCampusBargain(BigDecimal price) {
+        return price != null && price.compareTo(CAMPUS_BARGAIN_MAX_PRICE) <= 0;
     }
 
-    private boolean matchGraduateClearance(String description) {
-        if (description == null || description.isBlank()) {
-            return false;
+    private boolean matchGraduateClearance(String categoryCode, String itemName, String description) {
+        String normalizedCategoryCode = categoryCode == null ? "" : categoryCode.trim().toLowerCase(Locale.ROOT);
+        if (GRADUATE_CLEARANCE_CATEGORY_CODES.contains(normalizedCategoryCode)) {
+            return true;
         }
-        String text = description.toLowerCase(Locale.ROOT);
-        return text.contains("二手") || text.contains("九成新") || text.contains("毕业生闲置") || text.contains("毕业")
-                || text.contains("清仓");
+        String text = buildSearchText(itemName, description);
+        return containsAnyKeyword(text, GRADUATE_CLEARANCE_KEYWORDS);
     }
 
-    private boolean matchBackToSchool(String categoryCode, String usageDuration, LocalDateTime listedAt) {
-        if (categoryCode == null || listedAt == null) {
+    private boolean matchBackToSchool(String categoryCode, String itemName, String description, String usageDuration) {
+        if (categoryCode == null) {
             return false;
         }
         String normalizedCategoryCode = categoryCode.trim().toLowerCase(Locale.ROOT);
         if (!BACK_TO_SCHOOL_CATEGORY_CODES.contains(normalizedCategoryCode)) {
             return false;
         }
+        String text = buildSearchText(itemName, description, usageDuration);
+        return containsAnyKeyword(text, BACK_TO_SCHOOL_KEYWORDS);
+    }
 
-        Month month = listedAt.getMonth();
-        boolean inBackToSchoolSeason = month == Month.AUGUST
-                || month == Month.SEPTEMBER
-                || month == Month.FEBRUARY
-                || month == Month.MARCH;
-        if (!inBackToSchoolSeason) {
+    private String buildSearchText(String... values) {
+        if (values == null || values.length == 0) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder();
+        for (String value : values) {
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            if (!builder.isEmpty()) {
+                builder.append(' ');
+            }
+            builder.append(value.trim().toLowerCase(Locale.ROOT));
+        }
+        return builder.toString();
+    }
+
+    private boolean containsAnyKeyword(String text, List<String> keywords) {
+        if (text == null || text.isBlank() || keywords == null || keywords.isEmpty()) {
             return false;
         }
-
-        if (usageDuration == null || usageDuration.isBlank()) {
-            return true;
-        }
-        String text = usageDuration.toLowerCase(Locale.ROOT);
-        return text.contains("全新") || text.contains("新品") || text.contains("未使用") || text.contains("99新");
+        return keywords.stream().anyMatch(keyword -> keyword != null && !keyword.isBlank() && text.contains(keyword));
     }
 
     private PublishOwnedItemDto toOwnedItemDto(PublishRepository.PublishOwnedItemBaseRecord item,

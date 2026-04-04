@@ -19,6 +19,7 @@ import {
 } from "../service/common/authSessionService";
 
 const ADMIN_EMAIL = "3299166215@qq.com";
+const PUBLIC_ROUTE_NAMES = new Set(["home", "terms", "privacy"]);
 
 const router = createRouter({
   history: createWebHistory(),
@@ -144,6 +145,28 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   await initAuthSession();
 
+  const isLoggedIn = Boolean(authState.user && authState.refreshToken);
+  const isPublicRoute = PUBLIC_ROUTE_NAMES.has(String(to.name || ""));
+
+  if (!isLoggedIn && !isPublicRoute) {
+    return {
+      name: "home",
+      query: {
+        loginRequired: "1",
+        from: to.fullPath,
+      },
+    };
+  }
+
+  if (!isLoggedIn && to.name === "home" && to.query?.opsView === "list") {
+    return {
+      name: "home",
+      query: {
+        loginRequired: "1",
+      },
+    };
+  }
+
   const currentEmail = (authState.user?.email || "").trim().toLowerCase();
   const isAdmin = currentEmail === ADMIN_EMAIL;
 
@@ -151,18 +174,10 @@ router.beforeEach(async (to) => {
     return { name: "admin-dashboard" };
   }
 
-  if (to.meta?.requiresAuth && !authState.user) {
-    return { name: "home" };
-  }
-
   if (to.meta?.requiresAdmin) {
     if (currentEmail !== ADMIN_EMAIL) {
       return { name: "home" };
     }
-  }
-
-  if (to.name === "profile" && !authState.user) {
-    return { name: "home" };
   }
 
   return true;

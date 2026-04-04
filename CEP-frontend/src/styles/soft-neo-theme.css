@@ -103,21 +103,9 @@ body,
   z-index: 1;
 }
 
-.profile-page::before {
-  content: "🧑‍🎓";
-}
-
 .chat-page::before {
   content: none;
   display: none;
-}
-
-.other-profile-page::before {
-  content: "🧸";
-}
-
-.item-detail-page::before {
-  content: "📦";
 }
 
 .confirm-page::before {

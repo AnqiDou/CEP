@@ -81,27 +81,6 @@
                   {{ item.category }} · 校园安心交易
                 </p>
               </div>
-              <div class="mini-illustration" aria-hidden="true">
-                <span class="mini-illustration__emoji">🧸</span>
-              </div>
-            </div>
-
-            <div class="feature-grid">
-              <article
-                v-for="feature in featureCards"
-                :key="feature.title"
-                class="feature-card"
-              >
-                <p class="feature-icon">{{ feature.icon }}</p>
-                <p class="feature-title">{{ feature.title }}</p>
-                <p class="feature-subtitle">{{ feature.subtitle }}</p>
-                <div class="feature-track">
-                  <span
-                    class="feature-progress"
-                    :style="{ width: `${feature.progress}%` }"
-                  />
-                </div>
-              </article>
             </div>
 
             <div class="summary-scroll">
@@ -671,26 +650,6 @@ const toggleFavorite = async () => {
   color: #6a57b3;
 }
 
-.mini-illustration {
-  width: 68px;
-  height: 68px;
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.mini-illustration__emoji {
-  font-size: 32px;
-}
-
-.feature-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
 .feature-card {
   border-radius: 18px;
   background: #ffffff;
@@ -822,10 +781,6 @@ const toggleFavorite = async () => {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .feature-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .summary-title {
     font-size: 30px;
   }
@@ -848,10 +803,6 @@ const toggleFavorite = async () => {
     order: 2;
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .feature-grid {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .summary-actions {

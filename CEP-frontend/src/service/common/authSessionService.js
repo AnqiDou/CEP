@@ -17,6 +17,8 @@ const authState = reactive({
   accessTokenExpiresAt: 0,
 });
 
+const AUTH_EXPIRED_EVENT = "cep:auth-expired";
+
 let refreshTimer = null;
 let refreshPromise = null;
 
@@ -30,6 +32,16 @@ const normalizeError = (error, fallback) => {
 const shouldClearSessionOnRefreshFailure = (error) => {
   const message = normalizeError(error, "");
   return message.includes("登录状态已过期") || message.includes("刷新令牌无效");
+};
+
+const notifyAuthExpired = (reasonMessage) => {
+  window.dispatchEvent(
+    new CustomEvent(AUTH_EXPIRED_EVENT, {
+      detail: {
+        message: reasonMessage || "登录状态已失效，请重新登录",
+      },
+    }),
+  );
 };
 
 const clearRefreshTimer = () => {
@@ -190,8 +202,17 @@ export const ensureValidAccessToken = async () => {
     return authState.accessToken;
   }
 
-  await refreshAccessToken();
-  return authState.accessToken;
+  try {
+    await refreshAccessToken();
+    return authState.accessToken;
+  } catch (error) {
+    if (shouldClearSessionOnRefreshFailure(error)) {
+      clearAuthSession();
+      notifyAuthExpired(normalizeError(error, "登录状态已过期，请重新登录"));
+      throw new Error("登录状态已过期，请重新登录");
+    }
+    throw error;
+  }
 };
 
 export const isLoggedIn = () =>
@@ -211,3 +232,4 @@ export const logout = async () => {
 };
 
 export { authState };
+export { AUTH_EXPIRED_EVENT, notifyAuthExpired };

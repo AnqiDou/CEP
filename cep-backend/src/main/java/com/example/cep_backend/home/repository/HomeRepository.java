@@ -244,6 +244,10 @@ public class HomeRepository {
             sql.append(
                     " AND EXISTS (SELECT 1 FROM item_ops_columns ioc WHERE ioc.item_id = i.id AND ioc.column_code = ?)");
             args.add(opsColumn);
+            if ("campus-bargain".equals(opsColumn)) {
+                sql.append(" AND i.price < ?");
+                args.add(15);
+            }
         }
 
         if (selfOnly && currentUserId != null) {

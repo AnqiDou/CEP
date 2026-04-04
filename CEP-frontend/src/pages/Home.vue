@@ -620,6 +620,7 @@ import {
   onBeforeUnmount,
   onMounted,
   ref,
+  watch,
   watchEffect,
 } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -734,6 +735,7 @@ const homeError = ref("");
 const HOT_CATEGORY_ID = "hot";
 const HOT_BATCH_SIZE = 8;
 const LIST_PAGE_SIZE = 12;
+const OPS_BARGAIN_MAX_PRICE = 15;
 const VIEWER_SCOPE_ALL = "all";
 const VIEWER_SCOPE_OTHERS = "others";
 const VIEWER_SCOPE_SELF = "self";
@@ -791,6 +793,27 @@ const searchPlaceholder = computed(() => {
   return "搜二手闲置、书籍、电子产品...";
 });
 
+const ensureLoginForAction = () => {
+  if (isUserLoggedIn.value) {
+    return true;
+  }
+  openLoginModal();
+  return false;
+};
+
+const consumeLoginRequiredQuery = async () => {
+  if (isUserLoggedIn.value || route.query?.loginRequired !== "1") {
+    return;
+  }
+  openLoginModal();
+
+  const nextQuery = { ...route.query };
+  delete nextQuery.loginRequired;
+  delete nextQuery.reason;
+  delete nextQuery.from;
+  await router.replace({ path: "/", query: nextQuery });
+};
+
 const loadUnreadMessageCount = async () => {
   if (!isUserLoggedIn.value) {
     unreadMessageCount.value = 0;
@@ -843,10 +866,20 @@ const activeCategory = computed(() =>
   categories.value.find((cat) => cat.id === activeCategoryId.value)
 );
 
+const isBenefitOpsMode = computed(
+  () =>
+    isOpsListOnlyMode.value &&
+    activeOpsColumn.value?.columnCode === "campus-bargain"
+);
+
 const isHotMode = computed(
   () =>
-    activeCategoryId.value === HOT_CATEGORY_ID && !searchedKeyword.value.trim()
+    !isOpsListOnlyMode.value &&
+    activeCategoryId.value === HOT_CATEGORY_ID &&
+    !searchedKeyword.value.trim()
 );
+
+const useHotStream = computed(() => isHotMode.value || isBenefitOpsMode.value);
 
 const blockTitle = computed(() => {
   if (isOpsListOnlyMode.value && activeOpsColumn.value) {
@@ -865,7 +898,13 @@ const blockDesc = computed(() => {
 });
 
 const displayedItems = computed(() => {
-  return isHotMode.value ? hotItems.value : listItems.value;
+  if (isBenefitOpsMode.value) {
+    return hotItems.value.filter((item) => {
+      const price = Number(item?.price);
+      return Number.isFinite(price) && price < OPS_BARGAIN_MAX_PRICE;
+    });
+  }
+  return useHotStream.value ? hotItems.value : listItems.value;
 });
 
 const opsCards = computed(() => ({
@@ -938,7 +977,7 @@ const heroCurrentItem = computed(() => {
 });
 
 const hasMoreItems = computed(() =>
-  isHotMode.value ? hotHasMore.value : listHasMore.value
+  useHotStream.value ? hotHasMore.value : listHasMore.value
 );
 
 const resolveSellerAvatarUrl = (item) => {
@@ -1153,7 +1192,7 @@ const loadMoreItems = async () => {
   }
   isLoadingMore.value = true;
   try {
-    if (isHotMode.value) {
+    if (useHotStream.value) {
       await loadHotItems({ append: true });
     } else {
       await loadListItems({ append: true });
@@ -1208,6 +1247,9 @@ const withPreservedHomeScroll = async (loader) => {
 };
 
 const handleSearch = async () => {
+  if (!ensureLoginForAction()) {
+    return;
+  }
   const value = keyword.value.trim();
   searchedKeyword.value = value;
   homeError.value = "";
@@ -1221,7 +1263,11 @@ const handleSearch = async () => {
     return;
   }
   try {
-    await loadListItems({ append: false });
+    if (isBenefitOpsMode.value) {
+      await loadHotItems({ append: false });
+    } else {
+      await loadListItems({ append: false });
+    }
     scrollGridToTop();
     await ensureScrollableContent();
   } catch (error) {
@@ -1235,6 +1281,9 @@ const selectHotKeyword = async (word) => {
 };
 
 const goToOpsItem = (index) => {
+  if (!ensureLoginForAction()) {
+    return;
+  }
   const resolved = router.resolve({
     path: "/",
     query: {
@@ -1256,7 +1305,11 @@ const applyOpsListMode = async () => {
   homeError.value = "";
 
   try {
-    await loadListItems({ append: false });
+    if (isBenefitOpsMode.value) {
+      await loadHotItems({ append: false });
+    } else {
+      await loadListItems({ append: false });
+    }
     scrollGridToTop();
     await ensureScrollableContent();
   } catch (error) {
@@ -1348,8 +1401,7 @@ const switchToForgotPassword = () => {
 };
 
 const goToProfile = () => {
-  if (!isUserLoggedIn.value) {
-    openLoginModal();
+  if (!ensureLoginForAction()) {
     return;
   }
   const currentEmail = (authState.user?.email || "").trim().toLowerCase();
@@ -1361,16 +1413,14 @@ const goToProfile = () => {
 };
 
 const goToPublish = () => {
-  if (!isUserLoggedIn.value) {
-    openLoginModal();
+  if (!ensureLoginForAction()) {
     return;
   }
   router.push("/publish");
 };
 
 const goToChat = () => {
-  if (!isUserLoggedIn.value) {
-    openLoginModal();
+  if (!ensureLoginForAction()) {
     return;
   }
   const resolved = router.resolve("/chat");
@@ -1378,6 +1428,9 @@ const goToChat = () => {
 };
 
 const goToItemDetail = (id) => {
+  if (!ensureLoginForAction()) {
+    return;
+  }
   const resolved = router.resolve(`/item/${id}`);
   window.open(resolved.href, "_blank");
 };
@@ -1669,11 +1722,15 @@ const submitRegister = async () => {
 
 onMounted(async () => {
   await initAuthSession();
+  await consumeLoginRequiredQuery();
   await loadUnreadMessageCount();
   homeError.value = "";
   try {
-    await Promise.all([loadCategories(), loadHotItems(), loadHotKeywords()]);
-    await applyOpsListMode();
+    if (isOpsListOnlyMode.value) {
+      await applyOpsListMode();
+    } else {
+      await Promise.all([loadCategories(), loadHotItems(), loadHotKeywords()]);
+    }
     await ensureScrollableContent();
   } catch (error) {
     homeError.value = error.message || "首页数据加载失败";
@@ -1699,6 +1756,24 @@ watchEffect(() => {
   }
   document.title = "校园易物平台";
 });
+
+watch(
+  () => [route.query.opsView, route.query.opsIndex],
+  async () => {
+    homeError.value = "";
+    if (isOpsListOnlyMode.value) {
+      await applyOpsListMode();
+      return;
+    }
+  }
+);
+
+watch(
+  () => [route.query.loginRequired, route.query.reason, isUserLoggedIn.value],
+  async () => {
+    await consumeLoginRequiredQuery();
+  }
+);
 </script>
 
 <style scoped>
