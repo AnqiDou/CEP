@@ -6,6 +6,8 @@ import com.example.cep_backend.common.api.ApiResponse;
 import com.example.cep_backend.message.dto.MessageConversationDto;
 import com.example.cep_backend.message.dto.MessageCreateConversationRequest;
 import com.example.cep_backend.message.dto.MessageItemDto;
+import com.example.cep_backend.message.dto.MessageNotificationDto;
+import com.example.cep_backend.message.dto.MessageNotificationUnreadDto;
 import com.example.cep_backend.message.service.MessageService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -60,5 +62,38 @@ public class MessageController {
         AuthUserDto user = authService.currentUser(authorization);
         messageService.markConversationRead(user.userId(), conversationId);
         return ApiResponse.ok("已标记已读", null);
+    }
+
+    @GetMapping("/notifications")
+    public ApiResponse<List<MessageNotificationDto>> getNotifications(
+            @RequestHeader("Authorization") String authorization,
+            @RequestParam(required = false) Integer limit) {
+        AuthUserDto user = authService.currentUser(authorization);
+        return ApiResponse.ok("获取成功", messageService.getNotifications(user.userId(), limit));
+    }
+
+    @GetMapping("/notifications/unread-count")
+    public ApiResponse<MessageNotificationUnreadDto> getNotificationUnreadCount(
+            @RequestHeader("Authorization") String authorization) {
+        AuthUserDto user = authService.currentUser(authorization);
+        int unread = messageService.getNotificationUnreadCount(user.userId());
+        return ApiResponse.ok("获取成功", new MessageNotificationUnreadDto(unread));
+    }
+
+    @PostMapping("/notifications/{notificationId}/read")
+    public ApiResponse<Void> markNotificationRead(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long notificationId) {
+        AuthUserDto user = authService.currentUser(authorization);
+        messageService.markNotificationRead(user.userId(), notificationId);
+        return ApiResponse.ok("已标记已读", null);
+    }
+
+    @PostMapping("/notifications/read-all")
+    public ApiResponse<Void> markAllNotificationsRead(
+            @RequestHeader("Authorization") String authorization) {
+        AuthUserDto user = authService.currentUser(authorization);
+        messageService.markAllNotificationsRead(user.userId());
+        return ApiResponse.ok("已全部标记已读", null);
     }
 }

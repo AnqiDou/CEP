@@ -18,6 +18,43 @@ public class PublishSchemaInitializer {
 
         @PostConstruct
         public void ensurePublishSchema() {
+                Integer tableCount = jdbcTemplate.queryForObject(
+                                """
+                                                SELECT COUNT(1)
+                                                FROM information_schema.tables
+                                                WHERE table_schema = DATABASE()
+                                                  AND table_name = 'item_ops_columns'
+                                                """,
+                                Integer.class);
+                if (tableCount == null || tableCount == 0) {
+                        jdbcTemplate.execute(
+                                        """
+                                                        CREATE TABLE item_ops_columns (
+                                                            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                                                            item_id BIGINT NOT NULL,
+                                                            column_code VARCHAR(40) NOT NULL,
+                                                            created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                                                            updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                                                            CONSTRAINT uq_item_ops_columns UNIQUE (item_id, column_code),
+                                                            CONSTRAINT fk_item_ops_columns_item FOREIGN KEY (item_id) REFERENCES items (id)
+                                                        )
+                                                        """);
+                }
+
+                Integer tableIndexCount = jdbcTemplate.queryForObject(
+                                """
+                                                SELECT COUNT(1)
+                                                FROM information_schema.statistics
+                                                WHERE table_schema = DATABASE()
+                                                  AND table_name = 'item_ops_columns'
+                                                  AND index_name = 'idx_item_ops_columns_code'
+                                                """,
+                                Integer.class);
+                if (tableIndexCount == null || tableIndexCount == 0) {
+                        jdbcTemplate.execute(
+                                        "CREATE INDEX idx_item_ops_columns_code ON item_ops_columns (column_code, item_id)");
+                }
+
                 Integer columnCount = jdbcTemplate.queryForObject(
                                 """
                                                 SELECT COUNT(1)

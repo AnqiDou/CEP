@@ -2,6 +2,7 @@ package com.example.cep_backend.profile.service;
 
 import com.example.cep_backend.auth.BusinessException;
 import com.example.cep_backend.auth.repository.UserRepository;
+import com.example.cep_backend.message.service.MessageNotificationService;
 import com.example.cep_backend.profile.dto.ProfileOverviewDto;
 import com.example.cep_backend.profile.dto.ProfileAvatarUploadDto;
 import com.example.cep_backend.profile.dto.OtherProfileItemDto;
@@ -30,14 +31,17 @@ public class ProfileService {
     private final ProfileRepository profileRepository;
     private final UserRepository userRepository;
     private final ProfileImageService profileImageService;
+    private final MessageNotificationService messageNotificationService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public ProfileService(ProfileRepository profileRepository,
             UserRepository userRepository,
-            ProfileImageService profileImageService) {
+            ProfileImageService profileImageService,
+            MessageNotificationService messageNotificationService) {
         this.profileRepository = profileRepository;
         this.userRepository = userRepository;
         this.profileImageService = profileImageService;
+        this.messageNotificationService = messageNotificationService;
     }
 
     public ProfileOverviewDto getOverview(Long userId) {
@@ -139,7 +143,11 @@ public class ProfileService {
         if (viewerUserId.equals(targetUserId)) {
             throw new BusinessException("不能关注自己");
         }
+        if (profileRepository.isFollowing(viewerUserId, targetUserId)) {
+            return;
+        }
         profileRepository.followUser(viewerUserId, targetUserId);
+        messageNotificationService.notifyFollowed(targetUserId, viewerUserId);
     }
 
     @Transactional

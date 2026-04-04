@@ -118,3 +118,98 @@
 | messageType   | string | 消息类型（`TEXT/IMAGE/REVIEW_INVITE`）                        |
 | reviewOrderId | long   | 评价邀请关联订单 ID，非邀评消息为 `null`                      |
 | reviewStatus  | string | 当前用户评价状态（`PENDING/SUBMITTED`），非邀评消息为空字符串 |
+
+---
+
+## 3. 获取通知消息列表（系统自动通知）
+
+- **URL**: `GET /api/messages/notifications`
+
+### Query 参数
+
+| 字段  | 类型 | 必填 | 默认值 | 说明                  |
+| ----- | ---- | ---- | ------ | --------------------- |
+| limit | int  | 否   | `20`   | 返回条数，范围 `1~50` |
+
+### 成功响应示例
+
+```json
+{
+  "success": true,
+  "message": "获取成功",
+  "data": [
+    {
+      "id": 101,
+      "type": "ITEM_FAVORITED",
+      "title": "商品被收藏提醒",
+      "content": "小王 收藏了你的商品《机械键盘》",
+      "relatedItemId": 88,
+      "relatedUserId": 12,
+      "read": false,
+      "createdAt": "2026-04-02 10:22"
+    },
+    {
+      "id": 102,
+      "type": "FAVORITE_PRICE_DROP",
+      "title": "收藏商品降价提醒",
+      "content": "你收藏的《二手耳机》已降价：¥120.00 → ¥99.00",
+      "relatedItemId": 66,
+      "relatedUserId": 9,
+      "read": true,
+      "createdAt": "2026-04-02 09:58"
+    }
+  ]
+}
+```
+
+### `type` 枚举
+
+- `ITEM_FAVORITED`：商品被收藏
+- `FAVORITE_PRICE_DROP`：收藏商品降价
+- `FOLLOWED`：被关注
+
+---
+
+## 4. 获取通知未读数
+
+- **URL**: `GET /api/messages/notifications/unread-count`
+
+### 成功响应示例
+
+```json
+{
+  "success": true,
+  "message": "获取成功",
+  "data": {
+    "unread": 3
+  }
+}
+```
+
+---
+
+## 5. 标记单条通知已读
+
+- **URL**: `POST /api/messages/notifications/{notificationId}/read`
+
+### Path 参数
+
+| 字段           | 类型 | 必填 | 说明    |
+| -------------- | ---- | ---- | ------- |
+| notificationId | long | 是   | 通知 ID |
+
+---
+
+## 6. 全部通知标记已读
+
+- **URL**: `POST /api/messages/notifications/read-all`
+
+---
+
+## 7. 系统自动通知触发规则
+
+以下通知均由系统自动检测并写入，不依赖管理员后台手动发送：
+
+1. 商品被收藏：用户收藏他人商品后，向商品发布者发送 `ITEM_FAVORITED`
+2. 收藏商品降价：卖家编辑商品价格且新价格低于原价格时，向收藏该商品的用户发送 `FAVORITE_PRICE_DROP`
+3. 被关注：用户关注他人后，向被关注者发送 `FOLLOWED`

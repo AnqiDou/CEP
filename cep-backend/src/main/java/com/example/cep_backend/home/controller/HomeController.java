@@ -30,11 +30,12 @@ public class HomeController {
     @GetMapping("/items")
     public ApiResponse<HomeItemListDto> items(@RequestParam(required = false) String keyword,
             @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) String opsColumn,
             @RequestParam(required = false) String sortBy,
             @RequestParam(required = false) String sortOrder,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size) {
-        HomeItemListDto list = homeService.searchItems(keyword, categoryId, sortBy, sortOrder, page, size);
+        HomeItemListDto list = homeService.searchItems(keyword, categoryId, opsColumn, sortBy, sortOrder, page, size);
         return ApiResponse.ok("获取成功", list);
     }
 

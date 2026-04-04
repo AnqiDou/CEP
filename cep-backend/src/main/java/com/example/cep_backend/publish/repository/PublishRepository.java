@@ -278,6 +278,32 @@ public class PublishRepository {
         return jdbcTemplate.update(sql, status, Timestamp.valueOf(now), userId, itemId);
     }
 
+    public BigDecimal findPublishedAveragePriceByCategoryId(Long categoryId, Long excludeItemId) {
+        String sql = """
+                SELECT AVG(i.price)
+                FROM items i
+                WHERE i.status = 'PUBLISHED'
+                  AND i.category_id = ?
+                  AND (? IS NULL OR i.id <> ?)
+                """;
+        return jdbcTemplate.queryForObject(sql, BigDecimal.class, categoryId, excludeItemId, excludeItemId);
+    }
+
+    public void replaceItemOpsColumns(Long itemId, List<String> columnCodes, LocalDateTime now) {
+        jdbcTemplate.update("DELETE FROM item_ops_columns WHERE item_id = ?", itemId);
+        if (columnCodes == null || columnCodes.isEmpty()) {
+            return;
+        }
+        String sql = """
+                INSERT INTO item_ops_columns (item_id, column_code, created_at, updated_at)
+                VALUES (?, ?, ?, ?)
+                """;
+        Timestamp ts = Timestamp.valueOf(now);
+        for (String columnCode : columnCodes) {
+            jdbcTemplate.update(sql, itemId, columnCode, ts, ts);
+        }
+    }
+
     public record PublishOwnedItemBaseRecord(
             Long id,
             String name,

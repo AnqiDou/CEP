@@ -35,6 +35,7 @@ export const fetchHomeCategories = () =>
 export const fetchHomeItems = ({
   keyword,
   categoryId,
+  opsColumn,
   sortBy,
   sortOrder,
   page = 1,
@@ -44,6 +45,7 @@ export const fetchHomeItems = ({
     `${HOME_API_BASE}/items${buildQuery({
       keyword,
       categoryId,
+      opsColumn,
       sortBy,
       sortOrder,
       page,

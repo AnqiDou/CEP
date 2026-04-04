@@ -67,3 +67,83 @@
   }
 }
 ```
+
+---
+
+## 2. 获取收藏状态
+
+- **URL**: `GET /api/items/{itemId}/favorite`
+- **鉴权**: 需要 `Authorization: Bearer {accessToken}`
+
+### Path 参数
+
+| 字段   | 类型   | 必填 | 说明         |
+| ------ | ------ | ---- | ------------ |
+| itemId | number | 是   | 物品 ID，> 0 |
+
+### 成功响应示例
+
+```json
+{
+  "success": true,
+  "message": "获取成功",
+  "data": {
+    "favorite": true
+  }
+}
+```
+
+---
+
+## 3. 收藏商品
+
+- **URL**: `POST /api/items/{itemId}/favorite`
+- **鉴权**: 需要 `Authorization: Bearer {accessToken}`
+
+### Path 参数
+
+| 字段   | 类型   | 必填 | 说明         |
+| ------ | ------ | ---- | ------------ |
+| itemId | number | 是   | 物品 ID，> 0 |
+
+### 说明
+
+- 不能收藏自己发布的商品。
+- 收藏成功后会自动给商品发布者生成一条系统通知（`ITEM_FAVORITED`）。
+
+### 成功响应示例
+
+```json
+{
+  "success": true,
+  "message": "收藏成功",
+  "data": {
+    "favorite": true
+  }
+}
+```
+
+---
+
+## 4. 取消收藏
+
+- **URL**: `DELETE /api/items/{itemId}/favorite`
+- **鉴权**: 需要 `Authorization: Bearer {accessToken}`
+
+### Path 参数
+
+| 字段   | 类型   | 必填 | 说明         |
+| ------ | ------ | ---- | ------------ |
+| itemId | number | 是   | 物品 ID，> 0 |
+
+### 成功响应示例
+
+```json
+{
+  "success": true,
+  "message": "取消收藏成功",
+  "data": {
+    "favorite": false
+  }
+}
+```

@@ -2,7 +2,7 @@
   <div class="publish-page">
     <main class="publish-main">
       <aside class="left-rail soft-card">
-        <h2 class="rail-title">发布导航</h2>
+        <h2 class="rail-title">{{ isEditMode ? "编辑导航" : "发布导航" }}</h2>
         <ul class="left-nav-list">
           <li class="left-nav-item is-active">
             <span class="left-nav-icon">📝</span>
@@ -22,7 +22,9 @@
             <span class="left-nav-icon">🚀</span>
             <div>
               <p class="left-nav-text">提交发布</p>
-              <p class="left-nav-sub">审核后即可展示</p>
+              <p class="left-nav-sub">
+                {{ isEditMode ? "保存后立即生效" : "审核后即可展示" }}
+              </p>
             </div>
           </li>
         </ul>
@@ -31,8 +33,12 @@
       <section class="center-rail">
         <header class="publish-header soft-card">
           <div>
-            <h1 class="publish-title">发布闲置</h1>
-            <p class="publish-subtitle">完善信息后可快速发布</p>
+            <h1 class="publish-title">
+              {{ isEditMode ? "编辑闲置" : "发布闲置" }}
+            </h1>
+            <p class="publish-subtitle">
+              {{ isEditMode ? "修改信息后保存" : "完善信息后可快速发布" }}
+            </p>
           </div>
           <div class="publish-header__actions">
             <button
@@ -41,7 +47,15 @@
               :disabled="submitting"
               @click="handleSubmit"
             >
-              {{ submitting ? "发布中..." : "提交发布" }}
+              {{
+                submitting
+                  ? isEditMode
+                    ? "保存中..."
+                    : "发布中..."
+                  : isEditMode
+                  ? "保存修改"
+                  : "提交发布"
+              }}
             </button>
             <button class="ghost-btn" @click="goBackHome">返回首页</button>
           </div>
@@ -185,15 +199,24 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import {
   createPublishItem,
+  fetchMyPublishItems,
+  updateMyPublishItem,
   uploadPublishImage,
 } from "../service/publish/publishApiService";
 
 const router = useRouter();
+const route = useRoute();
+
+const editItemId = computed(() => {
+  const parsed = Number(route.query.editItemId);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+});
+const isEditMode = computed(() => Boolean(editItemId.value));
 
 const categories = [
   {
@@ -238,7 +261,9 @@ const goBackHome = () => {
 
 const revokeUrls = (photos) => {
   photos.forEach((photo) => {
-    URL.revokeObjectURL(photo.url);
+    if (!photo?.isRemote && typeof photo?.url === "string") {
+      URL.revokeObjectURL(photo.url);
+    }
   });
 };
 
@@ -265,6 +290,7 @@ const handleFileChange = (event) => {
     id: `${Date.now()}-${photoId++}`,
     file,
     url: URL.createObjectURL(file),
+    isRemote: false,
   }));
   photoPreviews.value = [...photoPreviews.value, ...nextPreviews];
   input.value = "";
@@ -273,8 +299,71 @@ const handleFileChange = (event) => {
 const removePhoto = (id) => {
   const target = photoPreviews.value.find((photo) => photo.id === id);
   if (!target) return;
-  URL.revokeObjectURL(target.url);
+  if (!target.isRemote) {
+    URL.revokeObjectURL(target.url);
+  }
   photoPreviews.value = photoPreviews.value.filter((photo) => photo.id !== id);
+};
+
+const normalizeListData = (responseBody) => {
+  const payload = responseBody?.data;
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.records)) return payload.records;
+  if (Array.isArray(payload?.list)) return payload.list;
+  return [];
+};
+
+const fillFormForEdit = (item) => {
+  form.value = {
+    name: item?.title || item?.name || "",
+    category: item?.categoryCode || "other",
+    price:
+      item?.price === null || item?.price === undefined
+        ? ""
+        : String(item.price),
+    purchaseDate: item?.purchaseDate || "",
+    usageDuration: item?.usageDuration || "",
+    description: item?.description || "",
+  };
+
+  const remotePhotoUrls = Array.isArray(item?.photoUrls)
+    ? item.photoUrls
+    : typeof item?.photoUrl === "string" && item.photoUrl.trim()
+    ? [item.photoUrl.trim()]
+    : [];
+  revokeUrls(photoPreviews.value);
+  photoPreviews.value = remotePhotoUrls
+    .filter((url) => typeof url === "string" && url.trim())
+    .slice(0, 6)
+    .map((url) => ({
+      id: `${Date.now()}-${photoId++}`,
+      file: null,
+      url,
+      isRemote: true,
+    }));
+};
+
+const loadEditItem = async () => {
+  if (!isEditMode.value || !editItemId.value) {
+    return;
+  }
+  submitMessage.value = "正在加载待编辑物品...";
+  try {
+    const responseBody = await fetchMyPublishItems();
+    const list = normalizeListData(responseBody);
+    const target = list.find((item) => {
+      const id = Number(item?.itemId ?? item?.id ?? 0);
+      return id === editItemId.value;
+    });
+    if (!target) {
+      throw new Error("未找到可编辑物品");
+    }
+    fillFormForEdit(target);
+    submitMessage.value = "";
+  } catch (error) {
+    submitMessage.value = error?.message || "加载编辑数据失败";
+  }
 };
 
 const loadCategories = async () => {
@@ -334,16 +423,31 @@ const handleSubmit = async () => {
   }
 
   submitting.value = true;
-  submitMessage.value = "正在上传图片并提交发布...";
+  submitMessage.value = isEditMode.value
+    ? "正在上传图片并保存修改..."
+    : "正在上传图片并提交发布...";
 
   try {
     const uploadUrls = [];
     for (const photo of photoPreviews.value) {
+      if (
+        photo?.isRemote &&
+        typeof photo?.url === "string" &&
+        photo.url.trim()
+      ) {
+        uploadUrls.push(photo.url.trim());
+        continue;
+      }
+      if (!photo?.file) {
+        continue;
+      }
       const uploadResult = await uploadPublishImage(photo.file);
-      uploadUrls.push(uploadResult?.data?.url);
+      if (uploadResult?.data?.url) {
+        uploadUrls.push(uploadResult.data.url);
+      }
     }
 
-    await createPublishItem({
+    const payload = {
       name: form.value.name.trim(),
       categoryCode: form.value.category || "other",
       price: Number(normalizedPrice.toFixed(2)),
@@ -351,7 +455,18 @@ const handleSubmit = async () => {
       usageDuration: form.value.usageDuration.trim(),
       description: form.value.description.trim(),
       photoUrls: uploadUrls,
-    });
+    };
+
+    if (isEditMode.value && editItemId.value) {
+      await updateMyPublishItem(editItemId.value, payload);
+      showSubmitMessage("修改成功", "success");
+      window.setTimeout(() => {
+        router.push("/profile");
+      }, 500);
+      return;
+    }
+
+    await createPublishItem(payload);
 
     showSubmitMessage("发布成功", "success");
     revokeUrls(photoPreviews.value);
@@ -376,6 +491,7 @@ const handleSubmit = async () => {
 
 onMounted(() => {
   loadCategories();
+  loadEditItem();
 });
 
 onBeforeUnmount(() => {

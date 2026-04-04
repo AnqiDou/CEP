@@ -12,7 +12,7 @@
             v-model="keyword"
             class="search-bar__input"
             type="text"
-            placeholder="搜二手闲置、书籍、电子产品..."
+            :placeholder="searchPlaceholder"
             @keyup.enter="handleSearch"
           />
           <button class="search-bar__btn" @click="handleSearch">搜索</button>
@@ -28,19 +28,18 @@
           登录
         </button>
         <button class="primary-btn" @click="goToPublish">发布闲置</button>
-        <button
-          class="ghost-btn icon-btn"
-          @click="goToCart"
-          aria-label="购物车"
-        >
-          <el-icon><ShoppingCart /></el-icon>
-        </button>
         <button class="ghost-btn message-btn" @click="goToChat">
-          <span class="message-btn__dot" v-if="hasUnreadMessage"></span>
+          <span
+            v-if="isUserLoggedIn && unreadMessageCount > 0"
+            class="message-btn__badge"
+          >
+            {{ unreadMessageCount > 99 ? "99+" : unreadMessageCount }}
+          </span>
           <el-icon><ChatDotRound /></el-icon>
           <span>消息</span>
         </button>
         <button
+          v-if="isUserLoggedIn"
           class="ghost-btn profile-btn"
           @click="goToProfile"
           aria-label="进入个人主页"
@@ -51,7 +50,7 @@
     </header>
 
     <section class="home-hero">
-      <aside class="home-ops">
+      <aside v-if="!isOpsListOnlyMode" class="home-ops">
         <div class="home-ops__layout">
           <article class="ops-card ops-card--benefit">
             <div class="ops-benefit__content">
@@ -79,7 +78,7 @@
               v-for="(season, index) in opsCards.seasons"
               :key="season.id"
               class="ops-card ops-card--season"
-              @click="goToOpsItem(index)"
+              @click="goToOpsItem(index + 1)"
             >
               <div class="ops-card__main">
                 <h4>{{ season.title }}</h4>
@@ -103,7 +102,7 @@
         </div>
       </aside>
 
-      <section class="home-hero-showcase">
+      <section v-if="!isOpsListOnlyMode" class="home-hero-showcase">
         <div class="home-hero-showcase__carousel-wrap">
           <el-carousel
             class="home-hero-showcase__carousel"
@@ -140,7 +139,11 @@
     </section>
 
     <main class="home-main">
-      <nav class="category-tabs" aria-label="分类导航">
+      <nav
+        v-if="!isOpsListOnlyMode"
+        class="category-tabs"
+        aria-label="分类导航"
+      >
         <button
           v-for="cat in categories"
           :key="cat.id"
@@ -157,7 +160,7 @@
 
       <section class="content">
         <section class="block block--featured">
-          <header class="block-header">
+          <header v-if="!isOpsListOnlyMode" class="block-header">
             <h3 class="section-title">🔥 {{ blockTitle }}</h3>
             <div class="sort-actions">
               <button
@@ -611,14 +614,17 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
-import { ElMessage } from "element-plus";
 import {
-  ChatDotRound,
-  ShoppingCart,
-  UserFilled,
-} from "@element-plus/icons-vue";
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watchEffect,
+} from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { ElMessage } from "element-plus";
+import { ChatDotRound, UserFilled } from "@element-plus/icons-vue";
 import {
   loginUser,
   registerUser,
@@ -639,13 +645,19 @@ import {
   fetchHomeItems,
   fetchHotItems,
 } from "../service/home/homeApiService";
+import {
+  fetchMessageConversations,
+  fetchMessageNotificationUnreadCount,
+} from "../service/chat/chatApiService";
 
 const router = useRouter();
+const route = useRoute();
 const ADMIN_EMAIL = "3299166215@qq.com";
 const keyword = ref("");
 const searchedKeyword = ref("");
 const authModalType = ref("");
 const isAuthModalVisible = computed(() => Boolean(authModalType.value));
+const isOpsListOnlyMode = computed(() => route.query.opsView === "list");
 const isUserLoggedIn = computed(() =>
   Boolean(authState.user && authState.refreshToken)
 );
@@ -722,19 +734,90 @@ const listItems = ref([]);
 const homeError = ref("");
 const HOT_CATEGORY_ID = "hot";
 const HOT_BATCH_SIZE = 8;
+const HOT_MAX_LIMIT = 20;
 const LIST_PAGE_SIZE = 12;
 const activeCategoryId = ref(HOT_CATEGORY_ID);
 const sortBy = ref("price");
 const sortOrder = ref("desc");
 const hotLimit = ref(HOT_BATCH_SIZE);
 const hotHasMore = ref(true);
+const hotUseOverflow = ref(false);
+const hotOverflowPage = ref(0);
+const hotOverflowHasMore = ref(true);
 const listPage = ref(1);
 const listHasMore = ref(true);
 const isLoadingMore = ref(false);
 const cardGridRef = ref(null);
 const homeScrollRef = ref(null);
 const hotKeywords = ref([]);
-const hasUnreadMessage = ref(true);
+const unreadMessageCount = ref(0);
+const OPS_COLUMNS = [
+  {
+    id: "ops-benefit",
+    title: "校园抄底好物",
+    keyword: "福利",
+    columnCode: "campus-bargain",
+  },
+  {
+    id: "ops-graduate",
+    title: "毕业季「清仓市集」",
+    keyword: "毕业",
+    columnCode: "graduate-clearance",
+  },
+  {
+    id: "ops-campus",
+    title: "校园季「开学好物」",
+    keyword: "开学",
+    columnCode: "back-to-school",
+  },
+];
+
+const activeOpsColumn = computed(() => {
+  if (!isOpsListOnlyMode.value) {
+    return null;
+  }
+  const rawIndex = Number(route.query.opsIndex);
+  const safeIndex = Number.isInteger(rawIndex) ? rawIndex : 0;
+  return OPS_COLUMNS[safeIndex] || OPS_COLUMNS[0];
+});
+
+const searchPlaceholder = computed(() => {
+  if (isOpsListOnlyMode.value && activeOpsColumn.value) {
+    return `当前专栏：${activeOpsColumn.value.title}`;
+  }
+  return "搜二手闲置、书籍、电子产品...";
+});
+
+const loadUnreadMessageCount = async () => {
+  if (!isUserLoggedIn.value) {
+    unreadMessageCount.value = 0;
+    return;
+  }
+
+  try {
+    const [conversationResponse, notificationResponse] = await Promise.all([
+      fetchMessageConversations("all"),
+      fetchMessageNotificationUnreadCount(),
+    ]);
+    const conversations = Array.isArray(conversationResponse?.data)
+      ? conversationResponse.data
+      : [];
+    const chatUnreadCount = conversations.reduce((total, current) => {
+      const unread = Number.isInteger(current?.unread)
+        ? Math.max(current.unread, 0)
+        : 0;
+      return total + unread;
+    }, 0);
+    const notificationUnreadCount = Number.isInteger(
+      notificationResponse?.data?.unread
+    )
+      ? Math.max(notificationResponse.data.unread, 0)
+      : 0;
+    unreadMessageCount.value = chatUnreadCount + notificationUnreadCount;
+  } catch {
+    unreadMessageCount.value = 0;
+  }
+};
 
 const sortOptions = [
   {
@@ -763,6 +846,9 @@ const isHotMode = computed(
 );
 
 const blockTitle = computed(() => {
+  if (isOpsListOnlyMode.value && activeOpsColumn.value) {
+    return activeOpsColumn.value.title;
+  }
   if (searchedKeyword.value.trim())
     return `搜索结果：${searchedKeyword.value.trim()}`;
   if (isHotMode.value) return "热门推荐";
@@ -782,8 +868,8 @@ const displayedItems = computed(() => {
 const opsCards = computed(() => ({
   benefit: {
     id: "ops-benefit",
-    title: "平台福利",
-    desc: "交易成功送校园积分，可兑换打印券、奶茶券等合作商家权益。",
+    title: "校园抄底好物",
+    desc: "「超低价捡漏・1 省到底」",
   },
   seasons: [
     {
@@ -954,16 +1040,55 @@ const loadHotItems = async ({ append = false } = {}) => {
   if (!append) {
     hotLimit.value = HOT_BATCH_SIZE;
     hotHasMore.value = true;
+    hotUseOverflow.value = false;
+    hotOverflowPage.value = 0;
+    hotOverflowHasMore.value = true;
   } else {
     if (!hotHasMore.value) {
       return;
     }
-    hotLimit.value += HOT_BATCH_SIZE;
+
+    if (hotUseOverflow.value) {
+      if (!hotOverflowHasMore.value) {
+        hotHasMore.value = false;
+        return;
+      }
+
+      const nextPage = hotOverflowPage.value + 1;
+      const responseBody = await fetchHomeItems({
+        keyword: "",
+        categoryId: undefined,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+        page: nextPage,
+        size: LIST_PAGE_SIZE,
+      });
+      const incomingItems = (responseBody.data?.items || []).map(mapHomeItem);
+      const existingIds = new Set(hotItems.value.map((item) => item.id));
+      const dedupedIncoming = incomingItems.filter(
+        (item) => !existingIds.has(item.id)
+      );
+
+      hotItems.value = [...hotItems.value, ...dedupedIncoming];
+      hotOverflowPage.value = nextPage;
+      hotOverflowHasMore.value = incomingItems.length >= LIST_PAGE_SIZE;
+      hotHasMore.value = hotOverflowHasMore.value;
+      return;
+    }
+
+    const nextLimit = Math.min(hotLimit.value + HOT_BATCH_SIZE, HOT_MAX_LIMIT);
+    hotLimit.value = nextLimit;
+
+    if (hotLimit.value >= HOT_MAX_LIMIT) {
+      hotUseOverflow.value = true;
+      hotOverflowPage.value = 0;
+      hotOverflowHasMore.value = true;
+    }
   }
 
   const responseBody = await fetchHotItems(hotLimit.value);
   const mappedItems = (responseBody.data || []).map(mapHomeItem);
-  hotHasMore.value = mappedItems.length >= hotLimit.value;
+  hotHasMore.value = true;
   hotItems.value = mappedItems;
 
   if (sortBy.value === "price") {
@@ -985,9 +1110,16 @@ const loadListItems = async ({ append = false } = {}) => {
   }
 
   const nextPage = append ? listPage.value + 1 : 1;
+  const normalizedCategoryId =
+    typeof activeCategoryId.value === "number"
+      ? activeCategoryId.value
+      : undefined;
   const responseBody = await fetchHomeItems({
     keyword: searchedKeyword.value.trim(),
-    categoryId: activeCategoryId.value,
+    categoryId: normalizedCategoryId,
+    opsColumn: isOpsListOnlyMode.value
+      ? activeOpsColumn.value?.columnCode
+      : undefined,
     sortBy: sortBy.value,
     sortOrder: sortOrder.value,
     page: nextPage,
@@ -1052,11 +1184,30 @@ const ensureScrollableContent = async () => {
   }
 };
 
+const withPreservedHomeScroll = async (loader) => {
+  const element = homeScrollRef.value;
+  const previousScrollTop = element ? element.scrollTop : 0;
+
+  await loader();
+  await nextTick();
+
+  if (!element) {
+    return;
+  }
+
+  const maxScrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
+  element.scrollTop = Math.min(previousScrollTop, maxScrollTop);
+};
+
 const handleSearch = async () => {
   const value = keyword.value.trim();
   searchedKeyword.value = value;
   homeError.value = "";
-  if (!value && activeCategoryId.value === HOT_CATEGORY_ID) {
+  if (
+    !value &&
+    activeCategoryId.value === HOT_CATEGORY_ID &&
+    !isOpsListOnlyMode.value
+  ) {
     scrollGridToTop();
     await ensureScrollableContent();
     return;
@@ -1076,13 +1227,33 @@ const selectHotKeyword = async (word) => {
 };
 
 const goToOpsItem = (index) => {
-  const source = hotItems.value.length ? hotItems.value : displayedItems.value;
-  const target = source[index];
-  if (!target?.id) {
-    ElMessage.info("当前暂无可跳转的商品");
+  const resolved = router.resolve({
+    path: "/",
+    query: {
+      opsView: "list",
+      opsIndex: String(index),
+    },
+  });
+  window.open(resolved.href, "_blank");
+};
+
+const applyOpsListMode = async () => {
+  if (!isOpsListOnlyMode.value) {
     return;
   }
-  goToItemDetail(target.id);
+
+  activeCategoryId.value = HOT_CATEGORY_ID;
+  keyword.value = "";
+  searchedKeyword.value = "";
+  homeError.value = "";
+
+  try {
+    await loadListItems({ append: false });
+    scrollGridToTop();
+    await ensureScrollableContent();
+  } catch (error) {
+    homeError.value = error.message || "获取活动物品列表失败";
+  }
 };
 
 const handleHeroCarouselChange = (index) => {
@@ -1096,18 +1267,20 @@ const selectCategory = async (id) => {
   homeError.value = "";
   if (activeCategoryId.value === HOT_CATEGORY_ID) {
     try {
-      await loadHotItems({ append: false });
-      scrollGridToTop();
-      await ensureScrollableContent();
+      await withPreservedHomeScroll(async () => {
+        await loadHotItems({ append: false });
+        await ensureScrollableContent();
+      });
     } catch (error) {
       homeError.value = error.message || "获取热门推荐失败";
     }
     return;
   }
   try {
-    await loadListItems({ append: false });
-    scrollGridToTop();
-    await ensureScrollableContent();
+    await withPreservedHomeScroll(async () => {
+      await loadListItems({ append: false });
+      await ensureScrollableContent();
+    });
   } catch (error) {
     homeError.value = error.message || "获取物品列表失败";
   }
@@ -1180,6 +1353,10 @@ const goToProfile = () => {
 };
 
 const goToPublish = () => {
+  if (!isUserLoggedIn.value) {
+    openLoginModal();
+    return;
+  }
   router.push("/publish");
 };
 
@@ -1190,11 +1367,6 @@ const goToChat = () => {
   }
   const resolved = router.resolve("/chat");
   window.open(resolved.href, "_blank");
-  hasUnreadMessage.value = false;
-};
-
-const goToCart = () => {
-  router.push("/trade/confirm");
 };
 
 const goToItemDetail = (id) => {
@@ -1390,6 +1562,7 @@ const submitLogin = async () => {
   try {
     const responseBody = await loginUser(email, password);
     saveAuthSession(responseBody);
+    await loadUnreadMessageCount();
     ElMessage.success("登录成功");
     closeAuthModal();
     if (email.toLowerCase() === ADMIN_EMAIL) {
@@ -1477,6 +1650,7 @@ const submitRegister = async () => {
 
     const loginResponse = await loginUser(email.trim(), password);
     saveAuthSession(loginResponse);
+    await loadUnreadMessageCount();
 
     registerSuccess.value = "注册并登录成功";
     closeAuthModal();
@@ -1487,9 +1661,11 @@ const submitRegister = async () => {
 
 onMounted(async () => {
   await initAuthSession();
+  await loadUnreadMessageCount();
   homeError.value = "";
   try {
     await Promise.all([loadCategories(), loadHotItems(), loadHotKeywords()]);
+    await applyOpsListMode();
     await ensureScrollableContent();
   } catch (error) {
     homeError.value = error.message || "首页数据加载失败";
@@ -1506,6 +1682,14 @@ onBeforeUnmount(() => {
     clearInterval(forgotCodeCountdownTimer);
     forgotCodeCountdownTimer = null;
   }
+});
+
+watchEffect(() => {
+  if (isOpsListOnlyMode.value && activeOpsColumn.value) {
+    document.title = `${activeOpsColumn.value.title} - 校园易物平台`;
+    return;
+  }
+  document.title = "校园易物平台";
 });
 </script>
 
@@ -1657,16 +1841,6 @@ onBeforeUnmount(() => {
   color: #716a98;
 }
 
-.icon-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-}
-
 .login-btn {
   border-color: #e6e2f8;
   background: #f6f3ff;
@@ -1683,13 +1857,21 @@ onBeforeUnmount(() => {
   background: #f6f3ff;
 }
 
-.message-btn__dot {
+.message-btn__badge {
   position: absolute;
-  top: 7px;
-  right: 10px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  top: 4px;
+  right: 6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 700;
+  color: #fff;
   background: #ff4d4f;
   box-shadow: 0 0 0 2px #f6f3ff;
 }

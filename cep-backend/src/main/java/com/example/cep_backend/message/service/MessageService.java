@@ -4,7 +4,9 @@ import com.example.cep_backend.auth.BusinessException;
 import com.example.cep_backend.message.dto.MessageConversationDto;
 import com.example.cep_backend.message.dto.MessageCreateConversationRequest;
 import com.example.cep_backend.message.dto.MessageItemDto;
+import com.example.cep_backend.message.dto.MessageNotificationDto;
 import com.example.cep_backend.message.dto.MessageSendRequest;
+import com.example.cep_backend.message.repository.MessageNotificationRepository;
 import com.example.cep_backend.message.repository.MessageRepository;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
@@ -15,9 +17,13 @@ import java.util.List;
 @Service
 public class MessageService {
     private final MessageRepository messageRepository;
+    private final MessageNotificationRepository messageNotificationRepository;
 
-    public MessageService(MessageRepository messageRepository) {
+    public MessageService(
+            MessageRepository messageRepository,
+            MessageNotificationRepository messageNotificationRepository) {
         this.messageRepository = messageRepository;
+        this.messageNotificationRepository = messageNotificationRepository;
     }
 
     public List<MessageConversationDto> getConversations(Long userId, String filter) {
@@ -153,6 +159,26 @@ public class MessageService {
                 receiverMessage);
     }
 
+    public List<MessageNotificationDto> getNotifications(Long userId, Integer limit) {
+        int normalizedLimit = normalizeNotificationLimit(limit);
+        return messageNotificationRepository.findNotifications(userId, normalizedLimit);
+    }
+
+    public int getNotificationUnreadCount(Long userId) {
+        return messageNotificationRepository.countUnread(userId);
+    }
+
+    public void markNotificationRead(Long userId, Long notificationId) {
+        if (notificationId == null || notificationId <= 0) {
+            throw new BusinessException("通知参数无效");
+        }
+        messageNotificationRepository.markNotificationRead(userId, notificationId, LocalDateTime.now());
+    }
+
+    public void markAllNotificationsRead(Long userId) {
+        messageNotificationRepository.markAllRead(userId, LocalDateTime.now());
+    }
+
     private String normalizeFilter(String filter) {
         String normalized = filter == null ? "all" : filter.trim().toLowerCase();
         if (normalized.isEmpty()) {
@@ -162,6 +188,14 @@ public class MessageService {
             throw new BusinessException("消息筛选参数无效");
         }
         return normalized;
+    }
+
+    private int normalizeNotificationLimit(Integer limit) {
+        int resolved = limit == null ? 20 : limit;
+        if (resolved < 1 || resolved > 50) {
+            throw new BusinessException("通知数量限制必须在 1 到 50 之间");
+        }
+        return resolved;
     }
 
     public record MessageDispatchResult(

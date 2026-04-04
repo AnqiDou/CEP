@@ -162,15 +162,44 @@
 
         <section class="profile-content soft-card">
           <div class="section-head">
-            <h3 class="section-title">{{ currentSection.title }}</h3>
-            <span v-if="selectedMenu === 'idle'" class="section-count"
-              >共 {{ reviewTotal }} 条</span
+            <div class="section-head__left">
+              <h3 class="section-title">{{ currentSection.title }}</h3>
+              <span v-if="selectedMenu === 'idle'" class="section-count"
+                >共 {{ reviewTotal }} 条</span
+              >
+              <span
+                v-else-if="detailMenuKeys.includes(selectedMenu)"
+                class="section-count"
+                >共 {{ currentSectionItems.length }} 条</span
+              >
+            </div>
+            <div
+              v-if="selectedMenu === 'trade-published'"
+              class="section-head__actions"
             >
-            <span
-              v-else-if="detailMenuKeys.includes(selectedMenu)"
-              class="section-count"
-              >共 {{ currentSectionItems.length }} 条</span
-            >
+              <button
+                class="batch-btn batch-btn--danger"
+                type="button"
+                @click="startBatchDeleteMode"
+              >
+                {{
+                  batchActionMode === "delete"
+                    ? `确认删除（${selectedPublishedItemIds.length}）`
+                    : "批量删除"
+                }}
+              </button>
+              <button
+                class="batch-btn batch-btn--shelf"
+                type="button"
+                @click="startBatchOffShelfMode"
+              >
+                {{
+                  batchActionMode === "off_shelf"
+                    ? `确认下架（${selectedPublishedItemIds.length}）`
+                    : "批量下架"
+                }}
+              </button>
+            </div>
           </div>
 
           <div v-if="selectedMenu === 'idle'" class="review-tabs">
@@ -262,6 +291,103 @@
           </div>
 
           <div
+            v-else-if="selectedMenu === 'trade-published'"
+            class="published-grid"
+            @click.self="cancelBatchMode"
+          >
+            <article
+              v-for="item in currentSectionItems"
+              :key="item.id"
+              class="published-card"
+              @click="handlePublishedCardClick(item)"
+            >
+              <div class="published-card__thumb">
+                <label
+                  v-if="batchActionMode"
+                  class="published-card__check"
+                  @click.stop
+                >
+                  <input
+                    v-model="selectedPublishedItemIds"
+                    type="checkbox"
+                    :value="item.itemId"
+                    @click.stop
+                  />
+                </label>
+                <img
+                  v-if="getTradeItemPhoto(item)"
+                  :src="getTradeItemPhoto(item)"
+                  :alt="item.title"
+                  class="published-card__thumb-image"
+                  loading="lazy"
+                />
+                <div v-else class="published-card__thumb-placeholder">
+                  暂无图片
+                </div>
+                <span class="published-card__status">{{
+                  mapStatusText(item.status)
+                }}</span>
+              </div>
+              <div class="published-card__body">
+                <div class="published-card__title-row">
+                  <h4 class="published-card__title" :title="item.title">
+                    {{ item.title }}
+                  </h4>
+                  <div class="published-card__menu-wrap">
+                    <button
+                      class="published-card__more-btn"
+                      type="button"
+                      @click.stop="togglePublishedActionMenu(item.itemId)"
+                    >
+                      ⋯
+                    </button>
+                    <div
+                      v-if="activePublishedActionMenuId === item.itemId"
+                      class="published-card__menu"
+                    >
+                      <button
+                        class="published-card__menu-item"
+                        type="button"
+                        @click.stop="onPublishedActionEdit(item)"
+                      >
+                        编辑
+                      </button>
+                      <button
+                        class="published-card__menu-item published-card__menu-item--danger"
+                        type="button"
+                        @click.stop="onPublishedActionDelete(item)"
+                      >
+                        删除
+                      </button>
+                      <button
+                        class="published-card__menu-item published-card__menu-item--shelf"
+                        type="button"
+                        @click.stop="onPublishedActionToggleShelf(item)"
+                      >
+                        {{ item.status === "OFF_SHELF" ? "上架" : "下架" }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <p class="published-card__meta">
+                  {{ item.price }} · {{ item.campus }} · {{ item.time }}
+                </p>
+                <p
+                  v-if="item.description"
+                  class="published-card__desc"
+                  :title="item.description"
+                >
+                  {{ item.description }}
+                </p>
+              </div>
+            </article>
+
+            <div v-if="!currentSectionItems.length" class="pending-empty">
+              当前暂无物品
+            </div>
+          </div>
+
+          <div
             v-else-if="detailMenuKeys.includes(selectedMenu)"
             class="section-list"
           >
@@ -274,9 +400,6 @@
                 <h4 class="section-item__title">{{ item.title }}</h4>
                 <p class="section-item__meta">
                   {{ item.price }} · {{ item.campus }} · {{ item.time }}
-                  <span v-if="selectedMenu === 'trade-published'">
-                    · {{ mapStatusText(item.status) }}
-                  </span>
                 </p>
               </div>
               <div class="section-item__actions">
@@ -286,30 +409,6 @@
                   @click="goToItemDetail(item.itemId)"
                 >
                   查看详情
-                </button>
-                <button
-                  v-if="selectedMenu === 'trade-published'"
-                  class="section-item__btn section-item__btn--edit"
-                  type="button"
-                  @click="openItemEditDialog(item)"
-                >
-                  编辑
-                </button>
-                <button
-                  v-if="selectedMenu === 'trade-published'"
-                  class="section-item__btn section-item__btn--danger"
-                  type="button"
-                  @click="handleDeletePublishedItem(item)"
-                >
-                  删除
-                </button>
-                <button
-                  v-if="selectedMenu === 'trade-published'"
-                  class="section-item__btn section-item__btn--shelf"
-                  type="button"
-                  @click="togglePublishedItemShelf(item)"
-                >
-                  {{ item.status === "OFF_SHELF" ? "上架" : "下架" }}
                 </button>
               </div>
             </article>
@@ -477,6 +576,9 @@ const avatarInputRef = ref(null);
 const editError = ref("");
 const selectedAvatarFile = ref(null);
 const itemEditError = ref("");
+const selectedPublishedItemIds = ref([]);
+const activePublishedActionMenuId = ref(null);
+const batchActionMode = ref("");
 const activeReviewTab = ref("all");
 const editForm = reactive({ avatar: "", username: "", password: "" });
 const itemEditForm = reactive({
@@ -559,6 +661,11 @@ const normalizeListData = (responseBody) => {
 
 const selectMenu = async (key) => {
   selectedMenu.value = key;
+  if (key !== "trade-published") {
+    selectedPublishedItemIds.value = [];
+    activePublishedActionMenuId.value = null;
+    batchActionMode.value = "";
+  }
   localStorage.setItem(PROFILE_SELECTED_MENU_KEY, key);
   try {
     await loadMenuData(key, key === "idle");
@@ -669,6 +776,16 @@ const mapTradeItem = (item) => ({
   photoUrls: Array.isArray(item.photoUrls) ? item.photoUrls : [],
 });
 
+const getTradeItemPhoto = (item) => {
+  if (item?.photoUrl) {
+    return item.photoUrl;
+  }
+  if (Array.isArray(item?.photoUrls) && item.photoUrls.length > 0) {
+    return item.photoUrls[0];
+  }
+  return "";
+};
+
 const mapStatusText = (status) => {
   if (status === "OFF_SHELF") {
     return "已下架";
@@ -683,7 +800,148 @@ const reloadMyPublishedItems = async () => {
   const publishedRes = await fetchMyPublishItems();
   sectionItemMap["trade-published"] =
     normalizeListData(publishedRes).map(mapTradeItem);
+  selectedPublishedItemIds.value = [];
+  activePublishedActionMenuId.value = null;
+  batchActionMode.value = "";
   loadedMenus["trade-published"] = true;
+};
+
+const startBatchDeleteMode = async () => {
+  if (batchActionMode.value !== "delete") {
+    batchActionMode.value = "delete";
+    selectedPublishedItemIds.value = [];
+    activePublishedActionMenuId.value = null;
+    ElMessage.info("请勾选要删除的物品后，再点一次“确认删除”");
+    return;
+  }
+  await handleBatchDeletePublishedItems();
+};
+
+const startBatchOffShelfMode = async () => {
+  if (batchActionMode.value !== "off_shelf") {
+    batchActionMode.value = "off_shelf";
+    selectedPublishedItemIds.value = [];
+    activePublishedActionMenuId.value = null;
+    ElMessage.info("请勾选要下架的物品后，再点一次“确认下架”");
+    return;
+  }
+  await handleBatchOffShelfPublishedItems();
+};
+
+const cancelBatchMode = () => {
+  batchActionMode.value = "";
+  selectedPublishedItemIds.value = [];
+  activePublishedActionMenuId.value = null;
+};
+
+const handlePublishedCardClick = (item) => {
+  if (!batchActionMode.value) {
+    goToItemDetail(item.itemId);
+    return;
+  }
+  const currentId = String(item.itemId);
+  const next = selectedPublishedItemIds.value.map((id) => String(id));
+  const index = next.findIndex((id) => id === currentId);
+  if (index >= 0) {
+    next.splice(index, 1);
+  } else {
+    next.push(currentId);
+  }
+  selectedPublishedItemIds.value = next;
+};
+
+const togglePublishedActionMenu = (itemId) => {
+  activePublishedActionMenuId.value =
+    activePublishedActionMenuId.value === itemId ? null : itemId;
+};
+
+const onPublishedActionEdit = (item) => {
+  activePublishedActionMenuId.value = null;
+  router.push({
+    name: "publish",
+    query: {
+      editItemId: String(item.itemId),
+    },
+  });
+};
+
+const onPublishedActionDelete = async (item) => {
+  activePublishedActionMenuId.value = null;
+  await handleDeletePublishedItem(item);
+};
+
+const onPublishedActionToggleShelf = async (item) => {
+  activePublishedActionMenuId.value = null;
+  await togglePublishedItemShelf(item);
+};
+
+const selectedPublishedItems = computed(() => {
+  const selectedSet = new Set(
+    selectedPublishedItemIds.value.map((itemId) => String(itemId))
+  );
+  return sectionItemMap["trade-published"].filter((item) =>
+    selectedSet.has(String(item.itemId))
+  );
+});
+
+const handleBatchDeletePublishedItems = async () => {
+  const targets = selectedPublishedItems.value;
+  if (!targets.length) {
+    ElMessage.warning("请先勾选要删除的物品");
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确认批量删除已选的 ${targets.length} 件物品吗？删除后不可恢复。`,
+      "批量删除确认",
+      {
+        confirmButtonText: "确认删除",
+        cancelButtonText: "取消",
+        type: "warning",
+      }
+    );
+    await Promise.all(targets.map((item) => deleteMyPublishItem(item.itemId)));
+    await reloadMyPublishedItems();
+    ElMessage.success("批量删除成功");
+  } catch (error) {
+    if (error === "cancel" || error === "close") {
+      return;
+    }
+    ElMessage.error(error.message || "批量删除失败");
+  }
+};
+
+const handleBatchOffShelfPublishedItems = async () => {
+  const targets = selectedPublishedItems.value.filter(
+    (item) => item.status !== "OFF_SHELF"
+  );
+  if (!targets.length) {
+    ElMessage.warning("已选物品均为下架状态");
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确认批量下架已选的 ${targets.length} 件物品吗？`,
+      "批量下架确认",
+      {
+        confirmButtonText: "确认下架",
+        cancelButtonText: "取消",
+        type: "warning",
+      }
+    );
+    await Promise.all(
+      targets.map((item) => updateMyPublishItemStatus(item.itemId, "OFF_SHELF"))
+    );
+    await reloadMyPublishedItems();
+    ElMessage.success("批量下架成功");
+  } catch (error) {
+    if (error === "cancel" || error === "close") {
+      return;
+    }
+    ElMessage.error(error.message || "批量下架失败");
+  }
 };
 
 const openItemEditDialog = (item) => {
@@ -1177,10 +1435,46 @@ onMounted(async () => {
 
 .section-head {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding-bottom: 10px;
   border-bottom: 1px solid #f0ecff;
+}
+
+.section-head__left {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.section-head__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.batch-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 7px 12px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.batch-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.batch-btn--danger {
+  background: #f19aa3;
+}
+
+.batch-btn--shelf {
+  background: #72c8a0;
 }
 
 .section-title {
@@ -1385,6 +1679,178 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.published-grid {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+}
+
+.published-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  border: 1px solid #ece6ff;
+  background: #ffffff;
+  overflow: visible;
+  cursor: pointer;
+}
+
+.published-card:hover {
+  box-shadow: 0 10px 22px rgba(111, 90, 184, 0.14);
+}
+
+.published-card__thumb {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: linear-gradient(135deg, #ebe8ff 0%, #f7ecff 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.published-card__check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.published-card__check input {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.published-card__thumb-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.published-card__thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8e88aa;
+  font-size: 13px;
+}
+
+.published-card__status {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: #6751a8;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.published-card__body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.published-card__title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.published-card__menu-wrap {
+  position: relative;
+}
+
+.published-card__more-btn {
+  border: none;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #f5f1ff;
+  color: #6351a9;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.published-card__menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 5;
+  min-width: 90px;
+  border-radius: 10px;
+  border: 1px solid #e7ddff;
+  background: #ffffff;
+  box-shadow: 0 12px 24px rgba(111, 90, 184, 0.18);
+  overflow: hidden;
+}
+
+.published-card__menu-item {
+  width: 100%;
+  border: none;
+  background: #ffffff;
+  color: #3d3757;
+  font-size: 13px;
+  text-align: left;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.published-card__menu-item:hover {
+  background: #f8f4ff;
+}
+
+.published-card__menu-item--danger {
+  color: #cb4f6c;
+}
+
+.published-card__menu-item--shelf {
+  color: #3f8c6d;
+}
+
+.published-card__title {
+  margin: 0;
+  font-size: 16px;
+  color: #2f2f3f;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.published-card__meta {
+  margin: 0;
+  color: #8e88aa;
+  font-size: 12px;
+}
+
+.published-card__desc {
+  margin: 0;
+  color: #6f6a83;
+  font-size: 12px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .section-item {

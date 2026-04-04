@@ -2,13 +2,17 @@ package com.example.cep_backend.itemdetail.service;
 
 import com.example.cep_backend.auth.BusinessException;
 import com.example.cep_backend.itemdetail.dto.ItemDetailDto;
+import com.example.cep_backend.itemdetail.dto.ItemFavoriteStatusDto;
 import com.example.cep_backend.itemdetail.dto.ItemDetailPublisherDto;
 import com.example.cep_backend.itemdetail.model.ItemDetailRecord;
 import com.example.cep_backend.itemdetail.repository.ItemDetailRepository;
+import com.example.cep_backend.message.service.MessageNotificationService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -23,9 +27,13 @@ public class ItemDetailService {
     private static final String DEFAULT_PUBLISHER_NOTE = "该用户暂未完善个人简介";
 
     private final ItemDetailRepository itemDetailRepository;
+    private final MessageNotificationService messageNotificationService;
 
-    public ItemDetailService(ItemDetailRepository itemDetailRepository) {
+    public ItemDetailService(
+            ItemDetailRepository itemDetailRepository,
+            MessageNotificationService messageNotificationService) {
         this.itemDetailRepository = itemDetailRepository;
+        this.messageNotificationService = messageNotificationService;
     }
 
     public ItemDetailDto getItemDetail(Long itemId) {
@@ -73,6 +81,43 @@ public class ItemDetailService {
                 normalizeText(record.detailNote(), DEFAULT_NOTE),
                 photos,
                 publisher);
+    }
+
+    public ItemFavoriteStatusDto getFavoriteStatus(Long userId, Long itemId) {
+        validateItemId(itemId);
+        boolean favorite = itemDetailRepository.isFavorite(userId, itemId);
+        return new ItemFavoriteStatusDto(favorite);
+    }
+
+    @Transactional
+    public ItemFavoriteStatusDto addFavorite(Long userId, Long itemId) {
+        validateItemId(itemId);
+        Long ownerUserId = itemDetailRepository.findItemOwnerUserId(itemId);
+        if (ownerUserId == null || ownerUserId <= 0) {
+            throw new BusinessException("物品不存在");
+        }
+        if (ownerUserId.equals(userId)) {
+            throw new BusinessException("不能收藏自己的物品");
+        }
+
+        boolean inserted = itemDetailRepository.addFavorite(userId, itemId, LocalDateTime.now());
+        if (inserted) {
+            messageNotificationService.notifyItemFavorited(itemId, ownerUserId, userId);
+        }
+        return new ItemFavoriteStatusDto(true);
+    }
+
+    @Transactional
+    public ItemFavoriteStatusDto removeFavorite(Long userId, Long itemId) {
+        validateItemId(itemId);
+        itemDetailRepository.removeFavorite(userId, itemId, LocalDateTime.now());
+        return new ItemFavoriteStatusDto(false);
+    }
+
+    private void validateItemId(Long itemId) {
+        if (itemId == null || itemId <= 0) {
+            throw new BusinessException("物品 ID 无效");
+        }
     }
 
     private BigDecimal resolveOriginalPrice(BigDecimal price, BigDecimal originalPrice) {

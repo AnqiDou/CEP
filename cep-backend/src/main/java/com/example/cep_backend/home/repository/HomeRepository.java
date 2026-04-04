@@ -32,6 +32,7 @@ public class HomeRepository {
             rs.getBigDecimal("price"),
             rs.getString("campus"),
             rs.getString("badge"),
+            rs.getString("ops_columns"),
             rs.getString("photo_url"),
             rs.getTimestamp("created_at").toLocalDateTime());
 
@@ -52,21 +53,23 @@ public class HomeRepository {
         return jdbcTemplate.query(sql, categoryRowMapper);
     }
 
-    public long countItems(String keyword, Long categoryId) {
+    public long countItems(String keyword, Long categoryId, String opsColumn) {
         List<Object> args = new ArrayList<>();
-        String sql = buildBaseItemSql(keyword, categoryId, args, true);
+        String sql = buildBaseItemSql(keyword, categoryId, opsColumn, args, true);
         Long total = jdbcTemplate.queryForObject(sql, Long.class, args.toArray());
         return total == null ? 0 : total;
     }
 
     public List<HomeItemRecord> findItems(String keyword,
             Long categoryId,
+            String opsColumn,
             String orderBy,
             String order,
             int offset,
             int limit) {
         List<Object> args = new ArrayList<>();
-        String sql = buildBaseItemSql(keyword, categoryId, args, false) + " ORDER BY " + orderBy + " " + order
+        String sql = buildBaseItemSql(keyword, categoryId, opsColumn, args, false) + " ORDER BY " + orderBy + " "
+                + order
                 + " LIMIT ?, ?";
         args.add(offset);
         args.add(limit);
@@ -85,6 +88,11 @@ public class HomeRepository {
                     i.price,
                     i.campus,
                     i.badge,
+                    (
+                        SELECT GROUP_CONCAT(ioc.column_code ORDER BY ioc.column_code SEPARATOR ',')
+                        FROM item_ops_columns ioc
+                        WHERE ioc.item_id = i.id
+                    ) AS ops_columns,
                     (
                         SELECT ip.photo_url
                         FROM item_photos ip
@@ -123,7 +131,8 @@ public class HomeRepository {
         jdbcTemplate.update(insertSql, keyword, now, now, now);
     }
 
-    private String buildBaseItemSql(String keyword, Long categoryId, List<Object> args, boolean countOnly) {
+    private String buildBaseItemSql(String keyword, Long categoryId, String opsColumn, List<Object> args,
+            boolean countOnly) {
         StringBuilder sql = new StringBuilder();
         if (countOnly) {
             sql.append("SELECT COUNT(1) ");
@@ -139,6 +148,11 @@ public class HomeRepository {
                         i.price,
                         i.campus,
                         i.badge,
+                        (
+                            SELECT GROUP_CONCAT(ioc.column_code ORDER BY ioc.column_code SEPARATOR ',')
+                            FROM item_ops_columns ioc
+                            WHERE ioc.item_id = i.id
+                        ) AS ops_columns,
                         (
                             SELECT ip.photo_url
                             FROM item_photos ip
@@ -167,6 +181,12 @@ public class HomeRepository {
             args.add(likeValue);
             args.add(likeValue);
             args.add(likeValue);
+        }
+
+        if (opsColumn != null && !opsColumn.isBlank()) {
+            sql.append(
+                    " AND EXISTS (SELECT 1 FROM item_ops_columns ioc WHERE ioc.item_id = i.id AND ioc.column_code = ?)");
+            args.add(opsColumn);
         }
         return sql.toString();
     }

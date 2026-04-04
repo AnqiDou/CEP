@@ -100,7 +100,7 @@
         <footer class="session-panel__foot">
           <div class="soft-mini-card">
             <p class="soft-mini-card__label">今日提醒</p>
-            <p class="soft-mini-card__value">{{ unreadTotal }} 条未读消息</p>
+            <p class="soft-mini-card__value">{{ totalUnread }} 条未读消息</p>
             <div class="soft-mini-card__bar">
               <span :style="{ width: unreadProgress + '%' }"></span>
             </div>
@@ -109,14 +109,15 @@
       </aside>
 
       <section class="conversation-panel">
-        <template v-if="activeConversation">
+        <template v-if="hasActivePanel">
           <header class="conversation-topbar">
             <div class="conversation-peer">
               <div class="conversation-peer__head">
                 <h3 class="conversation-peer__name">
-                  {{ activeConversation.sellerName }}
+                  {{ activePanelName }}
                 </h3>
                 <button
+                  v-if="activeConversation"
                   class="conversation-home-btn"
                   type="button"
                   @click="goToSellerHome"
@@ -125,7 +126,11 @@
                 </button>
               </div>
 
-              <div class="conversation-item-row" @click="goToItemDetail">
+              <div
+                v-if="activeConversation"
+                class="conversation-item-row"
+                @click="goToItemDetail"
+              >
                 <img
                   v-if="activeConversation.itemImage"
                   :src="activeConversation.itemImage"
@@ -144,7 +149,7 @@
 
           <div ref="messageContainerRef" class="message-list">
             <article
-              v-for="message in activeConversation.messages"
+              v-for="message in activePanelMessages"
               :key="message.id"
               :class="[
                 'message-item',
@@ -409,6 +414,22 @@ const activeConversation = computed(() =>
   )
 );
 
+const hasActivePanel = computed(() => Boolean(activeConversation.value));
+
+const activePanelName = computed(() => {
+  if (activeConversation.value) {
+    return activeConversation.value.sellerName;
+  }
+  return "";
+});
+
+const activePanelMessages = computed(() => {
+  if (activeConversation.value) {
+    return activeConversation.value.messages;
+  }
+  return [];
+});
+
 const unreadTotal = computed(() =>
   conversationList.value.reduce(
     (total, conversation) => total + (conversation.unread || 0),
@@ -416,7 +437,9 @@ const unreadTotal = computed(() =>
   )
 );
 
-const unreadProgress = computed(() => Math.min(100, unreadTotal.value * 10));
+const totalUnread = computed(() => unreadTotal.value);
+
+const unreadProgress = computed(() => Math.min(100, totalUnread.value * 10));
 
 const getNowTime = () => {
   const date = new Date();
@@ -855,7 +878,7 @@ onBeforeUnmount(() => {
 .session-list {
   flex: 1;
   min-height: 0;
-  overflow-y: hidden;
+  overflow-y: auto;
   padding: 0 12px 12px;
 }
 

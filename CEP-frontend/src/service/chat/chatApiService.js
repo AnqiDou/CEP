@@ -56,6 +56,31 @@ export const markConversationRead = async (conversationId) =>
     headers: await withAuthHeaders(),
   });
 
+export const fetchMessageNotifications = async (limit = 20) =>
+  requestJson(
+    `${MESSAGE_API_BASE}/notifications?limit=${encodeURIComponent(limit)}`,
+    {
+      headers: await withAuthHeaders(),
+    },
+  );
+
+export const fetchMessageNotificationUnreadCount = async () =>
+  requestJson(`${MESSAGE_API_BASE}/notifications/unread-count`, {
+    headers: await withAuthHeaders(),
+  });
+
+export const markMessageNotificationRead = async (notificationId) =>
+  requestJson(`${MESSAGE_API_BASE}/notifications/${notificationId}/read`, {
+    method: "POST",
+    headers: await withAuthHeaders(),
+  });
+
+export const markAllMessageNotificationsRead = async () =>
+  requestJson(`${MESSAGE_API_BASE}/notifications/read-all`, {
+    method: "POST",
+    headers: await withAuthHeaders(),
+  });
+
 export const buildMessageWebSocketUrl = async () => {
   const accessToken = await ensureValidAccessToken();
   const wsBaseUrl = (import.meta.env.VITE_WS_BASE_URL || "").trim();

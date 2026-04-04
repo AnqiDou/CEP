@@ -1,6 +1,7 @@
 package com.example.cep_backend.publish.service;
 
 import com.example.cep_backend.auth.BusinessException;
+import com.example.cep_backend.message.service.MessageNotificationService;
 import com.example.cep_backend.publish.dto.PublishItemDto;
 import com.example.cep_backend.publish.dto.PublishItemRequest;
 import com.example.cep_backend.publish.dto.PublishItemUpdateRequest;
@@ -12,9 +13,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Month;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Locale;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class PublishService {
@@ -22,11 +27,15 @@ public class PublishService {
     private static final String STATUS_PUBLISHED = "PUBLISHED";
     private static final String STATUS_OFF_SHELF = "OFF_SHELF";
     private static final String STATUS_DELETED = "DELETED";
+    private static final Set<String> CAMPUS_BARGAIN_CATEGORY_CODES = Set.of("stationery", "digital", "daily");
+    private static final Set<String> BACK_TO_SCHOOL_CATEGORY_CODES = Set.of("stationery", "daily", "digital", "book");
 
     private final PublishRepository publishRepository;
+    private final MessageNotificationService messageNotificationService;
 
-    public PublishService(PublishRepository publishRepository) {
+    public PublishService(PublishRepository publishRepository, MessageNotificationService messageNotificationService) {
         this.publishRepository = publishRepository;
+        this.messageNotificationService = messageNotificationService;
     }
 
     @Transactional
@@ -60,6 +69,7 @@ public class PublishService {
                     now);
             publishRepository.insertItemPhotos(itemId, photoUrls, now);
             publishRepository.insertItemDetail(itemId, userId, purchaseDate, usageDuration, now);
+            refreshItemOpsColumns(itemId, categoryId, categoryCode, price, description, usageDuration, now);
         } catch (DataAccessException ex) {
             throw new BusinessException("发布失败：请先确认已执行建表脚本并检查数据库字段");
         }
@@ -120,6 +130,9 @@ public class PublishService {
         publishRepository.updateItemAndDetail(userId, itemId, categoryId, itemName, price, description, purchaseDate,
                 usageDuration, now);
         publishRepository.replaceItemPhotos(itemId, photoUrls, now);
+        refreshItemOpsColumns(itemId, categoryId, categoryCode, price, description, usageDuration, now);
+
+        messageNotificationService.notifyFavoritePriceDrop(itemId, userId, existing.price(), price);
 
         PublishRepository.PublishOwnedItemBaseRecord updated = publishRepository.findOwnedItem(userId, itemId)
                 .orElseThrow(() -> new BusinessException("物品不存在或无操作权限"));
@@ -160,7 +173,95 @@ public class PublishService {
         }
         PublishRepository.PublishOwnedItemBaseRecord item = publishRepository.findOwnedItem(userId, itemId)
                 .orElseThrow(() -> new BusinessException("物品不存在或无操作权限"));
+
+        if (STATUS_PUBLISHED.equals(normalized)) {
+            LocalDateTime now = LocalDateTime.now();
+            Long categoryId = publishRepository.findCategoryIdByCode(item.categoryCode());
+            if (categoryId != null) {
+                refreshItemOpsColumns(
+                        item.id(),
+                        categoryId,
+                        item.categoryCode(),
+                        item.price(),
+                        item.description(),
+                        item.usageDuration(),
+                        now);
+            }
+        }
+
         return toOwnedItemDto(item, publishRepository.findPhotoUrlsByItemId(itemId));
+    }
+
+    private void refreshItemOpsColumns(Long itemId,
+            Long categoryId,
+            String categoryCode,
+            BigDecimal price,
+            String description,
+            String usageDuration,
+            LocalDateTime now) {
+        List<String> matchedColumns = new ArrayList<>();
+
+        if (matchCampusBargain(itemId, categoryId, categoryCode, price)) {
+            matchedColumns.add("campus-bargain");
+        }
+        if (matchGraduateClearance(description)) {
+            matchedColumns.add("graduate-clearance");
+        }
+        if (matchBackToSchool(categoryCode, usageDuration, now)) {
+            matchedColumns.add("back-to-school");
+        }
+
+        publishRepository.replaceItemOpsColumns(itemId, matchedColumns, now);
+    }
+
+    private boolean matchCampusBargain(Long itemId, Long categoryId, String categoryCode, BigDecimal price) {
+        if (categoryId == null || price == null || categoryCode == null) {
+            return false;
+        }
+        String normalizedCategoryCode = categoryCode.trim().toLowerCase(Locale.ROOT);
+        if (!CAMPUS_BARGAIN_CATEGORY_CODES.contains(normalizedCategoryCode)) {
+            return false;
+        }
+
+        BigDecimal avgPrice = publishRepository.findPublishedAveragePriceByCategoryId(categoryId, itemId);
+        if (avgPrice == null) {
+            return false;
+        }
+        return price.compareTo(avgPrice) < 0;
+    }
+
+    private boolean matchGraduateClearance(String description) {
+        if (description == null || description.isBlank()) {
+            return false;
+        }
+        String text = description.toLowerCase(Locale.ROOT);
+        return text.contains("二手") || text.contains("九成新") || text.contains("毕业生闲置") || text.contains("毕业")
+                || text.contains("清仓");
+    }
+
+    private boolean matchBackToSchool(String categoryCode, String usageDuration, LocalDateTime listedAt) {
+        if (categoryCode == null || listedAt == null) {
+            return false;
+        }
+        String normalizedCategoryCode = categoryCode.trim().toLowerCase(Locale.ROOT);
+        if (!BACK_TO_SCHOOL_CATEGORY_CODES.contains(normalizedCategoryCode)) {
+            return false;
+        }
+
+        Month month = listedAt.getMonth();
+        boolean inBackToSchoolSeason = month == Month.AUGUST
+                || month == Month.SEPTEMBER
+                || month == Month.FEBRUARY
+                || month == Month.MARCH;
+        if (!inBackToSchoolSeason) {
+            return false;
+        }
+
+        if (usageDuration == null || usageDuration.isBlank()) {
+            return true;
+        }
+        String text = usageDuration.toLowerCase(Locale.ROOT);
+        return text.contains("全新") || text.contains("新品") || text.contains("未使用") || text.contains("99新");
     }
 
     private PublishOwnedItemDto toOwnedItemDto(PublishRepository.PublishOwnedItemBaseRecord item,

@@ -32,6 +32,7 @@ public class HomeService {
 
     public HomeItemListDto searchItems(String keyword,
             Long categoryId,
+            String opsColumn,
             String sortBy,
             String sortOrder,
             Integer page,
@@ -39,14 +40,15 @@ public class HomeService {
         int safePage = normalizePage(page);
         int safeSize = normalizeSize(size);
         String normalizedKeyword = normalizeKeyword(keyword);
+        String normalizedOpsColumn = normalizeOpsColumn(opsColumn);
 
         String orderBy = resolveOrderBy(sortBy);
         String order = resolveOrder(sortOrder);
         int offset = (safePage - 1) * safeSize;
 
-        long total = homeRepository.countItems(normalizedKeyword, categoryId);
+        long total = homeRepository.countItems(normalizedKeyword, categoryId, normalizedOpsColumn);
         List<HomeItemDto> items = homeRepository
-                .findItems(normalizedKeyword, categoryId, orderBy, order, offset, safeSize)
+                .findItems(normalizedKeyword, categoryId, normalizedOpsColumn, orderBy, order, offset, safeSize)
                 .stream()
                 .map(this::mapItem)
                 .toList();
@@ -90,6 +92,7 @@ public class HomeService {
                 record.price(),
                 record.campus(),
                 record.badge(),
+                record.opsColumns(),
                 record.photoUrl(),
                 record.createdAt());
     }
@@ -126,6 +129,17 @@ public class HomeService {
 
     private String normalizeKeyword(String keyword) {
         return keyword == null ? "" : keyword.trim();
+    }
+
+    private String normalizeOpsColumn(String opsColumn) {
+        if (opsColumn == null || opsColumn.trim().isEmpty()) {
+            return "";
+        }
+        String value = opsColumn.trim().toLowerCase();
+        return switch (value) {
+            case "campus-bargain", "graduate-clearance", "back-to-school" -> value;
+            default -> throw new BusinessException("opsColumn 不合法");
+        };
     }
 
     private String resolveOrderBy(String sortBy) {

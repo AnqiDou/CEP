@@ -5,6 +5,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -88,5 +90,64 @@ public class ItemDetailRepository {
     public void increaseViewCount(Long itemId) {
         String sql = "UPDATE items SET view_count = view_count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
         jdbcTemplate.update(sql, itemId);
+    }
+
+    public boolean isFavorite(Long userId, Long itemId) {
+        String sql = "SELECT COUNT(1) FROM user_favorites WHERE user_id = ? AND item_id = ?";
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, userId, itemId);
+        return count != null && count > 0;
+    }
+
+    public boolean addFavorite(Long userId, Long itemId, LocalDateTime now) {
+        String insertSql = """
+                INSERT INTO user_favorites (user_id, item_id, created_at)
+                SELECT ?, ?, ?
+                FROM DUAL
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM user_favorites WHERE user_id = ? AND item_id = ?
+                )
+                """;
+        int inserted = jdbcTemplate.update(insertSql, userId, itemId, Timestamp.valueOf(now), userId, itemId);
+        if (inserted <= 0) {
+            return false;
+        }
+
+        String updateFavoriteCountSql = """
+                UPDATE items i
+                SET i.favorite_count = (
+                    SELECT COUNT(1) FROM user_favorites f WHERE f.item_id = i.id
+                ),
+                i.updated_at = ?
+                WHERE i.id = ?
+                """;
+        jdbcTemplate.update(updateFavoriteCountSql, Timestamp.valueOf(now), itemId);
+        return true;
+    }
+
+    public void removeFavorite(Long userId, Long itemId, LocalDateTime now) {
+        String deleteSql = "DELETE FROM user_favorites WHERE user_id = ? AND item_id = ?";
+        jdbcTemplate.update(deleteSql, userId, itemId);
+
+        String updateFavoriteCountSql = """
+                UPDATE items i
+                SET i.favorite_count = (
+                    SELECT COUNT(1) FROM user_favorites f WHERE f.item_id = i.id
+                ),
+                i.updated_at = ?
+                WHERE i.id = ?
+                """;
+        jdbcTemplate.update(updateFavoriteCountSql, Timestamp.valueOf(now), itemId);
+    }
+
+    public Long findItemOwnerUserId(Long itemId) {
+        String sql = """
+                SELECT COALESCE(i.publisher_user_id, d.publisher_user_id) AS owner_user_id
+                FROM items i
+                LEFT JOIN item_details d ON d.item_id = i.id
+                WHERE i.id = ?
+                LIMIT 1
+                """;
+        List<Long> list = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getObject("owner_user_id", Long.class), itemId);
+        return list.isEmpty() ? null : list.getFirst();
     }
 }

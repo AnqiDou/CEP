@@ -151,7 +151,12 @@ import { computed, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
 import { useRoute, useRouter } from "vue-router";
 import { Star } from "@element-plus/icons-vue";
-import { fetchItemDetail } from "../service/item-detail/itemDetailApiService";
+import {
+  addItemFavorite,
+  fetchItemDetail,
+  fetchItemFavoriteStatus,
+  removeItemFavorite,
+} from "../service/item-detail/itemDetailApiService";
 
 const route = useRoute();
 const router = useRouter();
@@ -178,9 +183,11 @@ const createEmptyItem = () => ({
 const item = ref(createEmptyItem());
 const isLoading = ref(false);
 const loadError = ref("");
-const hasMultiplePhotos = computed(() => item.value.photos.length > 1);
+const hasMultiplePhotos = computed(
+  () => Array.isArray(item.value?.photos) && item.value.photos.length > 1
+);
 const sellerInitial = computed(() =>
-  (item.value.publisher.name || "校").slice(0, 1)
+  (item.value?.publisher?.name || "校").slice(0, 1)
 );
 
 const toNumber = (value, fallback = 0) => {
@@ -228,6 +235,7 @@ const formatDate = (value) => {
 };
 
 const mapItemDetail = (detail) => {
+  const publisher = detail?.publisher || {};
   const photos = Array.isArray(detail?.photos)
     ? detail.photos
         .filter((photo) => typeof photo === "string")
@@ -252,27 +260,23 @@ const mapItemDetail = (detail) => {
     description: normalizeOptionalText(detail?.description),
     photos,
     publisher: {
-      id: detail?.publisher?.id ?? null,
+      id: publisher?.id ?? null,
       name:
-        typeof detail?.publisher?.name === "string" &&
-        detail.publisher.name.trim()
-          ? detail.publisher.name.trim()
+        typeof publisher?.name === "string" && publisher.name.trim()
+          ? publisher.name.trim()
           : "校园用户",
       college:
-        typeof detail?.publisher?.college === "string" &&
-        detail.publisher.college.trim()
-          ? detail.publisher.college.trim()
+        typeof publisher?.college === "string" && publisher.college.trim()
+          ? publisher.college.trim()
           : "未填写学院",
       campus:
-        typeof detail?.publisher?.campus === "string" &&
-        detail.publisher.campus.trim()
-          ? detail.publisher.campus.trim()
+        typeof publisher?.campus === "string" && publisher.campus.trim()
+          ? publisher.campus.trim()
           : "未填写",
-      credit: Number(toNumber(detail?.publisher?.credit, 4.5).toFixed(1)),
+      credit: Number(toNumber(publisher?.credit, 4.5).toFixed(1)),
       note:
-        typeof detail?.publisher?.note === "string" &&
-        detail.publisher.note.trim()
-          ? detail.publisher.note.trim()
+        typeof publisher?.note === "string" && publisher.note.trim()
+          ? publisher.note.trim()
           : "该用户暂未完善个人简介",
     },
   };
@@ -333,19 +337,37 @@ const featureCards = computed(() => [
   {
     icon: "🍯",
     title: "卖家信用",
-    subtitle: `${item.value.publisher.credit.toFixed(1)} 分`,
-    progress: Math.min(100, Math.max(40, item.value.publisher.credit * 20)),
+    subtitle: `${toNumber(item.value?.publisher?.credit, 4.5).toFixed(1)} 分`,
+    progress: Math.min(
+      100,
+      Math.max(40, toNumber(item.value?.publisher?.credit, 4.5) * 20)
+    ),
   },
 ]);
 
 const activePhoto = ref("");
 const isFavorite = ref(false);
 
+const loadFavoriteStatus = async () => {
+  const itemId = Number(route.params.id);
+  if (!Number.isInteger(itemId) || itemId <= 0) {
+    isFavorite.value = false;
+    return;
+  }
+
+  try {
+    const responseBody = await fetchItemFavoriteStatus(itemId);
+    isFavorite.value = Boolean(responseBody?.data?.favorite);
+  } catch {
+    isFavorite.value = false;
+  }
+};
+
 watch(
   () => route.params.id,
   () => {
     loadItemDetail();
-    isFavorite.value = false;
+    loadFavoriteStatus();
   },
   { immediate: true }
 );
@@ -401,9 +423,27 @@ const goToSellerHome = () => {
   window.open(resolved.href, "_blank");
 };
 
-const toggleFavorite = () => {
-  isFavorite.value = !isFavorite.value;
-  ElMessage.info("收藏功能即将上线");
+const toggleFavorite = async () => {
+  const itemId = Number(item.value.id);
+  if (!Number.isInteger(itemId) || itemId <= 0) {
+    ElMessage.warning("当前物品不可收藏");
+    return;
+  }
+
+  try {
+    if (isFavorite.value) {
+      await removeItemFavorite(itemId);
+      isFavorite.value = false;
+      ElMessage.success("已取消收藏");
+      return;
+    }
+
+    await addItemFavorite(itemId);
+    isFavorite.value = true;
+    ElMessage.success("收藏成功");
+  } catch (error) {
+    ElMessage.error(error.message || "收藏操作失败");
+  }
 };
 </script>
 

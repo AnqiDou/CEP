@@ -1,8 +1,10 @@
+import { ensureValidAccessToken } from "../common/authSessionService";
+
 const ITEM_DETAIL_API_BASE = "/api/items";
 
-const requestJson = async (url) => {
+const requestJson = async (url, options = {}) => {
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, options);
     const body = await response.json().catch(() => ({}));
 
     if (!response.ok || body.success === false) {
@@ -19,3 +21,28 @@ const requestJson = async (url) => {
 
 export const fetchItemDetail = (itemId) =>
   requestJson(`${ITEM_DETAIL_API_BASE}/${itemId}/detail`);
+
+const withAuthHeaders = async (extraHeaders = {}) => {
+  const accessToken = await ensureValidAccessToken();
+  return {
+    Authorization: `Bearer ${accessToken}`,
+    ...extraHeaders,
+  };
+};
+
+export const fetchItemFavoriteStatus = async (itemId) =>
+  requestJson(`${ITEM_DETAIL_API_BASE}/${itemId}/favorite`, {
+    headers: await withAuthHeaders(),
+  });
+
+export const addItemFavorite = async (itemId) =>
+  requestJson(`${ITEM_DETAIL_API_BASE}/${itemId}/favorite`, {
+    method: "POST",
+    headers: await withAuthHeaders(),
+  });
+
+export const removeItemFavorite = async (itemId) =>
+  requestJson(`${ITEM_DETAIL_API_BASE}/${itemId}/favorite`, {
+    method: "DELETE",
+    headers: await withAuthHeaders(),
+  });
