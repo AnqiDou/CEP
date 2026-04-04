@@ -49,10 +49,10 @@
       </div>
     </header>
 
-    <section class="home-hero">
+    <section v-if="!isSearchListOnlyMode" class="home-hero">
       <aside v-if="!isOpsListOnlyMode" class="home-ops">
         <div class="home-ops__layout">
-          <article class="ops-card ops-card--benefit">
+          <article class="ops-card ops-card--benefit" @click="goToOpsItem(0)">
             <div class="ops-benefit__content">
               <h4>{{ opsCards.benefit.title }}</h4>
               <p>{{ opsCards.benefit.desc }}</p>
@@ -140,7 +140,7 @@
 
     <main class="home-main">
       <nav
-        v-if="!isOpsListOnlyMode"
+        v-if="!isOpsListOnlyMode && !isSearchListOnlyMode"
         class="category-tabs"
         aria-label="分类导航"
       >
@@ -160,7 +160,10 @@
 
       <section class="content">
         <section class="block block--featured">
-          <header v-if="!isOpsListOnlyMode" class="block-header">
+          <header
+            v-if="!isOpsListOnlyMode && !isSearchListOnlyMode"
+            class="block-header"
+          >
             <h3 class="section-title">🔥 {{ blockTitle }}</h3>
             <div class="sort-actions">
               <button
@@ -658,6 +661,7 @@ const searchedKeyword = ref("");
 const authModalType = ref("");
 const isAuthModalVisible = computed(() => Boolean(authModalType.value));
 const isOpsListOnlyMode = computed(() => route.query.opsView === "list");
+const isSearchListOnlyMode = computed(() => route.name === "search");
 const isUserLoggedIn = computed(() =>
   Boolean(authState.user && authState.refreshToken)
 );
@@ -777,6 +781,58 @@ const OPS_COLUMNS = [
   },
 ];
 
+const GRADUATE_COLUMN_KEYWORDS = [
+  "考研",
+  "考公",
+  "四六级",
+  "复习",
+  "教材",
+  "资料",
+  "宿舍家电",
+  "小风扇",
+  "风扇",
+  "台灯",
+  "电饭煲",
+  "吹风机",
+  "服饰",
+  "鞋",
+  "包",
+  "运动",
+  "器材",
+  "床品",
+  "衣柜",
+  "书桌",
+  "椅子",
+  "行李箱",
+];
+
+const CAMPUS_COLUMN_KEYWORDS = [
+  "宿舍",
+  "床垫",
+  "床帘",
+  "收纳",
+  "收纳箱",
+  "洗漱",
+  "暖壶",
+  "学习",
+  "笔记本",
+  "文具",
+  "四六级",
+  "计算器",
+  "军训",
+  "通勤",
+  "书包",
+  "水杯",
+  "雨伞",
+  "伞",
+  "数码",
+  "耳机",
+  "键盘",
+  "鼠标",
+  "电脑支架",
+  "插排",
+];
+
 const activeOpsColumn = computed(() => {
   if (!isOpsListOnlyMode.value) {
     return null;
@@ -786,12 +842,7 @@ const activeOpsColumn = computed(() => {
   return OPS_COLUMNS[safeIndex] || OPS_COLUMNS[0];
 });
 
-const searchPlaceholder = computed(() => {
-  if (isOpsListOnlyMode.value && activeOpsColumn.value) {
-    return `当前专栏：${activeOpsColumn.value.title}`;
-  }
-  return "搜二手闲置、书籍、电子产品...";
-});
+const searchPlaceholder = computed(() => "搜二手闲置、书籍、电子产品...");
 
 const ensureLoginForAction = () => {
   if (isUserLoggedIn.value) {
@@ -874,12 +925,15 @@ const isBenefitOpsMode = computed(
 
 const isHotMode = computed(
   () =>
+    !isSearchListOnlyMode.value &&
     !isOpsListOnlyMode.value &&
     activeCategoryId.value === HOT_CATEGORY_ID &&
     !searchedKeyword.value.trim()
 );
 
-const useHotStream = computed(() => isHotMode.value || isBenefitOpsMode.value);
+const useHotStream = computed(
+  () => isHotMode.value || isOpsListOnlyMode.value || isBenefitOpsMode.value
+);
 
 const blockTitle = computed(() => {
   if (isOpsListOnlyMode.value && activeOpsColumn.value) {
@@ -898,13 +952,62 @@ const blockDesc = computed(() => {
 });
 
 const displayedItems = computed(() => {
+  if (isSearchListOnlyMode.value) {
+    return sortItemsByOwnerPriority(listItems.value);
+  }
+
+  if (isOpsListOnlyMode.value && activeOpsColumn.value) {
+    const normalizeText = (value) =>
+      typeof value === "string" ? value.trim().toLowerCase() : "";
+    const containsAnyKeyword = (item, keywordList) => {
+      const text = [item.title, item.desc, item.badge, item.campus]
+        .map(normalizeText)
+        .filter(Boolean)
+        .join(" ");
+      return keywordList.some((keyword) =>
+        text.includes(keyword.toLowerCase())
+      );
+    };
+
+    const opsFilteredByColumn = hotItems.value.filter((item) => {
+      if (activeOpsColumn.value?.columnCode === "campus-bargain") {
+        const price = Number(item?.price);
+        return Number.isFinite(price) && price < OPS_BARGAIN_MAX_PRICE;
+      }
+
+      if (activeOpsColumn.value?.columnCode === "graduate-clearance") {
+        return containsAnyKeyword(item, GRADUATE_COLUMN_KEYWORDS);
+      }
+
+      if (activeOpsColumn.value?.columnCode === "back-to-school") {
+        return containsAnyKeyword(item, CAMPUS_COLUMN_KEYWORDS);
+      }
+
+      return true;
+    });
+
+    const keywordText = searchedKeyword.value.trim().toLowerCase();
+    if (!keywordText) {
+      return sortItemsByOwnerPriority(opsFilteredByColumn);
+    }
+
+    return sortItemsByOwnerPriority(opsFilteredByColumn).filter((item) => {
+      const searchable = [item.title, item.desc, item.badge, item.campus]
+        .map(normalizeText)
+        .filter(Boolean)
+        .join(" ");
+      return searchable.includes(keywordText);
+    });
+  }
+
   if (isBenefitOpsMode.value) {
-    return hotItems.value.filter((item) => {
+    return sortItemsByOwnerPriority(hotItems.value).filter((item) => {
       const price = Number(item?.price);
       return Number.isFinite(price) && price < OPS_BARGAIN_MAX_PRICE;
     });
   }
-  return useHotStream.value ? hotItems.value : listItems.value;
+  const source = useHotStream.value ? hotItems.value : listItems.value;
+  return sortItemsByOwnerPriority(source);
 });
 
 const opsCards = computed(() => ({
@@ -1050,6 +1153,11 @@ const mergeUniqueItemsById = (existing, incoming) => {
   return [...existing, ...deduped];
 };
 
+const sortItemsByOwnerPriority = (items) =>
+  [...items].sort(
+    (a, b) => Number(Boolean(a?.isSelf)) - Number(Boolean(b?.isSelf))
+  );
+
 const resolveInitialViewerScope = () =>
   isUserLoggedIn.value ? VIEWER_SCOPE_OTHERS : VIEWER_SCOPE_ALL;
 
@@ -1113,9 +1221,9 @@ const loadHotItems = async ({ append = false } = {}) => {
     accessToken: homeAccessToken.value,
   });
   const incomingItems = (responseBody.data?.items || []).map(mapHomeItem);
-  hotItems.value = append
-    ? mergeUniqueItemsById(hotItems.value, incomingItems)
-    : incomingItems;
+  hotItems.value = sortItemsByOwnerPriority(
+    append ? mergeUniqueItemsById(hotItems.value, incomingItems) : incomingItems
+  );
   hotPage.value = nextPage;
 
   if (incomingItems.length < HOT_BATCH_SIZE) {
@@ -1161,9 +1269,11 @@ const loadListItems = async ({ append = false } = {}) => {
     accessToken: homeAccessToken.value,
   });
   const incomingItems = (responseBody.data?.items || []).map(mapHomeItem);
-  listItems.value = append
-    ? mergeUniqueItemsById(listItems.value, incomingItems)
-    : incomingItems;
+  listItems.value = sortItemsByOwnerPriority(
+    append
+      ? mergeUniqueItemsById(listItems.value, incomingItems)
+      : incomingItems
+  );
   listPage.value = nextPage;
 
   if (incomingItems.length < LIST_PAGE_SIZE) {
@@ -1251,28 +1361,27 @@ const handleSearch = async () => {
     return;
   }
   const value = keyword.value.trim();
-  searchedKeyword.value = value;
-  homeError.value = "";
-  if (
-    !value &&
-    activeCategoryId.value === HOT_CATEGORY_ID &&
-    !isOpsListOnlyMode.value
-  ) {
-    scrollGridToTop();
-    await ensureScrollableContent();
+
+  if (isSearchListOnlyMode.value) {
+    searchedKeyword.value = value;
+    homeError.value = "";
+    await router.replace({
+      name: "search",
+      query: {
+        keyword: value,
+      },
+    });
+    await applySearchListMode();
     return;
   }
-  try {
-    if (isBenefitOpsMode.value) {
-      await loadHotItems({ append: false });
-    } else {
-      await loadListItems({ append: false });
-    }
-    scrollGridToTop();
-    await ensureScrollableContent();
-  } catch (error) {
-    homeError.value = error.message || "获取物品列表失败";
-  }
+
+  const resolved = router.resolve({
+    name: "search",
+    query: {
+      keyword: value,
+    },
+  });
+  window.open(resolved.href, "_blank");
 };
 
 const selectHotKeyword = async (word) => {
@@ -1294,6 +1403,26 @@ const goToOpsItem = (index) => {
   window.open(resolved.href, "_blank");
 };
 
+const applySearchListMode = async () => {
+  if (!isSearchListOnlyMode.value) {
+    return;
+  }
+
+  activeCategoryId.value = HOT_CATEGORY_ID;
+  keyword.value = String(route.query.keyword || "").trim();
+  searchedKeyword.value = keyword.value;
+  homeError.value = "";
+
+  try {
+    await Promise.all([loadCategories(), loadHotKeywords()]);
+    await loadListItems({ append: false });
+    scrollGridToTop();
+    await ensureScrollableContent();
+  } catch (error) {
+    homeError.value = error.message || "获取搜索结果失败";
+  }
+};
+
 const applyOpsListMode = async () => {
   if (!isOpsListOnlyMode.value) {
     return;
@@ -1305,11 +1434,7 @@ const applyOpsListMode = async () => {
   homeError.value = "";
 
   try {
-    if (isBenefitOpsMode.value) {
-      await loadHotItems({ append: false });
-    } else {
-      await loadListItems({ append: false });
-    }
+    await loadHotItems({ append: false });
     scrollGridToTop();
     await ensureScrollableContent();
   } catch (error) {
@@ -1726,7 +1851,9 @@ onMounted(async () => {
   await loadUnreadMessageCount();
   homeError.value = "";
   try {
-    if (isOpsListOnlyMode.value) {
+    if (isSearchListOnlyMode.value) {
+      await applySearchListMode();
+    } else if (isOpsListOnlyMode.value) {
       await applyOpsListMode();
     } else {
       await Promise.all([loadCategories(), loadHotItems(), loadHotKeywords()]);
@@ -1761,9 +1888,22 @@ watch(
   () => [route.query.opsView, route.query.opsIndex],
   async () => {
     homeError.value = "";
+    if (isSearchListOnlyMode.value) {
+      return;
+    }
     if (isOpsListOnlyMode.value) {
       await applyOpsListMode();
       return;
+    }
+  }
+);
+
+watch(
+  () => [route.name, route.query.keyword],
+  async () => {
+    homeError.value = "";
+    if (isSearchListOnlyMode.value) {
+      await applySearchListMode();
     }
   }
 );
@@ -2145,6 +2285,7 @@ watch(
   box-sizing: border-box;
   margin: 0;
   background: linear-gradient(160deg, #fcfbff 0%, #f2efff 100%);
+  cursor: pointer;
 }
 
 .ops-benefit__content {
@@ -2231,6 +2372,7 @@ watch(
   justify-content: space-between;
   gap: 8px;
   min-height: 0;
+  overflow: hidden;
 }
 
 .ops-card__main {
@@ -2239,6 +2381,29 @@ watch(
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  overflow: hidden;
+}
+
+.ops-card__main h4 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.15;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.ops-card__main p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
 }
 
 .ops-item-preview {

@@ -33,6 +33,14 @@ const router = createRouter({
       },
     },
     {
+      path: "/search",
+      name: "search",
+      component: Home,
+      meta: {
+        title: "搜索结果",
+      },
+    },
+    {
       path: "/profile",
       name: "profile",
       component: Profile,
