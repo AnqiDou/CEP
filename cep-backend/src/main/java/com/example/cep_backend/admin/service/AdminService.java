@@ -6,16 +6,21 @@ import com.example.cep_backend.admin.dto.AdminNoticeDto;
 import com.example.cep_backend.admin.dto.AdminOrderDto;
 import com.example.cep_backend.admin.dto.AdminOrderStateStatDto;
 import com.example.cep_backend.admin.dto.AdminSupportConversationDto;
+import com.example.cep_backend.admin.dto.AdminSupportMessageDto;
 import com.example.cep_backend.admin.dto.AdminUserDto;
 import com.example.cep_backend.admin.repository.AdminRepository;
 import com.example.cep_backend.auth.BusinessException;
 import com.example.cep_backend.auth.dto.AuthUserDto;
+import com.example.cep_backend.message.dto.MessageConversationDto;
+import com.example.cep_backend.message.dto.MessageItemDto;
+import com.example.cep_backend.message.ws.MessageWebSocketNotifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -23,10 +28,13 @@ import java.util.Map;
 public class AdminService {
     private final AdminRepository adminRepository;
     private final String adminEmail;
+    private final MessageWebSocketNotifier messageWebSocketNotifier;
 
     public AdminService(AdminRepository adminRepository,
+            MessageWebSocketNotifier messageWebSocketNotifier,
             @Value("${app.admin.email:3299166215@qq.com}") String adminEmail) {
         this.adminRepository = adminRepository;
+        this.messageWebSocketNotifier = messageWebSocketNotifier;
         this.adminEmail = adminEmail == null ? "" : adminEmail.trim().toLowerCase();
     }
 
@@ -167,6 +175,9 @@ public class AdminService {
         if (conversationId == null || conversationId <= 0) {
             throw new BusinessException("会话参数无效");
         }
+        if (!adminRepository.existsSupportConversation(conversationId)) {
+            throw new BusinessException("会话不存在");
+        }
         if (content == null || content.trim().isEmpty()) {
             throw new BusinessException("回复内容不能为空");
         }
@@ -181,6 +192,146 @@ public class AdminService {
             throw new BusinessException("会话不存在或回复失败");
         }
         adminRepository.touchConversation(conversationId, trimmed, now);
+
+        Long reporterUserId = adminRepository.findReporterUserIdByConversationId(conversationId);
+        if (reporterUserId != null && reporterUserId > 0) {
+            messageWebSocketNotifier.sendConversationEvent(
+                    reporterUserId,
+                    "SUPPORT_MESSAGE_CREATED",
+                    new MessageConversationDto(
+                            conversationId,
+                            0L,
+                            "平台客服",
+                            "",
+                            0L,
+                            "客服工单",
+                            "",
+                            1,
+                            trimmed,
+                            now.toString()),
+                    new MessageItemDto(
+                            0L,
+                            "other",
+                            trimmed,
+                            "",
+                            now.toString(),
+                            "TEXT",
+                            null,
+                            ""));
+        }
+    }
+
+    @Transactional
+    public void appendUserSupportMessage(Long userId, String content) {
+        if (userId == null || userId <= 0) {
+            throw new BusinessException("用户参数无效");
+        }
+        if (content == null || content.trim().isEmpty()) {
+            throw new BusinessException("消息不能为空");
+        }
+        String trimmed = content.trim();
+        if (trimmed.length() > 500) {
+            throw new BusinessException("消息不能超过500字");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        Long conversationId = adminRepository.findActiveConversationIdByReporter(userId);
+        if (conversationId == null || conversationId <= 0) {
+            conversationId = adminRepository.createSupportConversationForUser(
+                    userId,
+                    "User support consultation",
+                    "OTHER",
+                    trimmed,
+                    trimmed.length() > 120 ? trimmed.substring(0, 120) : trimmed,
+                    "OPEN",
+                    now);
+            if (conversationId == null || conversationId <= 0) {
+                throw new BusinessException("创建客服会话失败");
+            }
+        }
+        adminRepository.insertSupportMessage(conversationId, "USER", trimmed, now);
+        adminRepository.touchConversation(conversationId, trimmed, now);
+
+        Long adminUserId = adminRepository.findUserIdByEmail(adminEmail);
+        if (adminUserId != null && adminUserId > 0) {
+            messageWebSocketNotifier.sendConversationEvent(
+                    adminUserId,
+                    "SUPPORT_MESSAGE_CREATED",
+                    new MessageConversationDto(
+                            conversationId,
+                            userId,
+                            "用户",
+                            "",
+                            0L,
+                            "客服工单",
+                            "",
+                            1,
+                            trimmed,
+                            now.toString()),
+                    new MessageItemDto(
+                            0L,
+                            "other",
+                            trimmed,
+                            "",
+                            now.toString(),
+                            "TEXT",
+                            null,
+                            ""));
+        }
+
+        messageWebSocketNotifier.sendConversationEvent(
+                userId,
+                "SUPPORT_MESSAGE_CREATED",
+                new MessageConversationDto(
+                        conversationId,
+                        0L,
+                        "平台客服",
+                        "",
+                        0L,
+                        "客服工单",
+                        "",
+                        0,
+                        trimmed,
+                        now.toString()),
+                new MessageItemDto(
+                        0L,
+                        "self",
+                        trimmed,
+                        "",
+                        now.toString(),
+                        "TEXT",
+                        null,
+                        ""));
+    }
+
+    public List<AdminSupportMessageDto> listUserSupportMessages(Long userId) {
+        if (userId == null || userId <= 0) {
+            throw new BusinessException("用户参数无效");
+        }
+        Long conversationId = adminRepository.findLatestConversationIdByReporter(userId);
+        if (conversationId == null || conversationId <= 0) {
+            return Collections.emptyList();
+        }
+        return adminRepository.listSupportMessages(conversationId);
+    }
+
+    @Transactional
+    public void updateConversationStatus(Long conversationId, String status) {
+        if (conversationId == null || conversationId <= 0) {
+            throw new BusinessException("会话参数无效");
+        }
+        if (status == null || status.trim().isEmpty()) {
+            throw new BusinessException("状态不能为空");
+        }
+        String normalized = status.trim().toUpperCase();
+        if (!"OPEN".equals(normalized) && !"PROCESSING".equals(normalized) && !"RESOLVED".equals(normalized)
+                && !"CLOSED".equals(normalized)) {
+            throw new BusinessException("状态不合法");
+        }
+        int updated = adminRepository.updateSupportConversationStatus(conversationId, normalized, LocalDateTime.now());
+        if (updated <= 0) {
+            throw new BusinessException("会话不存在");
+        }
     }
 
     public List<AdminNoticeDto> listNotices() {

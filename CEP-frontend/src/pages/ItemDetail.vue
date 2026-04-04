@@ -107,6 +107,13 @@
                 申请交易
               </button>
               <button
+                class="danger-btn"
+                type="button"
+                @click="openReportDialog"
+              >
+                举报商品
+              </button>
+              <button
                 :class="[
                   'favorite-icon-btn',
                   isFavorite ? 'favorite-icon-btn--active' : '',
@@ -122,6 +129,40 @@
         </section>
       </template>
     </main>
+
+    <section
+      v-if="showReportDialog"
+      class="report-dialog-mask"
+      @click.self="closeReportDialog"
+    >
+      <div class="report-dialog card">
+        <h3>举报该商品</h3>
+        <select v-model="reportType" class="toolbar-select">
+          <option value="PROHIBITED_CONTACT">违规联系方式</option>
+          <option value="COUNTERFEIT">疑似假货</option>
+          <option value="WRONG_CATEGORY">类目错误</option>
+          <option value="FRAUD_RISK">欺诈风险</option>
+          <option value="OTHER">其他</option>
+        </select>
+        <textarea
+          v-model.trim="reportContent"
+          class="notice-input"
+          placeholder="请描述举报原因（至少5个字）"
+        ></textarea>
+        <div class="report-actions">
+          <button
+            class="secondary-btn"
+            type="button"
+            @click="closeReportDialog"
+          >
+            取消
+          </button>
+          <button class="danger-btn" type="button" @click="submitReport">
+            提交举报
+          </button>
+        </div>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -135,6 +176,7 @@ import {
   fetchItemDetail,
   fetchItemFavoriteStatus,
   removeItemFavorite,
+  reportItem,
 } from "../service/item-detail/itemDetailApiService";
 
 const route = useRoute();
@@ -326,6 +368,9 @@ const featureCards = computed(() => [
 
 const activePhoto = ref("");
 const isFavorite = ref(false);
+const showReportDialog = ref(false);
+const reportType = ref("PROHIBITED_CONTACT");
+const reportContent = ref("");
 
 const loadFavoriteStatus = async () => {
   const itemId = Number(route.params.id);
@@ -422,6 +467,42 @@ const toggleFavorite = async () => {
     ElMessage.success("收藏成功");
   } catch (error) {
     ElMessage.error(error.message || "收藏操作失败");
+  }
+};
+
+const openReportDialog = () => {
+  if (!item.value.id) {
+    ElMessage.warning("当前物品不可举报");
+    return;
+  }
+  showReportDialog.value = true;
+};
+
+const closeReportDialog = () => {
+  showReportDialog.value = false;
+  reportType.value = "PROHIBITED_CONTACT";
+  reportContent.value = "";
+};
+
+const submitReport = async () => {
+  const itemId = Number(item.value.id);
+  if (!Number.isInteger(itemId) || itemId <= 0) {
+    ElMessage.warning("当前物品不可举报");
+    return;
+  }
+  if (!reportContent.value || reportContent.value.length < 5) {
+    ElMessage.warning("举报内容至少5个字");
+    return;
+  }
+  try {
+    await reportItem(itemId, {
+      reportType: reportType.value,
+      content: reportContent.value,
+    });
+    ElMessage.success("举报已提交");
+    closeReportDialog();
+  } catch (error) {
+    ElMessage.error(error.message || "举报提交失败");
   }
 };
 </script>
@@ -755,6 +836,55 @@ const toggleFavorite = async () => {
   padding: 11px 24px;
   color: #605092;
   background: #efeaff;
+}
+
+.danger-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 11px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  background: #fee2e2;
+  color: #b91c1c;
+  box-shadow: inset 0 0 0 1px #fecaca;
+}
+
+.report-dialog-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.report-dialog {
+  width: min(92vw, 480px);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.report-dialog .toolbar-select,
+.report-dialog .notice-input {
+  border: 1px solid #d8cffa;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.report-dialog .notice-input {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.report-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .favorite-icon-btn {

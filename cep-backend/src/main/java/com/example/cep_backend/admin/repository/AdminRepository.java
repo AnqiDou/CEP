@@ -12,6 +12,8 @@ import org.springframework.stereotype.Repository;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -277,13 +279,23 @@ public class AdminRepository {
                 SELECT
                     c.id AS conversation_id,
                     c.title,
+                    c.report_type,
+                    c.reporter_user_id,
+                    c.item_id,
+                    c.report_content,
+                    c.status,
                     c.preview,
                     m.id AS message_id,
                     m.sender_type,
                     m.content,
-                    m.created_at
+                    m.created_at,
+                    u.email AS reporter_email,
+                    u.username AS reporter_username,
+                    i.title AS item_title
                 FROM admin_support_conversations c
                 LEFT JOIN admin_support_messages m ON m.conversation_id = c.id
+                LEFT JOIN users u ON u.id = c.reporter_user_id
+                LEFT JOIN items i ON i.id = c.item_id
                 ORDER BY c.updated_at DESC, c.id DESC, m.created_at ASC, m.id ASC
                 """;
 
@@ -297,6 +309,12 @@ public class AdminRepository {
                     id -> new ConversationAccumulator(
                             id,
                             String.valueOf(row.get("title")),
+                            toNullableString(row.get("report_type")),
+                            resolveReporterName(row.get("reporter_username"), row.get("reporter_email")),
+                            toNullableLong(row.get("item_id")),
+                            toNullableString(row.get("item_title")),
+                            toNullableString(row.get("report_content")),
+                            toNullableString(row.get("status")),
                             String.valueOf(row.get("preview")),
                             new ArrayList<>()));
 
@@ -304,12 +322,12 @@ public class AdminRepository {
             if (messageId != null) {
                 String senderType = String.valueOf(row.get("sender_type"));
                 String from = "ADMIN".equalsIgnoreCase(senderType) ? "管理员" : "用户";
-                Timestamp createdAt = (Timestamp) row.get("created_at");
+                LocalDateTime createdAt = toLocalDateTime(row.get("created_at"));
                 accumulator.messages().add(new AdminSupportMessageDto(
                         messageId.longValue(),
                         from,
                         String.valueOf(row.get("content")),
-                        createdAt == null ? null : createdAt.toLocalDateTime()));
+                        createdAt));
             }
         }
 
@@ -317,9 +335,28 @@ public class AdminRepository {
                 .map(item -> new AdminSupportConversationDto(
                         item.id(),
                         item.title(),
+                        item.reportType(),
+                        item.reporterName(),
+                        item.itemId(),
+                        item.itemTitle(),
+                        item.reportContent(),
+                        item.status(),
                         item.preview(),
                         item.messages()))
                 .toList();
+    }
+
+    public boolean existsSupportConversation(Long conversationId) {
+        String sql = "SELECT COUNT(1) FROM admin_support_conversations WHERE id = ?";
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, conversationId);
+        return count != null && count > 0;
+    }
+
+    public Long findReporterUserIdByConversationId(Long conversationId) {
+        String sql = "SELECT reporter_user_id FROM admin_support_conversations WHERE id = ? LIMIT 1";
+        List<Long> list = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getObject("reporter_user_id", Long.class),
+                conversationId);
+        return list.isEmpty() ? null : list.getFirst();
     }
 
     public int insertSupportMessage(Long conversationId, String senderType, String content, LocalDateTime now) {
@@ -338,10 +375,107 @@ public class AdminRepository {
         String sql = """
                 UPDATE admin_support_conversations
                 SET preview = ?,
+                    status = CASE WHEN status = 'OPEN' THEN 'PROCESSING' ELSE status END,
                     updated_at = ?
                 WHERE id = ?
                 """;
         return jdbcTemplate.update(sql, preview, Timestamp.valueOf(now), conversationId);
+    }
+
+    public int updateSupportConversationStatus(Long conversationId, String status, LocalDateTime now) {
+        String sql = """
+                UPDATE admin_support_conversations
+                SET status = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """;
+        return jdbcTemplate.update(sql, status, Timestamp.valueOf(now), conversationId);
+    }
+
+    public Long findUserIdByEmail(String email) {
+        String sql = "SELECT id FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1";
+        List<Long> list = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getLong("id"), email);
+        return list.isEmpty() ? null : list.getFirst();
+    }
+
+    public Long findLatestConversationIdByReporter(Long reporterUserId) {
+        String sql = """
+                SELECT id
+                FROM admin_support_conversations
+                WHERE reporter_user_id = ?
+                ORDER BY updated_at DESC, id DESC
+                LIMIT 1
+                """;
+        List<Long> list = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getLong("id"), reporterUserId);
+        return list.isEmpty() ? null : list.getFirst();
+    }
+
+    public Long findActiveConversationIdByReporter(Long reporterUserId) {
+        String sql = """
+                SELECT id
+                FROM admin_support_conversations
+                WHERE reporter_user_id = ?
+                  AND status IN ('OPEN', 'PROCESSING')
+                ORDER BY updated_at DESC, id DESC
+                LIMIT 1
+                """;
+        List<Long> list = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getLong("id"), reporterUserId);
+        return list.isEmpty() ? null : list.getFirst();
+    }
+
+    public Long createSupportConversationForUser(
+            Long reporterUserId,
+            String title,
+            String reportType,
+            String reportContent,
+            String preview,
+            String status,
+            LocalDateTime now) {
+        String sql = """
+                INSERT INTO admin_support_conversations (
+                    title,
+                    report_type,
+                    reporter_user_id,
+                    report_content,
+                    preview,
+                    status,
+                    created_at,
+                    updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """;
+        org.springframework.jdbc.support.KeyHolder keyHolder = new org.springframework.jdbc.support.GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            var statement = connection.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS);
+            statement.setString(1, title);
+            statement.setString(2, reportType);
+            statement.setLong(3, reporterUserId);
+            statement.setString(4, reportContent);
+            statement.setString(5, preview);
+            statement.setString(6, status);
+            statement.setTimestamp(7, Timestamp.valueOf(now));
+            statement.setTimestamp(8, Timestamp.valueOf(now));
+            return statement;
+        }, keyHolder);
+        Number key = keyHolder.getKey();
+        return key == null ? null : key.longValue();
+    }
+
+    public List<AdminSupportMessageDto> listSupportMessages(Long conversationId) {
+        String sql = """
+                SELECT id, sender_type, content, created_at
+                FROM admin_support_messages
+                WHERE conversation_id = ?
+                ORDER BY created_at ASC, id ASC
+                """;
+        return jdbcTemplate.query(sql, (rs, rowNum) -> {
+            String senderType = rs.getString("sender_type");
+            String from = "ADMIN".equalsIgnoreCase(senderType) ? "管理员" : "用户";
+            return new AdminSupportMessageDto(
+                    rs.getLong("id"),
+                    from,
+                    rs.getString("content"),
+                    rs.getTimestamp("created_at").toLocalDateTime());
+        }, conversationId);
     }
 
     public List<AdminNoticeDto> listNotices() {
@@ -391,7 +525,79 @@ public class AdminRepository {
     private record ConversationAccumulator(
             Long id,
             String title,
+            String reportType,
+            String reporterName,
+            Long itemId,
+            String itemTitle,
+            String reportContent,
+            String status,
             String preview,
             List<AdminSupportMessageDto> messages) {
+    }
+
+    private String resolveReporterName(Object username, Object email) {
+        String u = toNullableString(username);
+        if (u != null && !u.isBlank()) {
+            return u;
+        }
+        String e = toNullableString(email);
+        if (e == null || e.isBlank()) {
+            return "用户";
+        }
+        return e;
+    }
+
+    private Long toNullableLong(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        String text = String.valueOf(value).trim();
+        if (text.isEmpty()) {
+            return null;
+        }
+        return Long.parseLong(text);
+    }
+
+    private String toNullableString(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String text = String.valueOf(value).trim();
+        return text.isEmpty() ? null : text;
+    }
+
+    private LocalDateTime toLocalDateTime(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof LocalDateTime localDateTime) {
+            return localDateTime;
+        }
+        if (value instanceof Timestamp timestamp) {
+            return timestamp.toLocalDateTime();
+        }
+        if (value instanceof java.sql.Date date) {
+            return date.toLocalDate().atStartOfDay();
+        }
+        if (value instanceof java.util.Date date) {
+            return new Timestamp(date.getTime()).toLocalDateTime();
+        }
+        if (value instanceof OffsetDateTime offsetDateTime) {
+            return offsetDateTime.toLocalDateTime();
+        }
+        if (value instanceof ZonedDateTime zonedDateTime) {
+            return zonedDateTime.toLocalDateTime();
+        }
+        if (value instanceof CharSequence charSequence) {
+            String text = charSequence.toString().trim();
+            if (text.isEmpty()) {
+                return null;
+            }
+            return LocalDateTime.parse(text.replace(' ', 'T'));
+        }
+        throw new IllegalStateException("不支持的时间类型: " + value.getClass().getName());
     }
 }

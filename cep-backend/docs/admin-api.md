@@ -62,8 +62,21 @@
 ## 5. 客服会话
 
 - `GET /api/admin/support/conversations`
+  - 响应新增字段：
+    - `reportType`：举报类型（`PROHIBITED_CONTACT/COUNTERFEIT/WRONG_CATEGORY/FRAUD_RISK/OTHER`）
+    - `reporterName`：举报人展示名
+    - `itemId`：关联商品 ID
+    - `itemTitle`：关联商品标题
+    - `reportContent`：举报内容
+    - `status`：会话状态（`OPEN/PROCESSING/RESOLVED/CLOSED`）
+    - `preview`：会话预览
+    - `messages`：消息列表
 - `POST /api/admin/support/conversations/{conversationId}/messages`
   - 请求体：`{ "content": "处理意见" }`
+  - 行为说明：发送成功后，会将会话状态从 `OPEN` 自动推进为 `PROCESSING`（若当前仍为 `OPEN`）
+- `PATCH /api/admin/support/conversations/{conversationId}/status`
+  - 请求体：`{ "status": "RESOLVED" }`
+  - 可选状态：`OPEN/PROCESSING/RESOLVED/CLOSED`
 
 ## 6. 公告管理
 

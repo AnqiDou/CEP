@@ -10,7 +10,10 @@
         <button
           v-for="item in navItems"
           :key="item.key"
-          :class="['menu-item', activeMenu === item.key ? 'menu-item--active' : '']"
+          :class="[
+            'menu-item',
+            activeMenu === item.key ? 'menu-item--active' : '',
+          ]"
           @click="activeMenu = item.key"
         >
           <span class="menu-item__label">{{ item.label }}</span>
@@ -23,7 +26,11 @@
 
     <main class="admin-main">
       <section v-if="activeMenu === 'dashboard'" class="dashboard-grid">
-        <article class="metric-card card" v-for="metric in metrics" :key="metric.label">
+        <article
+          class="metric-card card"
+          v-for="metric in metrics"
+          :key="metric.label"
+        >
           <p class="metric-card__label">{{ metric.label }}</p>
           <p class="metric-card__value">{{ metric.value }}</p>
           <p class="metric-card__desc">{{ metric.desc }}</p>
@@ -32,10 +39,17 @@
         <article class="card panel chart-panel">
           <h3>交易状态分布</h3>
           <div class="status-bars">
-            <div v-for="state in orderStateStats" :key="state.label" class="status-bar-row">
+            <div
+              v-for="state in orderStateStats"
+              :key="state.label"
+              class="status-bar-row"
+            >
               <span>{{ state.label }}</span>
               <div class="status-bar-track">
-                <div class="status-bar-fill" :style="{ width: `${state.percent}%` }"></div>
+                <div
+                  class="status-bar-fill"
+                  :style="{ width: `${state.percent}%` }"
+                ></div>
               </div>
               <strong>{{ state.count }}</strong>
             </div>
@@ -54,7 +68,11 @@
 
       <section v-else-if="activeMenu === 'users'" class="card panel">
         <div class="toolbar">
-          <input v-model.trim="userKeyword" class="toolbar-input" placeholder="搜索昵称/邮箱/电话" />
+          <input
+            v-model.trim="userKeyword"
+            class="toolbar-input"
+            placeholder="搜索昵称/邮箱/电话"
+          />
         </div>
         <div class="table-wrap">
           <table class="table">
@@ -73,12 +91,17 @@
             <tbody>
               <tr v-for="user in filteredUsers" :key="user.id">
                 <td>{{ user.name }}</td>
-                <td>{{ user.phone || '-' }}</td>
-                <td>{{ user.email || '-' }}</td>
+                <td>{{ user.phone || "-" }}</td>
+                <td>{{ user.email || "-" }}</td>
                 <td>{{ user.registeredAt }}</td>
                 <td>
-                  <span :class="['pill', user.disabled ? 'pill--danger' : 'pill--ok']">
-                    {{ user.disabled ? '已禁用' : '正常' }}
+                  <span
+                    :class="[
+                      'pill',
+                      user.disabled ? 'pill--danger' : 'pill--ok',
+                    ]"
+                  >
+                    {{ user.disabled ? "已禁用" : "正常" }}
                   </span>
                 </td>
                 <td>{{ user.itemCount }}</td>
@@ -86,9 +109,14 @@
                 <td>
                   <div class="actions">
                     <button class="text-btn" @click="toggleUserState(user)">
-                      {{ user.disabled ? '解封' : '禁用' }}
+                      {{ user.disabled ? "解封" : "禁用" }}
                     </button>
-                    <button class="text-btn text-btn--danger" @click="removeUser(user.id)">删除</button>
+                    <button
+                      class="text-btn text-btn--danger"
+                      @click="removeUser(user.id)"
+                    >
+                      删除
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -99,7 +127,11 @@
 
       <section v-else-if="activeMenu === 'items'" class="card panel">
         <div class="toolbar toolbar--multi">
-          <input v-model.trim="itemKeyword" class="toolbar-input" placeholder="搜索商品名/分类" />
+          <input
+            v-model.trim="itemKeyword"
+            class="toolbar-input"
+            placeholder="搜索商品名/分类"
+          />
           <select v-model="itemStatus" class="toolbar-select">
             <option value="all">全部状态</option>
             <option value="pending">待审核</option>
@@ -127,17 +159,32 @@
                 <td>￥{{ item.price }}</td>
                 <td>{{ item.owner }}</td>
                 <td>
-                  <span class="pill" :class="statusClass(item.status)">{{ statusText(item.status) }}</span>
+                  <span class="pill" :class="statusClass(item.status)">{{
+                    statusText(item.status)
+                  }}</span>
                 </td>
                 <td>
                   <div class="actions">
-                    <button class="text-btn" @click="approveItem(item)" :disabled="item.status !== 'pending'">
+                    <button
+                      class="text-btn"
+                      @click="approveItem(item)"
+                      :disabled="item.status !== 'pending'"
+                    >
                       审核通过
                     </button>
-                    <button class="text-btn" @click="forceOffline(item)" :disabled="item.status === 'offline'">
+                    <button
+                      class="text-btn"
+                      @click="forceOffline(item)"
+                      :disabled="item.status === 'offline'"
+                    >
                       强制下架
                     </button>
-                    <button class="text-btn text-btn--danger" @click="deleteItem(item.id)">删除</button>
+                    <button
+                      class="text-btn text-btn--danger"
+                      @click="deleteItem(item.id)"
+                    >
+                      删除
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -148,7 +195,11 @@
 
       <section v-else-if="activeMenu === 'orders'" class="card panel">
         <div class="toolbar toolbar--multi">
-          <input v-model.trim="orderKeyword" class="toolbar-input" placeholder="搜索订单号/买家/卖家/商品" />
+          <input
+            v-model.trim="orderKeyword"
+            class="toolbar-input"
+            placeholder="搜索订单号/买家/卖家/商品"
+          />
           <select v-model="orderState" class="toolbar-select">
             <option value="all">全部状态</option>
             <option value="pending-pay">待付款</option>
@@ -177,10 +228,14 @@
                 <td>{{ order.seller }}</td>
                 <td>￥{{ order.amount }}</td>
                 <td>
-                  <span class="pill" :class="statusClass(order.status)">{{ statusText(order.status) }}</span>
+                  <span class="pill" :class="statusClass(order.status)">{{
+                    statusText(order.status)
+                  }}</span>
                 </td>
                 <td>
-                  <button class="text-btn" @click="markAbnormalHandled(order)">处理异常</button>
+                  <button class="text-btn" @click="markAbnormalHandled(order)">
+                    处理异常
+                  </button>
                 </td>
               </tr>
             </tbody>
@@ -188,30 +243,82 @@
         </div>
       </section>
 
-      <section v-else-if="activeMenu === 'support'" class="card panel support-panel">
+      <section
+        v-else-if="activeMenu === 'support'"
+        class="card panel support-panel"
+      >
         <div class="support-layout">
           <aside class="conversation-list">
             <button
               v-for="session in conversations"
               :key="session.id"
-              :class="['conversation-item', activeConversationId === session.id ? 'conversation-item--active' : '']"
+              :class="[
+                'conversation-item',
+                activeConversationId === session.id
+                  ? 'conversation-item--active'
+                  : '',
+              ]"
               @click="activeConversationId = session.id"
             >
               <strong>{{ session.title }}</strong>
+              <span
+                >{{ session.reporterName || "用户" }} ·
+                {{ mapReportTypeText(session.reportType) }}</span
+              >
               <span>{{ session.preview }}</span>
             </button>
           </aside>
 
           <section class="conversation-main">
-            <h3>{{ currentConversation?.title || '请选择会话' }}</h3>
+            <h3>{{ currentConversation?.title || "请选择会话" }}</h3>
+            <div v-if="currentConversation" class="support-meta">
+              <span
+                :class="[
+                  'pill',
+                  supportStatusClass(currentConversation.status),
+                ]"
+              >
+                {{ supportStatusText(currentConversation.status) }}
+              </span>
+              <span>举报人：{{ currentConversation.reporterName || "-" }}</span>
+              <span>商品：{{ currentConversation.itemTitle || "-" }}</span>
+            </div>
+            <p v-if="currentConversation?.reportContent" class="report-content">
+              <strong>举报内容：</strong>{{ currentConversation.reportContent }}
+            </p>
             <div class="chat-box">
-              <p v-for="msg in currentConversation?.messages || []" :key="msg.id">
+              <p
+                v-for="msg in currentConversation?.messages || []"
+                :key="msg.id"
+              >
                 <strong>{{ msg.from }}：</strong>{{ msg.content }}
               </p>
             </div>
             <div class="toolbar">
-              <input v-model.trim="supportReply" class="toolbar-input" placeholder="输入处理意见" />
+              <input
+                v-model.trim="supportReply"
+                class="toolbar-input"
+                placeholder="输入处理意见"
+              />
               <button class="primary-btn" @click="appendReply">发送</button>
+              <button
+                v-if="
+                  currentConversation &&
+                  currentConversation.status !== 'RESOLVED' &&
+                  currentConversation.status !== 'CLOSED'
+                "
+                class="text-btn"
+                @click="resolveConversation"
+              >
+                标记已解决
+              </button>
+              <button
+                v-else-if="currentConversation"
+                class="text-btn"
+                @click="reopenConversation"
+              >
+                重新打开
+              </button>
             </div>
           </section>
         </div>
@@ -220,7 +327,11 @@
       <section v-else class="card panel">
         <div class="setting-block">
           <h3>发布平台公告</h3>
-          <textarea v-model="newNotice" class="notice-input" placeholder="请输入公告内容"></textarea>
+          <textarea
+            v-model="newNotice"
+            class="notice-input"
+            placeholder="请输入公告内容"
+          ></textarea>
           <button class="primary-btn" @click="publishNotice">发布公告</button>
         </div>
 
@@ -229,7 +340,12 @@
           <ul class="notice-list">
             <li v-for="notice in notices" :key="notice.id">
               <span>{{ notice.content }}</span>
-              <button class="text-btn text-btn--danger" @click="deleteNotice(notice.id)">删除</button>
+              <button
+                class="text-btn text-btn--danger"
+                @click="deleteNotice(notice.id)"
+              >
+                删除
+              </button>
             </li>
           </ul>
         </div>
@@ -243,6 +359,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { logout } from "../service/common/authSessionService";
+import { buildMessageWebSocketUrl } from "../service/chat/chatApiService";
 import {
   approveAdminItem,
   createAdminNotice,
@@ -258,11 +375,15 @@ import {
   handleAdminOrderAbnormal,
   offlineAdminItem,
   replyAdminConversation,
+  updateAdminConversationStatus,
   updateAdminUserStatus,
 } from "../service/admin/adminApiService";
 
 const router = useRouter();
 const loading = ref(false);
+const socketRef = ref(null);
+const reconnectTimerRef = ref(null);
+const isManualClose = ref(false);
 
 const navItems = ref([
   { key: "dashboard", label: "仪表盘", count: "00" },
@@ -290,9 +411,13 @@ const filteredUsers = computed(() => {
   const keyword = userKeyword.value.toLowerCase();
   return users.value.filter(
     (item) =>
-      String(item.name || "").toLowerCase().includes(keyword) ||
+      String(item.name || "")
+        .toLowerCase()
+        .includes(keyword) ||
       String(item.phone || "").includes(keyword) ||
-      String(item.email || "").toLowerCase().includes(keyword),
+      String(item.email || "")
+        .toLowerCase()
+        .includes(keyword)
   );
 });
 
@@ -305,9 +430,10 @@ const filteredItems = computed(() =>
       !itemKeyword.value ||
       String(item.title || "").includes(itemKeyword.value) ||
       String(item.category || "").includes(itemKeyword.value);
-    const hitStatus = itemStatus.value === "all" || item.status === itemStatus.value;
+    const hitStatus =
+      itemStatus.value === "all" || item.status === itemStatus.value;
     return hitKeyword && hitStatus;
-  }),
+  })
 );
 
 const orders = ref([]);
@@ -321,24 +447,33 @@ const filteredOrders = computed(() =>
       String(order.itemTitle || "").includes(orderKeyword.value) ||
       String(order.buyer || "").includes(orderKeyword.value) ||
       String(order.seller || "").includes(orderKeyword.value);
-    const hitStatus = orderState.value === "all" || order.status === orderState.value;
+    const hitStatus =
+      orderState.value === "all" || order.status === orderState.value;
     return hitKeyword && hitStatus;
-  }),
+  })
 );
 
 const conversations = ref([]);
 const activeConversationId = ref(null);
 const supportReply = ref("");
 const currentConversation = computed(() =>
-  conversations.value.find((session) => session.id === activeConversationId.value),
+  conversations.value.find(
+    (session) => session.id === activeConversationId.value
+  )
 );
 
 const notices = ref([]);
 const newNotice = ref("");
 
-const pendingItemCount = computed(() => dashboardRaw.value.pendingItemCount || 0);
-const abnormalOrderCount = computed(() => dashboardRaw.value.abnormalOrderCount || 0);
-const pendingConversationCount = computed(() => dashboardRaw.value.pendingConversationCount || 0);
+const pendingItemCount = computed(
+  () => dashboardRaw.value.pendingItemCount || 0
+);
+const abnormalOrderCount = computed(
+  () => dashboardRaw.value.abnormalOrderCount || 0
+);
+const pendingConversationCount = computed(
+  () => dashboardRaw.value.pendingConversationCount || 0
+);
 
 const normalizeDate = (value) => {
   if (!value) return "-";
@@ -391,7 +526,9 @@ const applyDashboard = (data = {}) => {
     },
   ];
 
-  orderStateStats.value = Array.isArray(data.orderStateStats) ? data.orderStateStats : [];
+  orderStateStats.value = Array.isArray(data.orderStateStats)
+    ? data.orderStateStats
+    : [];
 };
 
 const updateNavCount = () => {
@@ -405,7 +542,7 @@ const updateNavCount = () => {
   navItems.value = navItems.value.map((item) =>
     map[item.key] === undefined
       ? item
-      : { ...item, count: String(map[item.key]).padStart(2, "0") },
+      : { ...item, count: String(map[item.key]).padStart(2, "0") }
   );
 };
 
@@ -442,6 +579,44 @@ const loadConversations = async () => {
     activeConversationId.value = conversations.value[0].id;
   }
   updateNavCount();
+};
+
+const scheduleReconnect = () => {
+  if (isManualClose.value || reconnectTimerRef.value) return;
+  reconnectTimerRef.value = window.setTimeout(() => {
+    reconnectTimerRef.value = null;
+    connectWebSocket();
+  }, 3000);
+};
+
+const connectWebSocket = async () => {
+  if (isManualClose.value) return;
+  try {
+    const wsUrl = await buildMessageWebSocketUrl();
+    const socket = new WebSocket(wsUrl);
+    socketRef.value = socket;
+
+    socket.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data || "{}");
+        const eventType = String(payload?.eventType || "").toUpperCase();
+        if (eventType === "SUPPORT_MESSAGE_CREATED") {
+          loadConversations();
+          loadDashboard();
+          return;
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    socket.onclose = () => {
+      socketRef.value = null;
+      scheduleReconnect();
+    };
+  } catch {
+    scheduleReconnect();
+  }
 };
 
 const loadNotices = async () => {
@@ -484,6 +659,34 @@ const statusClass = (status) => {
   if (status === "pending" || status === "pending-pay") return "pill--warn";
   if (status === "completed" || status === "online") return "pill--ok";
   return "";
+};
+
+const supportStatusText = (status) => {
+  const map = {
+    OPEN: "待处理",
+    PROCESSING: "处理中",
+    RESOLVED: "已解决",
+    CLOSED: "已关闭",
+  };
+  return map[String(status || "").toUpperCase()] || "待处理";
+};
+
+const supportStatusClass = (status) => {
+  const value = String(status || "").toUpperCase();
+  if (value === "RESOLVED" || value === "CLOSED") return "pill--ok";
+  if (value === "PROCESSING") return "pill--warn";
+  return "pill--danger";
+};
+
+const mapReportTypeText = (type) => {
+  const map = {
+    PROHIBITED_CONTACT: "违规联系方式",
+    COUNTERFEIT: "疑似假货",
+    WRONG_CATEGORY: "类目错误",
+    FRAUD_RISK: "欺诈风险",
+    OTHER: "其他",
+  };
+  return map[String(type || "").toUpperCase()] || "违规举报";
 };
 
 const toggleUserState = (user) => {
@@ -557,6 +760,28 @@ const appendReply = () => {
     .catch((error) => ElMessage.error(error.message || "发送失败"));
 };
 
+const resolveConversation = () => {
+  const target = currentConversation.value;
+  if (!target) return;
+  updateAdminConversationStatus(target.id, "RESOLVED")
+    .then(async () => {
+      await Promise.all([loadConversations(), loadDashboard()]);
+      ElMessage.success("会话已标记为已解决");
+    })
+    .catch((error) => ElMessage.error(error.message || "更新失败"));
+};
+
+const reopenConversation = () => {
+  const target = currentConversation.value;
+  if (!target) return;
+  updateAdminConversationStatus(target.id, "OPEN")
+    .then(async () => {
+      await Promise.all([loadConversations(), loadDashboard()]);
+      ElMessage.success("会话已重新打开");
+    })
+    .catch((error) => ElMessage.error(error.message || "更新失败"));
+};
+
 const publishNotice = () => {
   if (!newNotice.value.trim()) {
     ElMessage.warning("公告内容不能为空");
@@ -594,6 +819,7 @@ const handleLogout = async () => {
 onMounted(async () => {
   try {
     await loadAll();
+    connectWebSocket();
   } catch (error) {
     ElMessage.error(error.message || "管理后台数据加载失败");
   }
@@ -908,6 +1134,24 @@ onMounted(async () => {
 
 .conversation-main h3 {
   margin-top: 0;
+}
+
+.support-meta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+  color: #475569;
+  font-size: 13px;
+}
+
+.report-content {
+  margin: 0 0 10px;
+  padding: 10px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  color: #334155;
 }
 
 .chat-box {

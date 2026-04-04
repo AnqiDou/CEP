@@ -147,3 +147,52 @@
   }
 }
 ```
+
+---
+
+## 5. 举报商品
+
+- **URL**: `POST /api/items/{itemId}/reports`
+- **鉴权**: 需要 `Authorization: Bearer {accessToken}`
+
+### Path 参数
+
+| 字段   | 类型   | 必填 | 说明         |
+| ------ | ------ | ---- | ------------ |
+| itemId | number | 是   | 物品 ID，> 0 |
+
+### 请求体
+
+```json
+{
+  "reportType": "PROHIBITED_CONTACT",
+  "content": "详情页出现了站外联系方式，请核查"
+}
+```
+
+### 字段说明
+
+| 字段       | 类型   | 必填 | 说明                                                                                                  |
+| ---------- | ------ | ---- | ----------------------------------------------------------------------------------------------------- |
+| reportType | string | 否   | 举报类型：`PROHIBITED_CONTACT/COUNTERFEIT/WRONG_CATEGORY/FRAUD_RISK/OTHER`，默认 `PROHIBITED_CONTACT` |
+| content    | string | 是   | 举报内容，长度 `5~500`                                                                                |
+
+### 业务规则
+
+- 不能举报自己的商品。
+- 同一用户对同一商品在 `OPEN/PROCESSING` 状态下只能保留 1 条处理中举报。
+- 成功后会创建一条管理员客服会话，并写入用户首条举报消息。
+
+### 成功响应示例
+
+```json
+{
+  "success": true,
+  "message": "提交成功",
+  "data": {
+    "conversationId": 12,
+    "status": "OPEN",
+    "message": "举报已提交，管理员将尽快处理"
+  }
+}
+```

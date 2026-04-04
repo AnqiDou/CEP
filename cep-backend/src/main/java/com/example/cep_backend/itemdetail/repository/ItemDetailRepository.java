@@ -3,8 +3,11 @@ package com.example.cep_backend.itemdetail.repository;
 import com.example.cep_backend.itemdetail.model.ItemDetailRecord;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
+import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -149,5 +152,94 @@ public class ItemDetailRepository {
                 """;
         List<Long> list = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getObject("owner_user_id", Long.class), itemId);
         return list.isEmpty() ? null : list.getFirst();
+    }
+
+    public ItemReportMeta findItemReportMetaByItemId(Long itemId) {
+        String sql = """
+                SELECT
+                    i.id AS item_id,
+                    i.title AS item_title,
+                    COALESCE(i.publisher_user_id, d.publisher_user_id) AS publisher_user_id
+                FROM items i
+                LEFT JOIN item_details d ON d.item_id = i.id
+                WHERE i.id = ?
+                  AND i.status <> 'DELETED'
+                LIMIT 1
+                """;
+        List<ItemReportMeta> list = jdbcTemplate.query(sql, (rs, rowNum) -> new ItemReportMeta(
+                rs.getLong("item_id"),
+                rs.getString("item_title"),
+                rs.getObject("publisher_user_id", Long.class)), itemId);
+        return list.isEmpty() ? null : list.getFirst();
+    }
+
+    public boolean existsOpenReportForItemAndReporter(Long itemId, Long reporterUserId) {
+        String sql = """
+                SELECT COUNT(1)
+                FROM admin_support_conversations
+                WHERE item_id = ?
+                  AND reporter_user_id = ?
+                  AND status IN ('OPEN', 'PROCESSING')
+                """;
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, itemId, reporterUserId);
+        return count != null && count > 0;
+    }
+
+    public Long createAdminSupportConversation(
+            String title,
+            String reportType,
+            Long reporterUserId,
+            Long itemId,
+            String reportContent,
+            String preview,
+            String status,
+            LocalDateTime now) {
+        String sql = """
+                INSERT INTO admin_support_conversations (
+                    title,
+                    report_type,
+                    reporter_user_id,
+                    item_id,
+                    report_content,
+                    preview,
+                    status,
+                    created_at,
+                    updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """;
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            var statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            statement.setString(1, title);
+            statement.setString(2, reportType);
+            statement.setLong(3, reporterUserId);
+            statement.setLong(4, itemId);
+            statement.setString(5, reportContent);
+            statement.setString(6, preview);
+            statement.setString(7, status);
+            statement.setTimestamp(8, Timestamp.valueOf(now));
+            statement.setTimestamp(9, Timestamp.valueOf(now));
+            return statement;
+        }, keyHolder);
+        Number key = keyHolder.getKey();
+        if (key == null) {
+            return null;
+        }
+        return key.longValue();
+    }
+
+    public int insertAdminSupportMessage(Long conversationId, String senderType, String content, LocalDateTime now) {
+        String sql = """
+                INSERT INTO admin_support_messages (
+                    conversation_id,
+                    sender_type,
+                    content,
+                    created_at
+                ) VALUES (?, ?, ?, ?)
+                """;
+        return jdbcTemplate.update(sql, conversationId, senderType, content, Timestamp.valueOf(now));
+    }
+
+    public record ItemReportMeta(Long itemId, String itemTitle, Long publisherUserId) {
     }
 }

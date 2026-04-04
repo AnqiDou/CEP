@@ -27,6 +27,7 @@
         >
           登录
         </button>
+        <button class="ghost-btn support-btn" @click="goToSupport">客服</button>
         <button class="primary-btn" @click="goToPublish">发布闲置</button>
         <button class="ghost-btn message-btn" @click="goToChat">
           <span
@@ -1566,6 +1567,14 @@ const goToChat = () => {
     return;
   }
   const resolved = router.resolve("/chat");
+  window.open(resolved.href, "_blank");
+};
+
+const goToSupport = () => {
+  if (!ensureLoginForAction()) {
+    return;
+  }
+  const resolved = router.resolve("/support");
   window.open(resolved.href, "_blank");
 };
 

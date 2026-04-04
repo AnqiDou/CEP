@@ -6,7 +6,9 @@ import com.example.cep_backend.admin.dto.AdminNoticeCreateRequest;
 import com.example.cep_backend.admin.dto.AdminNoticeDto;
 import com.example.cep_backend.admin.dto.AdminOrderDto;
 import com.example.cep_backend.admin.dto.AdminSupportConversationDto;
+import com.example.cep_backend.admin.dto.AdminSupportMessageDto;
 import com.example.cep_backend.admin.dto.AdminSupportReplyRequest;
+import com.example.cep_backend.admin.dto.AdminSupportStatusRequest;
 import com.example.cep_backend.admin.dto.AdminUserDto;
 import com.example.cep_backend.admin.dto.AdminUserStatusRequest;
 import com.example.cep_backend.admin.service.AdminService;
@@ -139,6 +141,32 @@ public class AdminController {
             @RequestBody AdminSupportReplyRequest request) {
         ensureAdmin(authorization);
         adminService.replyConversation(conversationId, request == null ? null : request.content());
+        return ApiResponse.ok("发送成功");
+    }
+
+    @PatchMapping("/support/conversations/{conversationId}/status")
+    public ApiResponse<Void> updateConversationStatus(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long conversationId,
+            @RequestBody AdminSupportStatusRequest request) {
+        ensureAdmin(authorization);
+        adminService.updateConversationStatus(conversationId, request == null ? null : request.status());
+        return ApiResponse.ok("更新成功");
+    }
+
+    @GetMapping("/support/me/messages")
+    public ApiResponse<List<AdminSupportMessageDto>> mySupportMessages(
+            @RequestHeader("Authorization") String authorization) {
+        AuthUserDto currentUser = authService.currentUser(authorization);
+        return ApiResponse.ok("获取成功", adminService.listUserSupportMessages(currentUser.userId()));
+    }
+
+    @PostMapping("/support/me/messages")
+    public ApiResponse<Void> sendMySupportMessage(
+            @RequestHeader("Authorization") String authorization,
+            @RequestBody AdminSupportReplyRequest request) {
+        AuthUserDto currentUser = authService.currentUser(authorization);
+        adminService.appendUserSupportMessage(currentUser.userId(), request == null ? null : request.content());
         return ApiResponse.ok("发送成功");
     }
 

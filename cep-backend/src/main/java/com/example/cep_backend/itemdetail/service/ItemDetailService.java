@@ -3,6 +3,7 @@ package com.example.cep_backend.itemdetail.service;
 import com.example.cep_backend.auth.BusinessException;
 import com.example.cep_backend.itemdetail.dto.ItemDetailDto;
 import com.example.cep_backend.itemdetail.dto.ItemFavoriteStatusDto;
+import com.example.cep_backend.itemdetail.dto.ItemReportCreateResultDto;
 import com.example.cep_backend.itemdetail.dto.ItemDetailPublisherDto;
 import com.example.cep_backend.itemdetail.model.ItemDetailRecord;
 import com.example.cep_backend.itemdetail.repository.ItemDetailRepository;
@@ -14,6 +15,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 public class ItemDetailService {
@@ -114,6 +116,46 @@ public class ItemDetailService {
         return new ItemFavoriteStatusDto(false);
     }
 
+    @Transactional
+    public ItemReportCreateResultDto createReport(Long reporterUserId, Long itemId, String reportType, String content) {
+        validateItemId(itemId);
+        if (reporterUserId == null || reporterUserId <= 0) {
+            throw new BusinessException("用户参数无效");
+        }
+        ItemDetailRepository.ItemReportMeta meta = itemDetailRepository.findItemReportMetaByItemId(itemId);
+        if (meta == null) {
+            throw new BusinessException("物品不存在");
+        }
+        if (meta.publisherUserId() != null && meta.publisherUserId().equals(reporterUserId)) {
+            throw new BusinessException("不能举报自己的物品");
+        }
+        if (itemDetailRepository.existsOpenReportForItemAndReporter(itemId, reporterUserId)) {
+            throw new BusinessException("你已提交过该商品的处理中举报");
+        }
+
+        String normalizedType = normalizeReportType(reportType);
+        String normalizedContent = normalizeReportContent(content);
+        String title = buildConversationTitle(normalizedType);
+        String preview = normalizedContent.length() > 100
+                ? normalizedContent.substring(0, 100)
+                : normalizedContent;
+        LocalDateTime now = LocalDateTime.now();
+        Long conversationId = itemDetailRepository.createAdminSupportConversation(
+                title,
+                normalizedType,
+                reporterUserId,
+                itemId,
+                normalizedContent,
+                preview,
+                "OPEN",
+                now);
+        if (conversationId == null || conversationId <= 0) {
+            throw new BusinessException("提交失败，请稍后重试");
+        }
+        itemDetailRepository.insertAdminSupportMessage(conversationId, "USER", normalizedContent, now);
+        return new ItemReportCreateResultDto(conversationId, "OPEN", "举报已提交，管理员将尽快处理");
+    }
+
     private void validateItemId(Long itemId) {
         if (itemId == null || itemId <= 0) {
             throw new BusinessException("物品 ID 无效");
@@ -141,5 +183,40 @@ public class ItemDetailService {
             return fallback;
         }
         return value.trim();
+    }
+
+    private String normalizeReportType(String reportType) {
+        if (reportType == null || reportType.trim().isEmpty()) {
+            return "PROHIBITED_CONTACT";
+        }
+        String value = reportType.trim().toUpperCase(Locale.ROOT);
+        return switch (value) {
+            case "PROHIBITED_CONTACT", "COUNTERFEIT", "WRONG_CATEGORY", "FRAUD_RISK", "OTHER" -> value;
+            default -> throw new BusinessException("举报类型不支持");
+        };
+    }
+
+    private String normalizeReportContent(String content) {
+        if (content == null || content.trim().isEmpty()) {
+            throw new BusinessException("举报内容不能为空");
+        }
+        String trimmed = content.trim();
+        if (trimmed.length() < 5) {
+            throw new BusinessException("举报内容至少5个字");
+        }
+        if (trimmed.length() > 500) {
+            throw new BusinessException("举报内容不能超过500字");
+        }
+        return trimmed;
+    }
+
+    private String buildConversationTitle(String reportType) {
+        return switch (reportType) {
+            case "PROHIBITED_CONTACT" -> "Report: prohibited listing";
+            case "COUNTERFEIT" -> "Report: suspected counterfeit";
+            case "WRONG_CATEGORY" -> "Report: wrong category";
+            case "FRAUD_RISK" -> "Report: fraud risk";
+            default -> "Report: other issue";
+        };
     }
 }

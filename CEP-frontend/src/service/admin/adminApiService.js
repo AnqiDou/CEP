@@ -104,7 +104,36 @@ export const fetchAdminConversations = async () =>
   });
 
 export const replyAdminConversation = async (conversationId, content) =>
-  requestJson(`${ADMIN_API_BASE}/support/conversations/${conversationId}/messages`, {
+  requestJson(
+    `${ADMIN_API_BASE}/support/conversations/${conversationId}/messages`,
+    {
+      method: "POST",
+      headers: await withAuthHeaders({
+        "Content-Type": "application/json",
+      }),
+      body: JSON.stringify({ content }),
+    },
+  );
+
+export const updateAdminConversationStatus = async (conversationId, status) =>
+  requestJson(
+    `${ADMIN_API_BASE}/support/conversations/${conversationId}/status`,
+    {
+      method: "PATCH",
+      headers: await withAuthHeaders({
+        "Content-Type": "application/json",
+      }),
+      body: JSON.stringify({ status }),
+    },
+  );
+
+export const fetchMySupportMessages = async () =>
+  requestJson(`${ADMIN_API_BASE}/support/me/messages`, {
+    headers: await withAuthHeaders(),
+  });
+
+export const sendMySupportMessage = async (content) =>
+  requestJson(`${ADMIN_API_BASE}/support/me/messages`, {
     method: "POST",
     headers: await withAuthHeaders({
       "Content-Type": "application/json",

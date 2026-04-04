@@ -13,6 +13,7 @@ import WechatPay from "../pages/WechatPay.vue";
 import PaymentResult from "../pages/PaymentResult.vue";
 import TradeReview from "../pages/TradeReview.vue";
 import AdminDashboard from "../pages/AdminDashboard.vue";
+import Support from "../pages/Support.vue";
 import {
   authState,
   initAuthSession,
@@ -71,6 +72,14 @@ const router = createRouter({
       component: Chat,
       meta: {
         title: "聊天消息",
+      },
+    },
+    {
+      path: "/support",
+      name: "support",
+      component: Support,
+      meta: {
+        title: "在线客服",
       },
     },
     {

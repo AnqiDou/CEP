@@ -1,6 +1,7 @@
 package com.example.cep_backend.message.ws;
 
 import com.example.cep_backend.message.dto.MessageSendRequest;
+import com.example.cep_backend.admin.service.AdminService;
 import com.example.cep_backend.message.service.MessageService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
@@ -15,16 +16,19 @@ import java.util.Map;
 public class MessageWebSocketHandler extends TextWebSocketHandler {
     private final ObjectMapper objectMapper;
     private final MessageService messageService;
+    private final AdminService adminService;
     private final MessageWebSocketSessionRegistry sessionRegistry;
     private final MessageWebSocketNotifier notifier;
 
     public MessageWebSocketHandler(
             ObjectMapper objectMapper,
             MessageService messageService,
+            AdminService adminService,
             MessageWebSocketSessionRegistry sessionRegistry,
             MessageWebSocketNotifier notifier) {
         this.objectMapper = objectMapper;
         this.messageService = messageService;
+        this.adminService = adminService;
         this.sessionRegistry = sessionRegistry;
         this.notifier = notifier;
     }
@@ -64,6 +68,15 @@ public class MessageWebSocketHandler extends TextWebSocketHandler {
         String action = payload.action() == null ? "" : payload.action().trim().toUpperCase();
         if ("PING".equals(action)) {
             session.sendMessage(new TextMessage("{\"eventType\":\"PONG\"}"));
+            return;
+        }
+
+        if ("SEND_SUPPORT_MESSAGE".equals(action)) {
+            try {
+                adminService.appendUserSupportMessage(userId, payload.text());
+            } catch (RuntimeException ex) {
+                sendError(session, ex.getMessage() == null ? "发送失败" : ex.getMessage());
+            }
             return;
         }
 

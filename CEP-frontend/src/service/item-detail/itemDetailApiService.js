@@ -46,3 +46,12 @@ export const removeItemFavorite = async (itemId) =>
     method: "DELETE",
     headers: await withAuthHeaders(),
   });
+
+export const reportItem = async (itemId, payload) =>
+  requestJson(`${ITEM_DETAIL_API_BASE}/${itemId}/reports`, {
+    method: "POST",
+    headers: await withAuthHeaders({
+      "Content-Type": "application/json",
+    }),
+    body: JSON.stringify(payload || {}),
+  });
