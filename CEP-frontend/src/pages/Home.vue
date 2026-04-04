@@ -992,7 +992,16 @@ const displayedItems = computed(() => {
     }
 
     return sortItemsByOwnerPriority(opsFilteredByColumn).filter((item) => {
-      const searchable = [item.title, item.desc, item.badge, item.campus]
+      const priceText = Number.isFinite(Number(item?.price))
+        ? String(item.price)
+        : "";
+      const searchable = [
+        item.title,
+        item.desc,
+        item.badge,
+        item.campus,
+        priceText,
+      ]
         .map(normalizeText)
         .filter(Boolean)
         .join(" ");
@@ -1361,6 +1370,14 @@ const handleSearch = async () => {
     return;
   }
   const value = keyword.value.trim();
+
+  if (isOpsListOnlyMode.value) {
+    searchedKeyword.value = value;
+    homeError.value = "";
+    scrollGridToTop();
+    await ensureScrollableContent();
+    return;
+  }
 
   if (isSearchListOnlyMode.value) {
     searchedKeyword.value = value;
