@@ -16,24 +16,21 @@
       <template v-else>
         <section class="seller-bar card">
           <div class="seller-info">
-            <div class="seller-avatar">{{ sellerInitial }}</div>
-            <div>
+            <img
+              v-if="sellerAvatar"
+              class="seller-avatar seller-avatar--image"
+              :src="sellerAvatar"
+              :alt="item.publisher.name"
+            />
+            <div v-else class="seller-avatar">{{ sellerInitial }}</div>
+            <div class="seller-main">
               <p class="seller-name">{{ item.publisher.name }}</p>
-              <p class="seller-meta">
-                {{ item.publisher.college }} · {{ item.publisher.campus }} ·
-                信用
-                {{ item.publisher.credit }}
-              </p>
+              <p class="seller-meta">{{ sellerCreditLevel }}</p>
             </div>
-            <button
-              class="seller-home-btn"
-              type="button"
-              @click="goToSellerHome"
-            >
-              TA的主页
-            </button>
           </div>
-          <p class="seller-note">{{ item.publisher.note }}</p>
+          <button class="seller-home-btn" type="button" @click="goToSellerHome">
+            TA的主页
+          </button>
         </section>
 
         <section class="detail-top card">
@@ -70,16 +67,12 @@
           </div>
 
           <div class="summary">
-            <div class="summary-hero soft-gradient-panel">
-              <div>
-                <p class="summary-tip">闲置好物</p>
+            <div class="summary-hero">
+              <div class="summary-head-row">
+                <h1 class="summary-title">{{ item.title }}</h1>
                 <div class="summary-price-row">
                   <span class="summary-price">￥{{ displayPrice }}</span>
                 </div>
-                <h1 class="summary-title">{{ item.title }}</h1>
-                <p class="summary-subtitle">
-                  {{ item.category }} · 校园安心交易
-                </p>
               </div>
             </div>
 
@@ -137,18 +130,36 @@
     >
       <div class="report-dialog card">
         <h3>举报该商品</h3>
-        <select v-model="reportType" class="toolbar-select">
-          <option value="PROHIBITED_CONTACT">违规联系方式</option>
-          <option value="COUNTERFEIT">疑似假货</option>
-          <option value="WRONG_CATEGORY">类目错误</option>
-          <option value="FRAUD_RISK">欺诈风险</option>
-          <option value="OTHER">其他</option>
-        </select>
-        <textarea
-          v-model.trim="reportContent"
-          class="notice-input"
-          placeholder="请描述举报原因（至少5个字）"
-        ></textarea>
+        <p class="report-dialog-desc">
+          请选择问题类型并补充说明，我们会尽快审核处理。
+        </p>
+
+        <div class="report-field">
+          <label class="report-label" for="report-type-select">问题类型</label>
+          <select
+            id="report-type-select"
+            v-model="reportType"
+            class="toolbar-select"
+          >
+            <option value="PROHIBITED_CONTACT">违规联系方式</option>
+            <option value="COUNTERFEIT">疑似假货</option>
+            <option value="FRAUD_RISK">欺诈风险</option>
+            <option value="OTHER">其他</option>
+          </select>
+        </div>
+
+        <div class="report-field">
+          <label class="report-label" for="report-content-input"
+            >详细描述</label
+          >
+          <textarea
+            id="report-content-input"
+            v-model.trim="reportContent"
+            class="notice-input"
+            placeholder="请描述举报原因（至少5个字）"
+          ></textarea>
+        </div>
+
         <div class="report-actions">
           <button
             class="secondary-btn"
@@ -194,10 +205,8 @@ const createEmptyItem = () => ({
   publisher: {
     id: null,
     name: "校园用户",
-    college: "未填写学院",
-    campus: "未填写",
-    credit: 4.5,
-    note: "该用户暂未完善个人简介",
+    avatar: "",
+    credit: "良好",
   },
 });
 
@@ -210,6 +219,14 @@ const hasMultiplePhotos = computed(
 const sellerInitial = computed(() =>
   (item.value?.publisher?.name || "校").slice(0, 1)
 );
+const sellerAvatar = computed(() =>
+  normalizeOptionalText(item.value?.publisher?.avatar)
+);
+const sellerCreditLevel = computed(() => {
+  const creditText = normalizeOptionalText(item.value?.publisher?.credit);
+  if (!creditText) return "卖家信用良好";
+  return creditText.includes("信用") ? creditText : `卖家信用${creditText}`;
+});
 
 const toNumber = (value, fallback = 0) => {
   const converted = Number(value);
@@ -286,19 +303,14 @@ const mapItemDetail = (detail) => {
         typeof publisher?.name === "string" && publisher.name.trim()
           ? publisher.name.trim()
           : "校园用户",
-      college:
-        typeof publisher?.college === "string" && publisher.college.trim()
-          ? publisher.college.trim()
-          : "未填写学院",
-      campus:
-        typeof publisher?.campus === "string" && publisher.campus.trim()
-          ? publisher.campus.trim()
-          : "未填写",
-      credit: Number(toNumber(publisher?.credit, 4.5).toFixed(1)),
-      note:
-        typeof publisher?.note === "string" && publisher.note.trim()
-          ? publisher.note.trim()
-          : "该用户暂未完善个人简介",
+      avatar:
+        typeof publisher?.avatar === "string" && publisher.avatar.trim()
+          ? publisher.avatar.trim()
+          : "",
+      credit:
+        typeof publisher?.credit === "string" && publisher.credit.trim()
+          ? publisher.credit.trim()
+          : "良好",
     },
   };
 };
@@ -358,11 +370,8 @@ const featureCards = computed(() => [
   {
     icon: "🍯",
     title: "卖家信用",
-    subtitle: `${toNumber(item.value?.publisher?.credit, 4.5).toFixed(1)} 分`,
-    progress: Math.min(
-      100,
-      Math.max(40, toNumber(item.value?.publisher?.credit, 4.5) * 20)
-    ),
+    subtitle: sellerCreditLevel.value,
+    progress: 82,
   },
 ]);
 
@@ -517,7 +526,7 @@ const submitReport = async () => {
 .detail-main {
   max-width: 1220px;
   margin: 0 auto;
-  padding: 38px 30px 56px;
+  padding: 12px 30px 20px;
 }
 
 .card {
@@ -575,10 +584,10 @@ const submitReport = async () => {
   display: flex;
   align-items: center;
   gap: 14px;
+  min-width: 0;
 }
 
 .seller-home-btn {
-  margin-left: auto;
   border: none;
   border-radius: 999px;
   background: #efeaff;
@@ -601,25 +610,29 @@ const submitReport = async () => {
   font-weight: 600;
 }
 
+.seller-avatar--image {
+  object-fit: cover;
+}
+
 .seller-name {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
 }
 
-.seller-meta,
-.seller-note {
+.seller-meta {
   margin: 4px 0 0;
   color: #7f789f;
   font-size: 13px;
 }
 
 .detail-top {
-  padding: 24px;
+  padding: 18px;
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
-  gap: 24px;
+  gap: 18px;
   align-items: stretch;
+  min-height: clamp(420px, calc(100vh - 300px), 560px);
 }
 
 .gallery-wrap {
@@ -640,14 +653,14 @@ const submitReport = async () => {
 
 .gallery-main {
   width: 100%;
-  aspect-ratio: 4 / 5;
+  aspect-ratio: 4 / 3;
   object-fit: cover;
   border-radius: 16px;
 }
 
 .gallery-empty {
   width: 100%;
-  aspect-ratio: 4 / 5;
+  aspect-ratio: 4 / 3;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -689,7 +702,7 @@ const submitReport = async () => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .summary-hero {
@@ -697,6 +710,18 @@ const submitReport = async () => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+.summary-head-row {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .summary-tip {
@@ -706,8 +731,10 @@ const submitReport = async () => {
 }
 
 .summary-title {
-  margin: 6px 0 0;
-  font-size: 34px;
+  margin: 0;
+  min-width: 0;
+  flex: 1;
+  font-size: 30px;
   line-height: 1.25;
   color: #2f2950;
 }
@@ -721,6 +748,8 @@ const submitReport = async () => {
 .summary-price-row {
   display: flex;
   align-items: baseline;
+  justify-content: flex-end;
+  flex-shrink: 0;
   gap: 8px;
 }
 
@@ -776,7 +805,7 @@ const submitReport = async () => {
   flex-direction: column;
   gap: 8px;
   color: #4f496f;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .summary-meta__row {
@@ -797,16 +826,20 @@ const submitReport = async () => {
 
 .summary-meta__value {
   color: #514b70;
-  line-height: 1.6;
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.summary-meta__row--desc .summary-meta__value {
+  font-size: 16px;
+  line-height: 1.72;
 }
 
 .summary-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
+  overflow: visible;
   border-radius: 18px;
-  padding: 14px;
-  background: #f6f2ff;
+  padding: 12px 14px;
+  background: #f7f3ff;
 }
 
 .summary-actions {
@@ -853,7 +886,8 @@ const submitReport = async () => {
 .report-dialog-mask {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.35);
+  background: rgba(80, 64, 132, 0.22);
+  backdrop-filter: blur(3px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -861,24 +895,95 @@ const submitReport = async () => {
 }
 
 .report-dialog {
-  width: min(92vw, 480px);
-  padding: 18px;
+  width: min(92vw, 520px);
+  padding: 22px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
+  border: 1px solid #ece3ff;
+  background: linear-gradient(145deg, #fcfaff 0%, #f7f3ff 55%, #f3f8ff 100%);
+  box-shadow: 0 22px 50px rgba(143, 127, 190, 0.2);
+}
+
+.report-dialog h3 {
+  margin: 0;
+  font-size: 20px;
+  color: #41366d;
+}
+
+.report-dialog-desc {
+  margin: -4px 0 2px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #776ea0;
+}
+
+.report-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.report-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #61548f;
 }
 
 .report-dialog .toolbar-select,
 .report-dialog .notice-input {
-  border: 1px solid #d8cffa;
-  border-radius: 10px;
-  padding: 10px 12px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: block;
+  border: 1px solid #ddd2ff;
+  border-radius: 14px;
+  padding: 11px 14px;
   font-size: 14px;
+  color: #4e4573;
+  background: #ffffff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 6px 16px rgba(164, 146, 210, 0.1);
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.report-dialog .toolbar-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, #8f80d8 50%),
+    linear-gradient(135deg, #8f80d8 50%, transparent 50%),
+    linear-gradient(145deg, #ffffff 0%, #f6f2ff 100%);
+  background-position: calc(100% - 18px) calc(50% - 2px),
+    calc(100% - 12px) calc(50% - 2px), 0 0;
+  background-size: 6px 6px, 6px 6px, 100% 100%;
+  background-repeat: no-repeat;
+  padding-right: 36px;
+}
+
+.report-dialog .toolbar-select option {
+  background: #f8f4ff;
+  color: #4f4675;
+}
+
+.report-dialog .toolbar-select option:checked {
+  background: #d7c8ff;
+  color: #2f2950;
 }
 
 .report-dialog .notice-input {
-  min-height: 100px;
+  min-height: 110px;
+  line-height: 1.55;
   resize: vertical;
+}
+
+.report-dialog .toolbar-select:focus,
+.report-dialog .notice-input:focus {
+  border-color: #b7a4ff;
+  box-shadow: 0 0 0 4px rgba(183, 164, 255, 0.18),
+    0 10px 22px rgba(162, 144, 210, 0.18);
 }
 
 .report-actions {
@@ -909,6 +1014,7 @@ const submitReport = async () => {
 @media (max-width: 980px) {
   .detail-top {
     grid-template-columns: minmax(0, 1fr);
+    min-height: auto;
   }
 
   .summary-title {
@@ -922,7 +1028,7 @@ const submitReport = async () => {
 
 @media (max-width: 680px) {
   .detail-main {
-    padding: 20px 14px 36px;
+    padding: 12px 14px 16px;
   }
 
   .gallery-wrap {
@@ -945,3 +1051,4 @@ const submitReport = async () => {
   }
 }
 </style>
+

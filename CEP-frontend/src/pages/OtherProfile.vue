@@ -2,8 +2,6 @@
   <div class="other-profile-page">
     <main class="other-profile-main">
       <section class="seller-hero card">
-        <div class="seller-cover"></div>
-
         <div class="seller-hero__content">
           <div class="seller-info-wrap">
             <img
@@ -22,10 +20,8 @@
                 >
               </div>
               <p class="seller-stats">
-                {{ seller.city }} ｜ {{ seller.fans }}粉丝 ｜
-                {{ seller.following }}关注
+                {{ seller.fans }}粉丝 ｜ {{ seller.following }}关注
               </p>
-              <p class="seller-intro">{{ seller.bio }}</p>
             </div>
           </div>
 
@@ -43,7 +39,8 @@
             type="button"
             @click="activeTab = 'goods'"
           >
-            宝贝 <span>{{ seller.items.length }}</span>
+            <span class="seller-tab__label">已发布</span>
+            <span>{{ seller.items.length }}</span>
           </button>
           <button
             :class="[
@@ -53,7 +50,8 @@
             type="button"
             @click="activeTab = 'review'"
           >
-            信用及评价 <span>{{ seller.reviews.length }}</span>
+            <span class="seller-tab__label">信用及评价</span>
+            <span>{{ seller.reviews.length }}</span>
           </button>
         </div>
       </section>
@@ -122,6 +120,10 @@
             v-for="goods in displayedGoods"
             :key="goods.id"
             class="goods-card"
+            role="button"
+            tabindex="0"
+            @click="goToItemDetail(goods.id)"
+            @keydown.enter="goToItemDetail(goods.id)"
           >
             <img
               :src="goods.image"
@@ -150,29 +152,38 @@
           <h3>信用及评价</h3>
         </div>
 
-        <article
-          v-for="review in seller.reviews"
-          :key="review.id"
-          class="review-item"
-        >
-          <div class="review-item__top">
-            <img
-              class="review-avatar"
-              :src="review.avatar"
-              :alt="review.user"
-            />
-            <div class="review-main">
-              <p class="review-user">{{ review.user }}</p>
-              <p class="review-content">
-                <span class="review-tag">{{
-                  getReviewTagText(review.tag)
-                }}</span>
-                {{ review.content }}
-              </p>
-              <p class="review-time">{{ review.time }}</p>
+        <div class="review-list-scroll">
+          <article
+            v-for="review in seller.reviews"
+            :key="review.id"
+            class="review-item"
+          >
+            <div class="review-item__top">
+              <img
+                class="review-avatar"
+                :src="review.avatar"
+                :alt="review.user"
+              />
+              <div class="review-main">
+                <div class="review-user-row">
+                  <p class="review-user">{{ review.user }}</p>
+                  <span class="review-identity">{{ review.identity }}</span>
+                </div>
+                <div class="review-content-row">
+                  <span class="review-tag">{{
+                    getReviewTagText(review.tag)
+                  }}</span>
+                  <p class="review-content">{{ review.content }}</p>
+                </div>
+                <p class="review-time">{{ review.time }}</p>
+              </div>
             </div>
+          </article>
+
+          <div v-if="seller.reviews.length === 0" class="empty-state">
+            暂无评价
           </div>
-        </article>
+        </div>
       </section>
     </main>
   </div>
@@ -180,7 +191,7 @@
 
 <script setup>
 import { computed, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import {
   fetchOtherProfileItems,
@@ -191,6 +202,7 @@ import {
 } from "../service/profile/profileApiService";
 
 const route = useRoute();
+const router = useRouter();
 
 const activeTab = ref("goods");
 const activeStatus = ref("all");
@@ -200,10 +212,8 @@ const seller = ref({
   id: null,
   name: "校园卖家",
   avatar: "",
-  city: "未填写校区",
   fans: 0,
   following: 0,
-  bio: "该用户暂未填写简介",
   sellerCredit: "良好",
   buyerCredit: "良好",
   items: [],
@@ -273,16 +283,8 @@ const loadOtherProfile = async () => {
         typeof overview?.avatar === "string" && overview.avatar.trim()
           ? overview.avatar.trim()
           : "",
-      city:
-        typeof overview?.city === "string" && overview.city.trim()
-          ? overview.city.trim()
-          : "未填写校区",
       fans: Number.isInteger(overview?.fans) ? overview.fans : 0,
       following: Number.isInteger(overview?.following) ? overview.following : 0,
-      bio:
-        typeof overview?.bio === "string" && overview.bio.trim()
-          ? overview.bio.trim()
-          : "该用户暂未填写简介",
       sellerCredit:
         typeof overview?.sellerCredit === "string" &&
         overview.sellerCredit.trim()
@@ -308,6 +310,10 @@ const loadOtherProfile = async () => {
           typeof review?.user === "string" && review.user.trim()
             ? review.user.trim()
             : "校园用户",
+        identity:
+          typeof review?.identity === "string" && review.identity.trim()
+            ? review.identity.trim()
+            : "交易方",
         time: typeof review?.time === "string" ? review.time : "",
         tag: typeof review?.tag === "string" ? review.tag : "好评",
         avatar: typeof review?.avatar === "string" ? review.avatar : "",
@@ -353,57 +359,64 @@ const toggleFollow = async () => {
 };
 
 const getReviewTagText = (tag) => (tag === "差评" ? "😞 差评" : "🥰 好评");
+
+const goToItemDetail = (id) => {
+  const itemId = Number(id);
+  if (!Number.isInteger(itemId) || itemId <= 0) {
+    ElMessage.warning("商品信息异常，暂时无法打开详情");
+    return;
+  }
+  const resolved = router.resolve(`/item/${itemId}`);
+  window.open(resolved.href, "_blank");
+};
 </script>
 
 <style scoped>
 .other-profile-page {
   min-height: 100vh;
-  background: #f5f7fb;
-  color: #1f2933;
+  background: #f7f8fc;
+  color: #2c2f45;
 }
 
 .other-profile-main {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 14px 20px 28px;
+  padding: 28px 24px 40px;
 }
 
 .card {
   background: #ffffff;
-  border-radius: 16px;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  border-radius: 26px;
+  box-shadow: 0 14px 38px rgba(140, 124, 240, 0.11);
 }
 
 .seller-hero {
-  border-radius: 16px 16px 0 0;
+  border-radius: 26px 26px 0 0;
   overflow: hidden;
-  background: linear-gradient(90deg, #eff6ff 0%, #dbeafe 100%);
-}
-
-.seller-cover {
-  height: 140px;
-  background: transparent;
+  background: #ffffff;
+  position: relative;
 }
 
 .seller-hero__content {
-  margin-top: -86px;
-  padding: 0 18px 12px;
+  margin-top: 0;
+  padding: 18px 24px 18px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 14px;
+  gap: 20px;
 }
 
 .seller-info-wrap {
   display: flex;
-  gap: 16px;
+  gap: 18px;
 }
 
 .seller-avatar {
-  width: 96px;
-  height: 96px;
+  width: 108px;
+  height: 108px;
   border-radius: 50%;
-  border: 4px solid #ffffff;
+  border: 5px solid #ffffff;
+  box-shadow: 0 8px 20px rgba(140, 124, 240, 0.16);
   object-fit: cover;
 }
 
@@ -418,57 +431,70 @@ const getReviewTagText = (tag) => (tag === "差评" ? "😞 差评" : "🥰 好�
   margin: 0;
   font-size: 30px;
   line-height: 1.05;
+  color: #232640;
 }
 
 .seller-badge {
-  padding: 3px 10px;
+  padding: 4px 12px;
   border-radius: 999px;
-  background: #dbeafe;
+  background: #ece6ff;
   font-size: 13px;
   font-weight: 700;
-  color: #1d4ed8;
+  color: #6f5dd9;
 }
 
 .seller-stats {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   font-size: 16px;
-  color: #475569;
-}
-
-.seller-intro {
-  margin: 8px 0 0;
-  max-width: 920px;
-  font-size: 16px;
-  color: #374151;
+  color: #616587;
 }
 
 .follow-btn {
-  margin-top: 14px;
-  border: 1px solid #2563eb;
+  margin-top: 16px;
+  border: none;
   border-radius: 999px;
-  padding: 10px 30px;
-  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  padding: 11px 34px;
+  background: #8c7cf0;
   color: #ffffff;
   font-size: 18px;
   font-weight: 700;
   cursor: pointer;
+  box-shadow: 0 10px 20px rgba(140, 124, 240, 0.28);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.follow-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgba(140, 124, 240, 0.32);
 }
 
 .seller-tabs {
   display: flex;
-  gap: 26px;
-  border-top: 1px solid #e5e7eb;
-  padding: 14px 18px 0;
-  background: #ffffff;
+  gap: 30px;
+  border-top: none;
+  padding: 16px 24px 0;
+  background: transparent;
 }
 
 .seller-tab {
-  border: none;
-  background: transparent;
-  color: #475569;
-  font-size: 20px;
-  padding: 8px 0 14px;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.2;
+  color: #707492;
+  font-size: 20px !important;
+  padding: 8px 0 16px;
   cursor: pointer;
+}
+
+.seller-tab__label {
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
 }
 
 .seller-tab span {
@@ -476,25 +502,42 @@ const getReviewTagText = (tag) => (tag === "差评" ? "😞 差评" : "🥰 好�
 }
 
 .seller-tab--active {
-  color: #1d4ed8;
+  color: #6f5dd9;
   font-weight: 800;
-  border-bottom: 4px solid #2563eb;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
 }
 
 .goods-panel,
 .review-panel {
   margin-top: 0;
-  padding: 16px;
-  background: #ffffff;
-  border-radius: 0 0 16px 16px;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  padding: 22px;
+  background: #fcfbff;
+  border-radius: 0 0 26px 26px;
+  box-shadow: 0 14px 38px rgba(140, 124, 240, 0.11);
+}
+
+.review-panel {
+  height: calc(100vh - 230px);
+  min-height: 380px;
+  display: flex;
+  flex-direction: column;
+}
+
+.review-list-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .goods-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: 22px;
   position: relative;
 }
 
@@ -504,19 +547,19 @@ const getReviewTagText = (tag) => (tag === "差评" ? "😞 差评" : "🥰 好�
 }
 
 .status-chip {
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  background: #f3f4f6;
-  color: #1f2937;
+  border: 1px solid #ece8ff;
+  border-radius: 14px;
+  background: #f8f5ff;
+  color: #545a80;
   font-size: 15px;
-  padding: 8px 14px;
+  padding: 9px 16px;
   cursor: pointer;
 }
 
 .status-chip--active {
-  background: #e5edff;
-  border-color: #93c5fd;
-  color: #1d4ed8;
+  background: #e9e2ff;
+  border-color: #c6b9ff;
+  color: #6f5dd9;
   font-weight: 700;
 }
 
@@ -526,18 +569,18 @@ const getReviewTagText = (tag) => (tag === "差评" ? "😞 差评" : "🥰 好�
 }
 
 .sort-btn {
-  border: 1px solid #dbeafe;
+  border: 1px solid #e8e3ff;
   border-radius: 999px;
-  padding: 7px 14px;
+  padding: 8px 15px;
   font-size: 14px;
-  color: #1d4ed8;
-  background: #ffffff;
+  color: #6f5dd9;
+  background: #f8f5ff;
   cursor: pointer;
 }
 
 .sort-btn--active {
-  background: #e5edff;
-  border-color: #93c5fd;
+  background: #ece6ff;
+  border-color: #c6b9ff;
   font-weight: 700;
 }
 
@@ -548,9 +591,17 @@ const getReviewTagText = (tag) => (tag === "差评" ? "😞 差评" : "🥰 好�
 }
 
 .goods-card {
-  border-radius: 12px;
+  border-radius: 18px;
   overflow: hidden;
   background: #ffffff;
+  box-shadow: 0 10px 26px rgba(140, 124, 240, 0.09);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.goods-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(140, 124, 240, 0.16);
 }
 
 .goods-card__image {
@@ -561,7 +612,7 @@ const getReviewTagText = (tag) => (tag === "差评" ? "😞 差评" : "🥰 好�
 }
 
 .goods-card__body {
-  padding: 8px;
+  padding: 11px;
 }
 
 .goods-card__title {
@@ -579,12 +630,12 @@ const getReviewTagText = (tag) => (tag === "差评" ? "😞 差评" : "🥰 好�
 }
 
 .goods-card__price {
-  color: #ef4444;
+  color: #f06f72;
   font-weight: 700;
 }
 
 .goods-card__status {
-  color: #6b7280;
+  color: #8085a7;
   font-size: 13px;
 }
 
@@ -592,6 +643,7 @@ const getReviewTagText = (tag) => (tag === "差评" ? "😞 差评" : "🥰 好�
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 10px;
 }
 
 .review-header h3 {
@@ -601,8 +653,8 @@ const getReviewTagText = (tag) => (tag === "差评" ? "😞 差评" : "🥰 好�
 
 .review-item {
   margin-top: 0;
-  border-bottom: 1px solid #e5e7eb;
-  padding: 12px 0;
+  border-bottom: 1px solid #efebff;
+  padding: 14px 0;
   background: transparent;
 }
 
@@ -627,6 +679,23 @@ const getReviewTagText = (tag) => (tag === "差评" ? "😞 差评" : "🥰 好�
   flex: 1;
 }
 
+.review-user-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.review-identity {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: #f1ecff;
+  color: #6d5bb1;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+}
+
 .review-user {
   margin: 0;
   font-size: 14px;
@@ -635,32 +704,38 @@ const getReviewTagText = (tag) => (tag === "差评" ? "😞 差评" : "🥰 好�
 
 .review-time {
   margin: 6px 0 0;
-  color: #6b7280;
+  color: #8085a7;
   font-size: 12px;
 }
 
 .review-tag {
-  margin-right: 8px;
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  background: #e5edff;
-  color: #1d4ed8;
+  background: #ece6ff;
+  color: #6f5dd9;
   font-size: 12px;
   font-weight: 700;
   padding: 3px 9px;
 }
 
+.review-content-row {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .review-content {
-  margin: 8px 0 0;
-  color: #374151;
+  margin: 0;
+  color: #4d5378;
   line-height: 1.55;
 }
 
 .empty-state {
   padding: 14px 0;
   text-align: center;
-  color: #6b7280;
+  color: #8489ab;
 }
 
 @media (max-width: 1120px) {
@@ -671,11 +746,11 @@ const getReviewTagText = (tag) => (tag === "差评" ? "😞 差评" : "🥰 好�
 
 @media (max-width: 820px) {
   .other-profile-main {
-    padding: 12px;
+    padding: 14px;
   }
 
   .seller-hero__content {
-    margin-top: -72px;
+    margin-top: 0;
     flex-direction: column;
   }
 
@@ -688,8 +763,7 @@ const getReviewTagText = (tag) => (tag === "差评" ? "😞 差评" : "🥰 好�
     font-size: 24px;
   }
 
-  .seller-stats,
-  .seller-intro {
+  .seller-stats {
     font-size: 14px;
   }
 

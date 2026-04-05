@@ -117,7 +117,7 @@ public class AdminRepository {
                 SELECT
                     u.id,
                     COALESCE(NULLIF(u.username, ''), u.email) AS display_name,
-                    p.note AS phone,
+                    '' AS phone,
                     u.email,
                     u.created_at,
                     CASE WHEN u.status = 'DISABLED' THEN 1 ELSE 0 END AS disabled,

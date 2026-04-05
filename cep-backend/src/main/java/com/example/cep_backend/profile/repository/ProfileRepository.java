@@ -51,6 +51,7 @@ public class ProfileRepository {
                 rs.getLong("id"),
                 rs.getString("rater_name"),
                 rs.getString("rater_avatar"),
+                rs.getString("rater_identity"),
                 rs.getString("rating"),
                 rs.getString("content"),
                 createdAt.format(DateTimeFormatter.ISO_LOCAL_DATE));
@@ -114,6 +115,11 @@ public class ProfileRepository {
                     r.id,
                     COALESCE(NULLIF(u.username, ''), '校园用户') AS rater_name,
                     up.avatar_url AS rater_avatar,
+                    CASE
+                        WHEN UPPER(r.target_role) = 'SELLER' THEN '买家'
+                        WHEN UPPER(r.target_role) = 'BUYER' THEN '卖家'
+                        ELSE '交易方'
+                    END AS rater_identity,
                     r.rating,
                     r.content,
                     r.created_at
@@ -255,8 +261,6 @@ public class ProfileRepository {
                 SELECT
                     COALESCE(NULLIF(u.username, ''), '校园用户') AS username,
                     up.avatar_url,
-                    COALESCE(NULLIF(up.campus, ''), '未填写校区') AS city,
-                    COALESCE(NULLIF(up.note, ''), '该用户暂未填写简介') AS bio,
                     (SELECT COUNT(1) FROM user_follows uf WHERE uf.target_user_id = u.id) AS fans,
                     (SELECT COUNT(1) FROM user_follows uf WHERE uf.user_id = u.id) AS following
                 FROM users u
@@ -266,8 +270,6 @@ public class ProfileRepository {
         List<OtherProfileBaseInfo> list = jdbcTemplate.query(sql, (rs, rowNum) -> new OtherProfileBaseInfo(
                 rs.getString("username"),
                 rs.getString("avatar_url"),
-                rs.getString("city"),
-                rs.getString("bio"),
                 rs.getLong("fans"),
                 rs.getLong("following")), userId);
         return list.isEmpty() ? null : list.getFirst();
@@ -394,7 +396,7 @@ public class ProfileRepository {
     public record ProfileBaseInfo(String username, String avatar, long fans, long following) {
     }
 
-    public record OtherProfileBaseInfo(String username, String avatar, String city, String bio, long fans,
+    public record OtherProfileBaseInfo(String username, String avatar, long fans,
             long following) {
     }
 

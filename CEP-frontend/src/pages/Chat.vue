@@ -170,12 +170,10 @@
                   <button
                     class="review-invite-btn"
                     type="button"
-                    :disabled="message.reviewStatus === 'SUBMITTED'"
+                    :disabled="!canClickReviewInvite(message)"
                     @click="goToReview(message.reviewOrderId)"
                   >
-                    {{
-                      message.reviewStatus === "SUBMITTED" ? "已评价" : "去评价"
-                    }}
+                    {{ getReviewInviteButtonText(message) }}
                   </button>
                 </div>
                 <time class="message-time">{{ message.time }}</time>
@@ -516,6 +514,34 @@ const isReviewInvite = (message) =>
   message?.messageType === "REVIEW_INVITE" &&
   Number.isInteger(message?.reviewOrderId) &&
   message.reviewOrderId > 0;
+
+const canClickReviewInvite = (message) => {
+  if (!isReviewInvite(message)) {
+    return false;
+  }
+  if (message.from === "self") {
+    return false;
+  }
+  if (message.reviewStatus === "SUBMITTED") {
+    return false;
+  }
+  return (
+    typeof message.reviewStatus === "string" && message.reviewStatus.trim()
+  );
+};
+
+const getReviewInviteButtonText = (message) => {
+  if (message?.reviewStatus === "SUBMITTED") {
+    return "已评价";
+  }
+  if (message?.from === "self") {
+    return "仅对方可评";
+  }
+  if (!message?.reviewStatus) {
+    return "暂不可评";
+  }
+  return "去评价";
+};
 
 const goToReview = (orderId) => {
   if (!Number.isInteger(orderId) || orderId <= 0) {

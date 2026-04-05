@@ -107,10 +107,8 @@ public class ProfileService {
                 targetUserId,
                 baseInfo.avatar(),
                 baseInfo.username(),
-                baseInfo.city(),
                 baseInfo.fans(),
                 baseInfo.following(),
-                baseInfo.bio(),
                 resolveCreditLabel(sellerStats),
                 resolveCreditLabel(buyerStats),
                 followed);
@@ -261,6 +259,7 @@ public class ProfileService {
                 item.id(),
                 item.user(),
                 item.avatar(),
+                item.identity(),
                 item.rating(),
                 item.content(),
                 item.time(),

@@ -105,20 +105,33 @@ public class ReviewRepository {
             updateConversationLastInvite(conversationId, now);
         }
 
-        if (conversationId != null && !existsInviteMessage(orderId)) {
-            insertInviteMessage(conversationId, sellerUserId, orderId, now);
+        if (conversationId != null) {
+            boolean sellerInviteExists = existsInviteMessage(orderId, sellerUserId);
+            boolean buyerInviteExists = existsInviteMessage(orderId, buyerUserId);
+
+            if (!sellerInviteExists) {
+                insertInviteMessage(conversationId, sellerUserId, orderId, now);
+            }
+            if (!buyerInviteExists) {
+                insertInviteMessage(conversationId, buyerUserId, orderId, now);
+            }
+
+            if (!sellerInviteExists || !buyerInviteExists) {
+                updateConversationLastInvite(conversationId, now);
+            }
         }
     }
 
-    private boolean existsInviteMessage(Long orderId) {
+    private boolean existsInviteMessage(Long orderId, Long senderUserId) {
         String sql = """
                 SELECT COUNT(1)
                 FROM message_records
                 WHERE message_type = 'REVIEW_INVITE'
                   AND biz_type = 'TRADE_ORDER_REVIEW'
                   AND biz_id = ?
+                  AND sender_user_id = ?
                 """;
-        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, orderId);
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, orderId, senderUserId);
         return count != null && count > 0;
     }
 

@@ -116,7 +116,13 @@
               v-for="(item, index) in heroCarouselItems"
               :key="item.id || index"
             >
-              <div class="home-hero-showcase__slide">
+              <div
+                :class="[
+                  'home-hero-showcase__slide',
+                  item.detailId ? '' : 'home-hero-showcase__slide--disabled',
+                ]"
+                @click="goToHeroItemDetail(item)"
+              >
                 <img
                   v-if="item.photoUrl"
                   :src="item.photoUrl"
@@ -217,7 +223,9 @@
                   >
                     <el-icon><UserFilled /></el-icon>
                   </el-avatar>
-                  <span class="item-card__seller-name">{{ item.sellerName }}</span>
+                  <span class="item-card__seller-name">{{
+                    item.sellerName
+                  }}</span>
                   <span class="item-card__credit-level"
                     >卖家信用{{ item.sellerCredit }}</span
                   >
@@ -1053,13 +1061,20 @@ const heroCarouselItems = computed(() => {
   const validItems = source
     .filter((item) => item && (item.photoUrl || item.title || item.desc))
     .slice(0, 5)
-    .map((item, index) => ({
-      id: item.id ?? `hero-${index}`,
-      title: item.title || "校园精选福利",
-      price: item.price ?? "0.00",
-      desc: item.desc || "精选好物限时推荐，欢迎点击查看详情。",
-      photoUrl: item.photoUrl || "",
-    }));
+    .map((item, index) => {
+      const parsedDetailId = Number(item?.id);
+      return {
+        id: item.id ?? `hero-${index}`,
+        detailId:
+          Number.isInteger(parsedDetailId) && parsedDetailId > 0
+            ? parsedDetailId
+            : null,
+        title: item.title || "校园精选福利",
+        price: item.price ?? "0.00",
+        desc: item.desc || "精选好物限时推荐，欢迎点击查看详情。",
+        photoUrl: item.photoUrl || "",
+      };
+    });
 
   if (validItems.length > 0) {
     return validItems;
@@ -1068,6 +1083,7 @@ const heroCarouselItems = computed(() => {
   return [
     {
       id: "hero-fallback-1",
+      detailId: null,
       title: "校园精选福利",
       price: "29.90",
       desc: "福利专区每日上新，覆盖学习与生活必备好物。",
@@ -1080,6 +1096,7 @@ const heroCurrentItem = computed(() => {
   const list = heroCarouselItems.value;
   if (!list.length) {
     return {
+      detailId: null,
       title: "校园精选福利",
       price: "0.00",
       desc: "暂无推荐商品",
@@ -1463,6 +1480,14 @@ const applyOpsListMode = async () => {
 
 const handleHeroCarouselChange = (index) => {
   heroActiveIndex.value = Number.isFinite(index) ? index : 0;
+};
+
+const goToHeroItemDetail = (item) => {
+  const detailId = Number(item?.detailId);
+  if (!Number.isInteger(detailId) || detailId <= 0) {
+    return;
+  }
+  goToItemDetail(detailId);
 };
 
 const selectCategory = async (id) => {
@@ -2204,6 +2229,11 @@ watch(
   justify-content: center;
   padding: 0;
   box-sizing: border-box;
+  cursor: pointer;
+}
+
+.home-hero-showcase__slide--disabled {
+  cursor: default;
 }
 
 .home-hero-showcase__image {

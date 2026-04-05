@@ -2,8 +2,10 @@
   <div class="support-page">
     <main class="support-main card">
       <header class="support-header">
-        <button class="back-btn" type="button" @click="goBack">←</button>
-        <h2>在线客服</h2>
+        <div>
+          <h2>在线客服</h2>
+          <p class="support-subtitle">有问题随时留言，我们会尽快回复</p>
+        </div>
       </header>
 
       <section ref="messageListRef" class="message-list">
@@ -21,22 +23,71 @@
           ]"
         >
           <div class="message-bubble">
-            <p class="message-text">{{ msg.content }}</p>
+            <img
+              v-if="getMessageImageUrl(msg.content)"
+              :src="getMessageImageUrl(msg.content)"
+              alt="消息图片"
+              class="message-image"
+            />
+            <p v-if="getMessageText(msg.content)" class="message-text">
+              {{ getMessageText(msg.content) }}
+            </p>
             <time class="message-time">{{ msg.time }}</time>
           </div>
         </article>
       </section>
 
       <footer class="composer">
-        <input
-          v-model.trim="draft"
-          class="composer-input"
-          placeholder="在这里输入您的问题试试~"
-          @keydown.enter.exact.prevent="sendMessage"
-        />
-        <button type="button" class="send-btn" @click="sendMessage">
-          发送
-        </button>
+        <div class="composer-tools">
+          <button
+            type="button"
+            class="upload-btn"
+            :disabled="sending"
+            @click="triggerImageSelect"
+          >
+            上传图片
+          </button>
+          <input
+            ref="imageInputRef"
+            class="image-input"
+            type="file"
+            accept="image/*"
+            @change="handleImageChange"
+          />
+          <div v-if="pendingImagePreviewUrl" class="pending-image-box">
+            <img
+              :src="pendingImagePreviewUrl"
+              alt="待发送图片"
+              class="pending-image"
+            />
+            <button
+              type="button"
+              class="pending-image-remove"
+              @click="clearPendingImage"
+            >
+              移除图片
+            </button>
+          </div>
+        </div>
+
+        <div class="composer-row">
+          <input
+            v-model.trim="draft"
+            class="composer-input"
+            placeholder="在这里输入您的问题试试~"
+            :disabled="sending"
+            @keydown.enter.exact.prevent="sendMessage"
+          />
+          <button
+            type="button"
+            class="send-btn"
+            :disabled="sending"
+            @click="sendMessage"
+          >
+            {{ sending ? "发送中" : "发送" }}
+          </button>
+        </div>
+        <p class="composer-tip">支持发送文字与图片，图片将自动上传后发送</p>
       </footer>
     </main>
   </div>
@@ -45,14 +96,13 @@
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { ElMessage } from "element-plus";
-import { useRouter } from "vue-router";
 import {
   fetchMySupportMessages,
   sendMySupportMessage,
 } from "../service/admin/adminApiService";
 import { buildMessageWebSocketUrl } from "../service/chat/chatApiService";
+import { uploadPublishImage } from "../service/publish/publishApiService";
 
-const router = useRouter();
 const loading = ref(false);
 const draft = ref("");
 const messages = ref([]);
@@ -60,6 +110,12 @@ const messageListRef = ref(null);
 const socketRef = ref(null);
 const reconnectTimerRef = ref(null);
 const isManualClose = ref(false);
+const imageInputRef = ref(null);
+const pendingImageFile = ref(null);
+const pendingImagePreviewUrl = ref("");
+const sending = ref(false);
+
+const IMAGE_PREFIX = "【图片】";
 
 const formatTime = (value) => {
   if (!value) return "";
@@ -68,6 +124,43 @@ const formatTime = (value) => {
   const h = String(date.getHours()).padStart(2, "0");
   const m = String(date.getMinutes()).padStart(2, "0");
   return `${h}:${m}`;
+};
+
+const parseMessagePayload = (content) => {
+  const raw = String(content || "").trim();
+  if (!raw) {
+    return { imageUrl: "", text: "" };
+  }
+
+  if (raw.startsWith(IMAGE_PREFIX)) {
+    const lines = raw.split("\n");
+    const imageUrl = lines[0].replace(IMAGE_PREFIX, "").trim();
+    const text = lines.slice(1).join("\n").trim();
+    return { imageUrl, text };
+  }
+
+  const directImageUrlPattern =
+    /^https?:\/\/\S+\.(png|jpe?g|webp|gif|bmp|svg)(\?.*)?$/i;
+  if (directImageUrlPattern.test(raw)) {
+    return { imageUrl: raw, text: "" };
+  }
+
+  return { imageUrl: "", text: raw };
+};
+
+const getMessageImageUrl = (content) => parseMessagePayload(content).imageUrl;
+const getMessageText = (content) => parseMessagePayload(content).text;
+
+const buildMessageContent = (text, imageUrl) => {
+  const safeText = String(text || "").trim();
+  const safeImageUrl = String(imageUrl || "").trim();
+  if (!safeImageUrl) {
+    return safeText;
+  }
+  if (!safeText) {
+    return `${IMAGE_PREFIX}${safeImageUrl}`;
+  }
+  return `${IMAGE_PREFIX}${safeImageUrl}\n${safeText}`;
 };
 
 const pushMessage = (from, content, createdAt, id = null) => {
@@ -84,6 +177,45 @@ const scrollToBottom = async () => {
   const el = messageListRef.value;
   if (!el) return;
   el.scrollTop = el.scrollHeight;
+};
+
+const clearPendingImage = () => {
+  if (pendingImagePreviewUrl.value) {
+    URL.revokeObjectURL(pendingImagePreviewUrl.value);
+  }
+  pendingImageFile.value = null;
+  pendingImagePreviewUrl.value = "";
+  if (imageInputRef.value) {
+    imageInputRef.value.value = "";
+  }
+};
+
+const triggerImageSelect = () => {
+  imageInputRef.value?.click();
+};
+
+const handleImageChange = (event) => {
+  const file = event?.target?.files?.[0];
+  if (!file) {
+    return;
+  }
+
+  if (!file.type || !file.type.startsWith("image/")) {
+    ElMessage.warning("仅支持上传图片");
+    clearPendingImage();
+    return;
+  }
+
+  const maxSize = 8 * 1024 * 1024;
+  if (file.size > maxSize) {
+    ElMessage.warning("图片大小不能超过 8MB");
+    clearPendingImage();
+    return;
+  }
+
+  clearPendingImage();
+  pendingImageFile.value = file;
+  pendingImagePreviewUrl.value = URL.createObjectURL(file);
 };
 
 const loadMessages = async () => {
@@ -153,34 +285,54 @@ const connectWebSocket = async () => {
 };
 
 const sendMessage = async () => {
-  if (!draft.value) {
-    ElMessage.warning("请输入问题内容");
-    return;
-  }
-  const text = draft.value;
-  draft.value = "";
-
-  const socket = socketRef.value;
-  if (socket && socket.readyState === WebSocket.OPEN) {
-    socket.send(
-      JSON.stringify({
-        action: "SEND_SUPPORT_MESSAGE",
-        text,
-      })
-    );
+  if (sending.value) {
     return;
   }
 
+  const text = String(draft.value || "").trim();
+  const imageFile = pendingImageFile.value;
+  if (!text && !imageFile) {
+    ElMessage.warning("请输入问题内容或上传图片");
+    return;
+  }
+
+  sending.value = true;
   try {
-    await sendMySupportMessage(text);
-    pushMessage("self", text, new Date().toISOString());
+    let imageUrl = "";
+    if (imageFile) {
+      const uploadResult = await uploadPublishImage(imageFile);
+      imageUrl = String(
+        uploadResult?.data?.url || uploadResult?.data || ""
+      ).trim();
+      if (!imageUrl) {
+        throw new Error("图片上传失败");
+      }
+    }
+
+    const finalContent = buildMessageContent(text, imageUrl);
+    draft.value = "";
+    clearPendingImage();
+
+    const socket = socketRef.value;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(
+        JSON.stringify({
+          action: "SEND_SUPPORT_MESSAGE",
+          text: finalContent,
+        })
+      );
+      return;
+    }
+
+    await sendMySupportMessage(finalContent);
+    pushMessage("self", finalContent, new Date().toISOString());
     await scrollToBottom();
   } catch (error) {
     ElMessage.error(error.message || "发送失败");
+  } finally {
+    sending.value = false;
   }
 };
-
-const goBack = () => router.back();
 
 onMounted(async () => {
   await loadMessages();
@@ -188,6 +340,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  clearPendingImage();
   if (reconnectTimerRef.value) {
     clearTimeout(reconnectTimerRef.value);
     reconnectTimerRef.value = null;
@@ -203,50 +356,59 @@ onBeforeUnmount(() => {
 <style scoped>
 .support-page {
   min-height: 100vh;
-  background: #f5f7fb;
-  padding: 20px;
+  background: #f5f6fb;
+  padding: 24px;
 }
 
 .card {
-  max-width: 1200px;
+  max-width: 1280px;
   margin: 0 auto;
-  border-radius: 14px;
-  background: #fff;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+  border-radius: 22px;
+  background: #fcfbff;
+  box-shadow: 0 16px 36px rgba(132, 116, 185, 0.14);
+  border: 1px solid #ece6ff;
 }
 
 .support-main {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  min-height: 82vh;
+  min-height: calc(100vh - 48px);
 }
 
 .support-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  border-bottom: 1px solid #eceff5;
-  padding: 14px 18px;
+  justify-content: space-between;
+  border-bottom: 1px solid #ece9f8;
+  padding: 22px 28px 16px;
 }
 
-.back-btn {
-  border: none;
-  background: transparent;
-  font-size: 24px;
-  cursor: pointer;
+.support-header h2 {
+  margin: 0;
+  color: #352d5f;
+  font-size: 40px;
+  line-height: 1.1;
+}
+
+.support-subtitle {
+  margin: 8px 0 0;
+  color: #7c74a6;
+  font-size: 14px;
 }
 
 .message-list {
   overflow: auto;
-  padding: 16px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  background: #faf9ff;
 }
 
 .state-text {
-  color: #64748b;
+  color: #6d6595;
   text-align: center;
+  margin: 24px 0;
 }
 
 .message-item {
@@ -258,19 +420,32 @@ onBeforeUnmount(() => {
 }
 
 .message-bubble {
-  max-width: 65%;
-  border-radius: 12px;
+  max-width: min(72%, 620px);
+  border-radius: 16px;
   padding: 10px 12px;
-  background: #eef2ff;
+  background: #f1ebff;
+  border: 1px solid #e4dbff;
+  box-shadow: 0 8px 18px rgba(143, 125, 197, 0.12);
 }
 
 .message-item--self .message-bubble {
-  background: #e8f8ee;
+  background: #fff3df;
+  border-color: #ffe1b8;
+}
+
+.message-image {
+  max-width: 280px;
+  width: 100%;
+  border-radius: 12px;
+  display: block;
+  object-fit: cover;
+  margin-bottom: 8px;
 }
 
 .message-text {
   margin: 0;
-  color: #0f172a;
+  color: #312b52;
+  line-height: 1.6;
   word-break: break-word;
 }
 
@@ -278,29 +453,133 @@ onBeforeUnmount(() => {
   display: block;
   margin-top: 6px;
   font-size: 12px;
-  color: #64748b;
+  color: #837bab;
 }
 
 .composer {
-  border-top: 1px solid #eceff5;
-  padding: 12px 18px;
+  border-top: 1px solid #ece9f8;
+  padding: 12px 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #fbfaff;
+}
+
+.composer-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.upload-btn {
+  border: 1px solid #cfc3ff;
+  background: #efe9ff;
+  color: #5a4e92;
+  border-radius: 12px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.image-input {
+  display: none;
+}
+
+.pending-image-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 12px;
+  border: 1px solid #ddd2ff;
+  background: #ffffff;
+  padding: 6px 8px;
+}
+
+.pending-image {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.pending-image-remove {
+  border: 1px solid #edd8d8;
+  background: #fff2f2;
+  color: #995a5a;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.composer-row {
   display: flex;
   gap: 10px;
 }
 
 .composer-input {
   flex: 1;
-  border: 1px solid #d6dbe7;
+  border: 1px solid #d9cfff;
   border-radius: 999px;
-  padding: 10px 14px;
+  padding: 11px 14px;
+  font-size: 14px;
+  color: #3f3565;
+  background: #ffffff;
+}
+
+.composer-input:focus {
+  outline: none;
+  border-color: #b9a5ff;
+  box-shadow: 0 0 0 3px rgba(185, 165, 255, 0.2);
 }
 
 .send-btn {
   border: none;
-  background: #ffb56c;
-  color: #fff;
+  background: #f6ad62;
+  color: #ffffff;
   border-radius: 999px;
-  padding: 10px 20px;
+  padding: 10px 22px;
   cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.upload-btn:disabled,
+.send-btn:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.composer-tip {
+  margin: 0;
+  font-size: 12px;
+  color: #8d86af;
+}
+
+@media (max-width: 760px) {
+  .support-page {
+    padding: 10px;
+  }
+
+  .support-main {
+    min-height: calc(100vh - 20px);
+  }
+
+  .support-header {
+    padding: 16px;
+  }
+
+  .support-header h2 {
+    font-size: 30px;
+  }
+
+  .message-bubble {
+    max-width: 86%;
+  }
+
+  .composer {
+    padding: 10px;
+  }
 }
 </style>

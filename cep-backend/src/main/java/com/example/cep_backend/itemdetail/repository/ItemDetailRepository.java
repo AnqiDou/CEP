@@ -35,10 +35,9 @@ public class ItemDetailRepository {
             rs.getBigDecimal("original_price"),
             rs.getObject("publisher_id", Long.class),
             rs.getString("publisher_name"),
-            rs.getString("publisher_college"),
-            rs.getString("publisher_campus"),
-            rs.getBigDecimal("publisher_credit"),
-            rs.getString("publisher_note"));
+            rs.getString("publisher_avatar"),
+            rs.getObject("publisher_good_count", Integer.class),
+            rs.getObject("publisher_bad_count", Integer.class));
 
     public ItemDetailRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
@@ -65,10 +64,21 @@ public class ItemDetailRepository {
                     d.original_price,
                     u.id AS publisher_id,
                     COALESCE(NULLIF(u.username, ''), '校园用户') AS publisher_name,
-                    up.college AS publisher_college,
-                    up.campus AS publisher_campus,
-                    up.credit_score AS publisher_credit,
-                    up.note AS publisher_note
+                    up.avatar_url AS publisher_avatar,
+                    (
+                        SELECT COUNT(1)
+                        FROM user_credit_reviews r
+                        WHERE r.target_user_id = u.id
+                          AND r.target_role = 'SELLER'
+                          AND r.rating = 'good'
+                    ) AS publisher_good_count,
+                    (
+                        SELECT COUNT(1)
+                        FROM user_credit_reviews r
+                        WHERE r.target_user_id = u.id
+                          AND r.target_role = 'SELLER'
+                          AND r.rating = 'bad'
+                    ) AS publisher_bad_count
                 FROM items i
                 INNER JOIN item_categories c ON c.id = i.category_id
                 LEFT JOIN item_details d ON d.item_id = i.id

@@ -297,7 +297,7 @@ public class PublishService {
 
     private LocalDate normalizePurchaseDate(LocalDate purchaseDate) {
         if (purchaseDate == null) {
-            return LocalDate.now();
+            return null;
         }
         if (purchaseDate.isAfter(LocalDate.now())) {
             throw new BusinessException("购买时间不能晚于当前日期");

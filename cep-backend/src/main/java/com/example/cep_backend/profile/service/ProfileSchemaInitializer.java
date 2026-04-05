@@ -62,9 +62,7 @@ public class ProfileSchemaInitializer {
                     id BIGINT AUTO_INCREMENT PRIMARY KEY,
                     user_id BIGINT NOT NULL UNIQUE,
                     college VARCHAR(80) NULL,
-                    campus VARCHAR(50) NULL,
                     credit_score DECIMAL(3, 1) NULL,
-                    note VARCHAR(200) NULL,
                     avatar_url VARCHAR(500) NULL,
                     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -76,9 +74,41 @@ public class ProfileSchemaInitializer {
     }
 
     private void ensureUserProfilesColumns() throws SQLException {
+        dropColumnIfExists(TABLE_USER_PROFILES, "campus");
+        dropColumnIfExists(TABLE_USER_PROFILES, "note");
         if (!columnExists(TABLE_USER_PROFILES, "avatar_url")) {
             jdbcTemplate.execute("ALTER TABLE user_profiles ADD COLUMN avatar_url VARCHAR(500) NULL");
         }
+    }
+
+    private void dropColumnIfExists(String tableName, String columnName) throws SQLException {
+        if (!columnExists(tableName, columnName)) {
+            return;
+        }
+        try {
+            jdbcTemplate.execute("ALTER TABLE " + tableName + " DROP COLUMN " + columnName);
+        } catch (org.springframework.jdbc.BadSqlGrammarException ex) {
+            if (isDropMissingColumnError(ex, columnName)) {
+                return;
+            }
+            throw ex;
+        }
+    }
+
+    private boolean isDropMissingColumnError(Throwable throwable, String columnName) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof java.sql.SQLSyntaxErrorException sqlException) {
+                String message = sqlException.getMessage();
+                if (message != null
+                        && message.contains("Can't DROP")
+                        && message.toLowerCase(Locale.ROOT).contains(columnName.toLowerCase(Locale.ROOT))) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private void ensureUserFollowsTable() throws SQLException {

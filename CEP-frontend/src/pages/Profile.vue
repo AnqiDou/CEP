@@ -160,7 +160,13 @@
           </div>
         </section>
 
-        <section class="profile-content soft-card">
+        <section
+          :class="[
+            'profile-content',
+            'soft-card',
+            selectedMenu === 'idle' ? 'profile-content--review-fixed' : '',
+          ]"
+        >
           <div class="section-head">
             <div class="section-head__left">
               <h3 class="section-title">{{ currentSection.title }}</h3>
@@ -232,11 +238,14 @@
                 <div class="review-main">
                   <div class="review-user-row">
                     <span class="review-user">{{ item.user }}</span>
+                    <span class="review-identity">{{ item.identity }}</span>
+                  </div>
+                  <div class="review-content-row">
                     <span class="review-tag">
                       {{ item.rating === "good" ? "好评" : "差评" }}
                     </span>
+                    <p class="review-content">{{ item.content }}</p>
                   </div>
-                  <p class="review-content">{{ item.content }}</p>
                   <span class="review-time">{{ item.time }}</span>
                 </div>
               </div>
@@ -1047,6 +1056,7 @@ const applyReviews = (reviewsRes) => {
   reviewList.value = (reviewSummary.reviews || []).map((item) => ({
     id: item.id,
     user: item.user || "校园用户",
+    identity: item.identity || "交易方",
     time: item.time || "",
     rating: item.rating === "bad" ? "bad" : "good",
     avatar: item.avatar || "",
@@ -1433,6 +1443,13 @@ onMounted(async () => {
   min-height: 380px;
 }
 
+.profile-content--review-fixed {
+  height: calc(100vh - 210px);
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+}
+
 .section-head {
   display: flex;
   align-items: center;
@@ -1519,6 +1536,13 @@ onMounted(async () => {
   flex-direction: column;
 }
 
+.profile-content--review-fixed .review-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
 .review-item {
   border-bottom: 1px solid #f1edff;
   padding: 12px 0;
@@ -1554,6 +1578,17 @@ onMounted(async () => {
   gap: 8px;
 }
 
+.review-identity {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: #f1ecff;
+  color: #6d5bb1;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+}
+
 .review-user {
   font-size: 14px;
   font-weight: 600;
@@ -1569,6 +1604,12 @@ onMounted(async () => {
   font-size: 12px;
   font-weight: 700;
   padding: 2px 8px;
+}
+
+.review-content-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .review-time {

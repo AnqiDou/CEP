@@ -49,10 +49,8 @@
     "userId": 5,
     "avatar": "https://xxx/avatar.jpg",
     "username": "王同学",
-    "city": "东校区",
     "fans": 64,
     "following": 9,
-    "bio": "支持当面验货交易",
     "sellerCredit": "优秀",
     "buyerCredit": "良好",
     "followed": true

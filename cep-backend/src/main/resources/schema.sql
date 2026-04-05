@@ -29,31 +29,31 @@ DROP TABLE IF EXISTS user_profiles;
 DROP TABLE IF EXISTS users;
 
 CREATE TABLE users (
-    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
-    email NVARCHAR(100) NOT NULL UNIQUE,
-    username NVARCHAR(50),
-    password_hash NVARCHAR(100) NOT NULL,
-    status NVARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    id BIGINT IDENTITY (1, 1) PRIMARY KEY,
+    email NVARCHAR (100) NOT NULL UNIQUE,
+    username NVARCHAR (50),
+    password_hash NVARCHAR (100) NOT NULL,
+    status NVARCHAR (20) NOT NULL DEFAULT 'ACTIVE',
     created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_login_at DATETIME2 NULL
 );
 
 CREATE TABLE email_verification_codes (
-    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
-    email NVARCHAR(100) NOT NULL,
-    purpose NVARCHAR(30) NOT NULL,
-    code NVARCHAR(6) NOT NULL,
+    id BIGINT IDENTITY (1, 1) PRIMARY KEY,
+    email NVARCHAR (100) NOT NULL,
+    purpose NVARCHAR (30) NOT NULL,
+    code NVARCHAR (6) NOT NULL,
     used BIT NOT NULL DEFAULT 0,
     expires_at DATETIME2 NOT NULL,
     created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE auth_sessions (
-    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
+    id BIGINT IDENTITY (1, 1) PRIMARY KEY,
     user_id BIGINT NOT NULL,
-    refresh_token_hash NVARCHAR(64) NOT NULL UNIQUE,
-    access_token_hash NVARCHAR(64) NOT NULL UNIQUE,
+    refresh_token_hash NVARCHAR (64) NOT NULL UNIQUE,
+    access_token_hash NVARCHAR (64) NOT NULL UNIQUE,
     refresh_expires_at DATETIME2 NOT NULL,
     access_expires_at DATETIME2 NOT NULL,
     revoked BIT NOT NULL DEFAULT 0,
@@ -63,39 +63,37 @@ CREATE TABLE auth_sessions (
 );
 
 CREATE TABLE user_profiles (
-    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
+    id BIGINT IDENTITY (1, 1) PRIMARY KEY,
     user_id BIGINT NOT NULL UNIQUE,
-    college NVARCHAR(80) NULL,
-    campus NVARCHAR(50) NULL,
+    college NVARCHAR (80) NULL,
     credit_score DECIMAL(3, 1) NULL,
-    note NVARCHAR(200) NULL,
-    avatar_url NVARCHAR(500) NULL,
+    avatar_url NVARCHAR (500) NULL,
     created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_user_profiles_user FOREIGN KEY (user_id) REFERENCES users (id)
 );
 
 CREATE TABLE item_categories (
-    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
-    code NVARCHAR(30) NOT NULL UNIQUE,
-    name NVARCHAR(50) NOT NULL,
-    description NVARCHAR(200) NOT NULL,
-    tags NVARCHAR(300) NOT NULL,
+    id BIGINT IDENTITY (1, 1) PRIMARY KEY,
+    code NVARCHAR (30) NOT NULL UNIQUE,
+    name NVARCHAR (50) NOT NULL,
+    description NVARCHAR (200) NOT NULL,
+    tags NVARCHAR (300) NOT NULL,
     sort_order INT NOT NULL DEFAULT 0,
     created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE items (
-    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
+    id BIGINT IDENTITY (1, 1) PRIMARY KEY,
     category_id BIGINT NOT NULL,
     publisher_user_id BIGINT NULL,
-    title NVARCHAR(120) NOT NULL,
-    description NVARCHAR(500) NOT NULL,
+    title NVARCHAR (120) NOT NULL,
+    description NVARCHAR (500) NOT NULL,
     price DECIMAL(10, 2) NOT NULL,
-    campus NVARCHAR(50) NOT NULL,
-    badge NVARCHAR(20) NULL,
-    status NVARCHAR(20) NOT NULL DEFAULT 'PUBLISHED',
+    campus NVARCHAR (50) NOT NULL,
+    badge NVARCHAR (20) NULL,
+    status NVARCHAR (20) NOT NULL DEFAULT 'PUBLISHED',
     view_count INT NOT NULL DEFAULT 0,
     favorite_count INT NOT NULL DEFAULT 0,
     created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -105,24 +103,24 @@ CREATE TABLE items (
 );
 
 CREATE TABLE item_photos (
-    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
+    id BIGINT IDENTITY (1, 1) PRIMARY KEY,
     item_id BIGINT NOT NULL,
-    photo_url NVARCHAR(500) NOT NULL,
+    photo_url NVARCHAR (500) NOT NULL,
     sort_order INT NOT NULL DEFAULT 0,
     created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_item_photos_item FOREIGN KEY (item_id) REFERENCES items (id)
 );
 
 CREATE TABLE item_details (
-    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
+    id BIGINT IDENTITY (1, 1) PRIMARY KEY,
     item_id BIGINT NOT NULL UNIQUE,
     publisher_user_id BIGINT NULL,
     purchase_date DATE NULL,
-    usage_duration NVARCHAR(50) NULL,
-    item_condition NVARCHAR(50) NULL,
-    accessories NVARCHAR(200) NULL,
-    detail_note NVARCHAR(300) NULL,
-    trade_location NVARCHAR(80) NULL,
+    usage_duration NVARCHAR (50) NULL,
+    item_condition NVARCHAR (50) NULL,
+    accessories NVARCHAR (200) NULL,
+    detail_note NVARCHAR (300) NULL,
+    trade_location NVARCHAR (80) NULL,
     original_price DECIMAL(10, 2) NULL,
     created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -131,18 +129,18 @@ CREATE TABLE item_details (
 );
 
 CREATE TABLE trade_orders (
-    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
-    order_no NVARCHAR(40) NOT NULL UNIQUE,
+    id BIGINT IDENTITY (1, 1) PRIMARY KEY,
+    order_no NVARCHAR (40) NOT NULL UNIQUE,
     item_id BIGINT NOT NULL,
     buyer_user_id BIGINT NULL,
     seller_user_id BIGINT NULL,
-    item_title NVARCHAR(120) NOT NULL,
+    item_title NVARCHAR (120) NOT NULL,
     amount DECIMAL(10, 2) NOT NULL,
-    cover_photo_url NVARCHAR(500) NULL,
-    receiver_name NVARCHAR(50) NOT NULL,
-    receiver_phone NVARCHAR(30) NOT NULL,
-    receiver_address NVARCHAR(200) NOT NULL,
-    status NVARCHAR(30) NOT NULL DEFAULT 'PENDING_PAYMENT',
+    cover_photo_url NVARCHAR (500) NULL,
+    receiver_name NVARCHAR (50) NOT NULL,
+    receiver_phone NVARCHAR (30) NOT NULL,
+    receiver_address NVARCHAR (200) NOT NULL,
+    status NVARCHAR (30) NOT NULL DEFAULT 'PENDING_PAYMENT',
     paid_at DATETIME2 NULL,
     created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -152,7 +150,7 @@ CREATE TABLE trade_orders (
 );
 
 CREATE TABLE user_follows (
-    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
+    id BIGINT IDENTITY (1, 1) PRIMARY KEY,
     user_id BIGINT NOT NULL,
     target_user_id BIGINT NOT NULL,
     created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -162,7 +160,7 @@ CREATE TABLE user_follows (
 );
 
 CREATE TABLE user_favorites (
-    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
+    id BIGINT IDENTITY (1, 1) PRIMARY KEY,
     user_id BIGINT NOT NULL,
     item_id BIGINT NOT NULL,
     created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -172,13 +170,13 @@ CREATE TABLE user_favorites (
 );
 
 CREATE TABLE user_credit_reviews (
-    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
+    id BIGINT IDENTITY (1, 1) PRIMARY KEY,
     order_id BIGINT NULL,
     rater_user_id BIGINT NOT NULL,
     target_user_id BIGINT NOT NULL,
-    target_role NVARCHAR(20) NOT NULL,
-    rating NVARCHAR(10) NOT NULL,
-    content NVARCHAR(300) NULL,
+    target_role NVARCHAR (20) NOT NULL,
+    rating NVARCHAR (10) NOT NULL,
+    content NVARCHAR (300) NULL,
     created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_user_credit_reviews_order FOREIGN KEY (order_id) REFERENCES trade_orders (id),
     CONSTRAINT fk_user_credit_reviews_rater FOREIGN KEY (rater_user_id) REFERENCES users (id),
@@ -186,77 +184,76 @@ CREATE TABLE user_credit_reviews (
 );
 
 CREATE TABLE search_keywords (
-    id BIGINT IDENTITY(1, 1) PRIMARY KEY,
-    keyword NVARCHAR(100) NOT NULL UNIQUE,
+    id BIGINT IDENTITY (1, 1) PRIMARY KEY,
+    keyword NVARCHAR (100) NOT NULL UNIQUE,
     search_count BIGINT NOT NULL DEFAULT 0,
     last_searched_at DATETIME2 NULL,
     created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE
-INDEX idx_verification_email_purpose ON email_verification_codes (
+CREATE INDEX idx_verification_email_purpose ON email_verification_codes (
     email,
     purpose,
     created_at DESC
 );
 
-CREATE
-INDEX idx_auth_sessions_user ON auth_sessions (user_id, created_at DESC);
+CREATE INDEX idx_auth_sessions_user ON auth_sessions (user_id, created_at DESC);
 
 CREATE INDEX idx_user_profiles_user ON user_profiles (user_id);
 
-CREATE
-INDEX idx_item_categories_sort ON item_categories (sort_order ASC);
+CREATE INDEX idx_item_categories_sort ON item_categories (sort_order ASC);
 
-CREATE
-INDEX idx_items_filter ON items (
+CREATE INDEX idx_items_filter ON items (
     status,
     category_id,
     created_at DESC,
     price DESC
 );
 
-CREATE
-INDEX idx_items_hot ON items (
+CREATE INDEX idx_items_hot ON items (
     status,
     favorite_count DESC,
     view_count DESC,
     created_at DESC
 );
 
-CREATE
-INDEX idx_items_publisher ON items (publisher_user_id, created_at DESC);
+CREATE INDEX idx_items_publisher ON items (
+    publisher_user_id,
+    created_at DESC
+);
 
-CREATE
-INDEX idx_item_photos_item ON item_photos (item_id, sort_order ASC);
+CREATE INDEX idx_item_photos_item ON item_photos (item_id, sort_order ASC);
 
-CREATE
-INDEX idx_item_details_item ON item_details (item_id, publisher_user_id);
+CREATE INDEX idx_item_details_item ON item_details (item_id, publisher_user_id);
 
-CREATE
-INDEX idx_trade_orders_item ON trade_orders (item_id, created_at DESC);
+CREATE INDEX idx_trade_orders_item ON trade_orders (item_id, created_at DESC);
 
-CREATE
-INDEX idx_trade_orders_status ON trade_orders (status, created_at DESC);
+CREATE INDEX idx_trade_orders_status ON trade_orders (status, created_at DESC);
 
-CREATE
-INDEX idx_trade_orders_buyer ON trade_orders (buyer_user_id, created_at DESC);
+CREATE INDEX idx_trade_orders_buyer ON trade_orders (
+    buyer_user_id,
+    created_at DESC
+);
 
-CREATE
-INDEX idx_trade_orders_seller ON trade_orders (seller_user_id, created_at DESC);
+CREATE INDEX idx_trade_orders_seller ON trade_orders (
+    seller_user_id,
+    created_at DESC
+);
 
-CREATE
-INDEX idx_user_follows_target ON user_follows (target_user_id, created_at DESC);
+CREATE INDEX idx_user_follows_target ON user_follows (
+    target_user_id,
+    created_at DESC
+);
 
-CREATE
-INDEX idx_user_favorites_user ON user_favorites (user_id, created_at DESC);
+CREATE INDEX idx_user_favorites_user ON user_favorites (user_id, created_at DESC);
 
-CREATE
-INDEX idx_user_credit_reviews_target ON user_credit_reviews (target_user_id, created_at DESC);
+CREATE INDEX idx_user_credit_reviews_target ON user_credit_reviews (
+    target_user_id,
+    created_at DESC
+);
 
-CREATE
-INDEX idx_search_keywords_hot ON search_keywords (
+CREATE INDEX idx_search_keywords_hot ON search_keywords (
     search_count DESC,
     updated_at DESC
 );
@@ -373,8 +370,8 @@ VALUES (
         'PUBLISHED',
         142,
         31,
-        DATEADD(HOUR, -1, CURRENT_TIMESTAMP),
-        DATEADD(HOUR, -1, CURRENT_TIMESTAMP)
+        DATEADD (HOUR, -1, CURRENT_TIMESTAMP),
+        DATEADD (HOUR, -1, CURRENT_TIMESTAMP)
     ),
     (
         (
@@ -391,8 +388,8 @@ VALUES (
         'PUBLISHED',
         286,
         57,
-        DATEADD(HOUR, -2, CURRENT_TIMESTAMP),
-        DATEADD(HOUR, -2, CURRENT_TIMESTAMP)
+        DATEADD (HOUR, -2, CURRENT_TIMESTAMP),
+        DATEADD (HOUR, -2, CURRENT_TIMESTAMP)
     ),
     (
         (
@@ -409,8 +406,8 @@ VALUES (
         'PUBLISHED',
         98,
         22,
-        DATEADD(HOUR, -3, CURRENT_TIMESTAMP),
-        DATEADD(HOUR, -3, CURRENT_TIMESTAMP)
+        DATEADD (HOUR, -3, CURRENT_TIMESTAMP),
+        DATEADD (HOUR, -3, CURRENT_TIMESTAMP)
     ),
     (
         (
@@ -427,12 +424,12 @@ VALUES (
         'PUBLISHED',
         167,
         38,
-        DATEADD(
+        DATEADD (
             MINUTE,
             -30,
             CURRENT_TIMESTAMP
         ),
-        DATEADD(
+        DATEADD (
             MINUTE,
             -30,
             CURRENT_TIMESTAMP
@@ -453,12 +450,12 @@ VALUES (
         'PUBLISHED',
         123,
         19,
-        DATEADD(
+        DATEADD (
             MINUTE,
             -15,
             CURRENT_TIMESTAMP
         ),
-        DATEADD(
+        DATEADD (
             MINUTE,
             -15,
             CURRENT_TIMESTAMP
@@ -479,12 +476,12 @@ VALUES (
         'PUBLISHED',
         209,
         41,
-        DATEADD(
+        DATEADD (
             MINUTE,
             -45,
             CURRENT_TIMESTAMP
         ),
-        DATEADD(
+        DATEADD (
             MINUTE,
             -45,
             CURRENT_TIMESTAMP
@@ -505,8 +502,8 @@ VALUES (
         'PUBLISHED',
         88,
         16,
-        DATEADD(HOUR, -4, CURRENT_TIMESTAMP),
-        DATEADD(HOUR, -4, CURRENT_TIMESTAMP)
+        DATEADD (HOUR, -4, CURRENT_TIMESTAMP),
+        DATEADD (HOUR, -4, CURRENT_TIMESTAMP)
     ),
     (
         (
@@ -523,8 +520,8 @@ VALUES (
         'PUBLISHED',
         76,
         11,
-        DATEADD(DAY, -1, CURRENT_TIMESTAMP),
-        DATEADD(DAY, -1, CURRENT_TIMESTAMP)
+        DATEADD (DAY, -1, CURRENT_TIMESTAMP),
+        DATEADD (DAY, -1, CURRENT_TIMESTAMP)
     ),
     (
         (
@@ -541,8 +538,8 @@ VALUES (
         'PUBLISHED',
         61,
         9,
-        DATEADD(HOUR, -6, CURRENT_TIMESTAMP),
-        DATEADD(HOUR, -6, CURRENT_TIMESTAMP)
+        DATEADD (HOUR, -6, CURRENT_TIMESTAMP),
+        DATEADD (HOUR, -6, CURRENT_TIMESTAMP)
     ),
     (
         (
@@ -559,8 +556,8 @@ VALUES (
         'PUBLISHED',
         53,
         7,
-        DATEADD(HOUR, -8, CURRENT_TIMESTAMP),
-        DATEADD(HOUR, -8, CURRENT_TIMESTAMP)
+        DATEADD (HOUR, -8, CURRENT_TIMESTAMP),
+        DATEADD (HOUR, -8, CURRENT_TIMESTAMP)
     );
 
 INSERT INTO
@@ -574,7 +571,7 @@ INSERT INTO
 VALUES (
         '考研资料',
         126,
-        DATEADD(
+        DATEADD (
             MINUTE,
             -20,
             CURRENT_TIMESTAMP
@@ -585,7 +582,7 @@ VALUES (
     (
         '四六级',
         89,
-        DATEADD(
+        DATEADD (
             MINUTE,
             -38,
             CURRENT_TIMESTAMP
@@ -596,7 +593,7 @@ VALUES (
     (
         '平板',
         95,
-        DATEADD(
+        DATEADD (
             MINUTE,
             -12,
             CURRENT_TIMESTAMP
@@ -607,7 +604,7 @@ VALUES (
     (
         '耳机',
         87,
-        DATEADD(
+        DATEADD (
             MINUTE,
             -15,
             CURRENT_TIMESTAMP
@@ -618,7 +615,7 @@ VALUES (
     (
         '自行车',
         73,
-        DATEADD(
+        DATEADD (
             MINUTE,
             -30,
             CURRENT_TIMESTAMP
@@ -629,7 +626,7 @@ VALUES (
     (
         '台灯',
         64,
-        DATEADD(
+        DATEADD (
             MINUTE,
             -24,
             CURRENT_TIMESTAMP
@@ -640,7 +637,7 @@ VALUES (
     (
         '二手手机',
         110,
-        DATEADD(MINUTE, -8, CURRENT_TIMESTAMP),
+        DATEADD (MINUTE, -8, CURRENT_TIMESTAMP),
         CURRENT_TIMESTAMP,
         CURRENT_TIMESTAMP
     );
