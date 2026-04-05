@@ -46,15 +46,21 @@ export const fetchPublishedItems = async () =>
     headers: await withAuthHeaders(),
   });
 
-export const fetchSoldItems = async () =>
-  requestJson(`${PROFILE_API_BASE}/trades/sold`, {
-    headers: await withAuthHeaders(),
-  });
+export const fetchSoldItems = async (status = "all") =>
+  requestJson(
+    `${PROFILE_API_BASE}/trades/sold?status=${encodeURIComponent(status)}`,
+    {
+      headers: await withAuthHeaders(),
+    },
+  );
 
-export const fetchBoughtItems = async () =>
-  requestJson(`${PROFILE_API_BASE}/trades/bought`, {
-    headers: await withAuthHeaders(),
-  });
+export const fetchBoughtItems = async (status = "all") =>
+  requestJson(
+    `${PROFILE_API_BASE}/trades/bought?status=${encodeURIComponent(status)}`,
+    {
+      headers: await withAuthHeaders(),
+    },
+  );
 
 export const fetchFavoriteItems = async () =>
   requestJson(`${PROFILE_API_BASE}/favorites`, {

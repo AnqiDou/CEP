@@ -28,7 +28,8 @@ public class ProfileRepository {
                 rs.getBigDecimal("price"),
                 rs.getString("campus"),
                 createdAt.format(DATE_TIME_FORMATTER),
-                rs.getString("photo_url"));
+                rs.getString("photo_url"),
+                rs.getString("status"));
     };
 
     private final RowMapper<ProfilePendingTradeDto> pendingTradeRowMapper = (rs, rowNum) -> {
@@ -153,7 +154,8 @@ public class ProfileRepository {
                         WHERE p.item_id = i.id
                         ORDER BY p.sort_order ASC, p.id ASC
                         LIMIT 1
-                    ) AS photo_url
+                    ) AS photo_url,
+                    i.status
                 FROM items i
                 LEFT JOIN item_details d ON d.item_id = i.id
                 WHERE COALESCE(i.publisher_user_id, d.publisher_user_id) = ?
@@ -162,7 +164,8 @@ public class ProfileRepository {
         return jdbcTemplate.query(sql, tradeItemRowMapper, userId);
     }
 
-    public List<ProfileTradeItemDto> findSoldItems(Long userId) {
+    public List<ProfileTradeItemDto> findSoldItems(Long userId, String status) {
+        String mappedStatus = mapTradeOrderStatus(status);
         String sql = """
                 SELECT
                     o.id,
@@ -170,16 +173,29 @@ public class ProfileRepository {
                     o.item_title AS title,
                     o.amount AS price,
                     '' AS campus,
-                    o.paid_at AS created_at,
-                    o.cover_photo_url AS photo_url
+                    COALESCE(o.paid_at, o.created_at) AS created_at,
+                    o.cover_photo_url AS photo_url,
+                    o.status
                 FROM trade_orders o
-                WHERE o.seller_user_id = ? AND o.status = 'PAID'
-                ORDER BY o.paid_at DESC, o.id DESC
+                WHERE o.seller_user_id = ?
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM trade_orders x
+                      WHERE x.seller_user_id = o.seller_user_id
+                        AND x.item_id = o.item_id
+                        AND (
+                          x.created_at > o.created_at
+                          OR (x.created_at = o.created_at AND x.id > o.id)
+                        )
+                  )
+                  AND (? = 'ALL' OR o.status = ?)
+                ORDER BY COALESCE(o.paid_at, o.created_at) DESC, o.id DESC
                 """;
-        return jdbcTemplate.query(sql, tradeItemRowMapper, userId);
+        return jdbcTemplate.query(sql, tradeItemRowMapper, userId, mappedStatus, mappedStatus);
     }
 
-    public List<ProfileTradeItemDto> findBoughtItems(Long userId) {
+    public List<ProfileTradeItemDto> findBoughtItems(Long userId, String status) {
+        String mappedStatus = mapTradeOrderStatus(status);
         String sql = """
                 SELECT
                     o.id,
@@ -187,13 +203,25 @@ public class ProfileRepository {
                     o.item_title AS title,
                     o.amount AS price,
                     '' AS campus,
-                    o.paid_at AS created_at,
-                    o.cover_photo_url AS photo_url
+                    COALESCE(o.paid_at, o.created_at) AS created_at,
+                    o.cover_photo_url AS photo_url,
+                    o.status
                 FROM trade_orders o
-                WHERE o.buyer_user_id = ? AND o.status = 'PAID'
-                ORDER BY o.paid_at DESC, o.id DESC
+                WHERE o.buyer_user_id = ?
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM trade_orders x
+                      WHERE x.buyer_user_id = o.buyer_user_id
+                        AND x.item_id = o.item_id
+                        AND (
+                          x.created_at > o.created_at
+                          OR (x.created_at = o.created_at AND x.id > o.id)
+                        )
+                  )
+                  AND (? = 'ALL' OR o.status = ?)
+                ORDER BY COALESCE(o.paid_at, o.created_at) DESC, o.id DESC
                 """;
-        return jdbcTemplate.query(sql, tradeItemRowMapper, userId);
+        return jdbcTemplate.query(sql, tradeItemRowMapper, userId, mappedStatus, mappedStatus);
     }
 
     public List<ProfileTradeItemDto> findFavoriteItems(Long userId) {
@@ -211,7 +239,8 @@ public class ProfileRepository {
                         WHERE p.item_id = i.id
                         ORDER BY p.sort_order ASC, p.id ASC
                         LIMIT 1
-                    ) AS photo_url
+                    ) AS photo_url,
+                    i.status
                 FROM user_favorites f
                 INNER JOIN items i ON i.id = f.item_id
                 WHERE f.user_id = ?
@@ -404,5 +433,17 @@ public class ProfileRepository {
         public int total() {
             return goodCount + badCount;
         }
+    }
+
+    private String mapTradeOrderStatus(String status) {
+        if (status == null) {
+            return "ALL";
+        }
+        return switch (status.trim().toLowerCase()) {
+            case "pending-payment" -> "PENDING_PAYMENT";
+            case "completed" -> "PAID";
+            case "cancelled" -> "CANCELLED";
+            default -> "ALL";
+        };
     }
 }

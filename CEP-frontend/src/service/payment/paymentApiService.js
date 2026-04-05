@@ -39,3 +39,13 @@ export const markTradeOrderPaid = (orderId) =>
   requestJson(`${PAYMENT_API_BASE}/${orderId}/pay-success`, {
     method: "POST",
   });
+
+export const cancelTradeOrder = async (orderId) => {
+  const accessToken = await ensureValidAccessToken();
+  return requestJson(`${PAYMENT_API_BASE}/${orderId}/cancel`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+};

@@ -67,6 +67,45 @@ public class TradeOrderRepository {
         return snapshots.isEmpty() ? null : snapshots.getFirst();
     }
 
+    public boolean existsPendingOrderForItem(Long itemId) {
+        String sql = """
+                SELECT COUNT(1)
+                FROM trade_orders
+                WHERE item_id = ?
+                  AND status = 'PENDING_PAYMENT'
+                """;
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, itemId);
+        return count != null && count > 0;
+    }
+
+    public TradeOrderRecord findLatestPendingOrderByBuyerAndItem(Long buyerUserId, Long itemId) {
+        String sql = """
+                SELECT
+                    id,
+                    order_no,
+                    item_id,
+                    buyer_user_id,
+                    seller_user_id,
+                    item_title,
+                    amount,
+                    cover_photo_url,
+                    status,
+                    receiver_name,
+                    receiver_phone,
+                    receiver_address,
+                    created_at,
+                    paid_at
+                FROM trade_orders
+                WHERE buyer_user_id = ?
+                  AND item_id = ?
+                  AND status = 'PENDING_PAYMENT'
+                ORDER BY created_at DESC, id DESC
+                LIMIT 1
+                """;
+        List<TradeOrderRecord> records = jdbcTemplate.query(sql, tradeOrderRowMapper, buyerUserId, itemId);
+        return records.isEmpty() ? null : records.getFirst();
+    }
+
     public Long createOrder(
             String orderNo,
             TradeOrderItemSnapshot snapshot,
@@ -150,5 +189,29 @@ public class TradeOrderRepository {
                 WHERE id = ? AND status = 'PENDING_PAYMENT'
                 """;
         return jdbcTemplate.update(sql, Timestamp.valueOf(paidAt), orderId);
+    }
+
+    public int cancelPendingOrder(Long orderId, Long actorUserId) {
+        String sql = """
+                UPDATE trade_orders
+                SET status = 'CANCELLED',
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                  AND status = 'PENDING_PAYMENT'
+                  AND (buyer_user_id = ? OR seller_user_id = ?)
+                """;
+        return jdbcTemplate.update(sql, orderId, actorUserId, actorUserId);
+    }
+
+    public int cancelPendingOrdersByBuyerAndItem(Long buyerUserId, Long itemId) {
+        String sql = """
+                UPDATE trade_orders
+                SET status = 'CANCELLED',
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE buyer_user_id = ?
+                  AND item_id = ?
+                  AND status = 'PENDING_PAYMENT'
+                """;
+        return jdbcTemplate.update(sql, buyerUserId, itemId);
     }
 }

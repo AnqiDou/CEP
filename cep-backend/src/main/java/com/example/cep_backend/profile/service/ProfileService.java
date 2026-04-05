@@ -78,11 +78,19 @@ public class ProfileService {
     }
 
     public List<ProfileTradeItemDto> getSoldItems(Long userId) {
-        return profileRepository.findSoldItems(userId);
+        return getSoldItems(userId, "all");
+    }
+
+    public List<ProfileTradeItemDto> getSoldItems(Long userId, String status) {
+        return profileRepository.findSoldItems(userId, normalizeTradeOrderStatus(status));
     }
 
     public List<ProfileTradeItemDto> getBoughtItems(Long userId) {
-        return profileRepository.findBoughtItems(userId);
+        return getBoughtItems(userId, "all");
+    }
+
+    public List<ProfileTradeItemDto> getBoughtItems(Long userId, String status) {
+        return profileRepository.findBoughtItems(userId, normalizeTradeOrderStatus(status));
     }
 
     public List<ProfileTradeItemDto> getFavoriteItems(Long userId) {
@@ -250,6 +258,20 @@ public class ProfileService {
         }
         if (!"price-desc".equals(normalized) && !"price-asc".equals(normalized)) {
             throw new BusinessException("排序参数无效");
+        }
+        return normalized;
+    }
+
+    private String normalizeTradeOrderStatus(String status) {
+        String normalized = normalizeText(status).toLowerCase();
+        if (normalized.isEmpty()) {
+            return "all";
+        }
+        if (!"all".equals(normalized)
+                && !"pending-payment".equals(normalized)
+                && !"completed".equals(normalized)
+                && !"cancelled".equals(normalized)) {
+            throw new BusinessException("交易状态筛选参数无效");
         }
         return normalized;
     }

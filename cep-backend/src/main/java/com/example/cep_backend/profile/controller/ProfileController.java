@@ -60,15 +60,19 @@ public class ProfileController {
     }
 
     @GetMapping("/trades/sold")
-    public ApiResponse<List<ProfileTradeItemDto>> getSold(@RequestHeader("Authorization") String authorization) {
+    public ApiResponse<List<ProfileTradeItemDto>> getSold(
+            @RequestHeader("Authorization") String authorization,
+            @RequestParam(defaultValue = "all") String status) {
         AuthUserDto user = authService.currentUser(authorization);
-        return ApiResponse.ok("获取成功", profileService.getSoldItems(user.userId()));
+        return ApiResponse.ok("获取成功", profileService.getSoldItems(user.userId(), status));
     }
 
     @GetMapping("/trades/bought")
-    public ApiResponse<List<ProfileTradeItemDto>> getBought(@RequestHeader("Authorization") String authorization) {
+    public ApiResponse<List<ProfileTradeItemDto>> getBought(
+            @RequestHeader("Authorization") String authorization,
+            @RequestParam(defaultValue = "all") String status) {
         AuthUserDto user = authService.currentUser(authorization);
-        return ApiResponse.ok("获取成功", profileService.getBoughtItems(user.userId()));
+        return ApiResponse.ok("获取成功", profileService.getBoughtItems(user.userId(), status));
     }
 
     @GetMapping("/favorites")

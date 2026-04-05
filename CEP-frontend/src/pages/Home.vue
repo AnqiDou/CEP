@@ -858,7 +858,7 @@ const ensureLoginForAction = () => {
   if (isUserLoggedIn.value) {
     return true;
   }
-  openLoginModal();
+  triggerLoginModalWithCooldown();
   return false;
 };
 
@@ -866,7 +866,7 @@ const consumeLoginRequiredQuery = async () => {
   if (isUserLoggedIn.value || route.query?.loginRequired !== "1") {
     return;
   }
-  openLoginModal();
+  triggerLoginModalWithCooldown();
 
   const nextQuery = { ...route.query };
   delete nextQuery.loginRequired;
@@ -1542,6 +1542,22 @@ const openLoginModal = () => {
   authModalType.value = "login";
   loginError.value = "";
   loginSuccess.value = "";
+};
+
+const LOGIN_MODAL_TRIGGER_COOLDOWN_MS = 1500;
+let lastLoginModalTriggerAt = 0;
+
+const triggerLoginModalWithCooldown = () => {
+  if (authModalType.value === "login") {
+    return;
+  }
+
+  const now = Date.now();
+  if (now - lastLoginModalTriggerAt < LOGIN_MODAL_TRIGGER_COOLDOWN_MS) {
+    return;
+  }
+  lastLoginModalTriggerAt = now;
+  openLoginModal();
 };
 
 const openRegisterModal = () => {

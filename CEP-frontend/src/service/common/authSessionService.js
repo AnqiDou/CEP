@@ -8,6 +8,7 @@ import {
 
 const AUTH_STORAGE_KEY = "cep.auth.session";
 const REFRESH_AHEAD_MS = 60 * 1000;
+const AUTH_EXPIRED_NOTIFY_COOLDOWN_MS = 3000;
 
 const authState = reactive({
   initialized: false,
@@ -18,9 +19,11 @@ const authState = reactive({
 });
 
 const AUTH_EXPIRED_EVENT = "cep:auth-expired";
+const AUTH_STORAGE_SYNC_EVENT = "storage";
 
 let refreshTimer = null;
 let refreshPromise = null;
+let lastAuthExpiredNotifyAt = 0;
 
 const normalizeError = (error, fallback) => {
   if (error instanceof Error && error.message) {
@@ -35,6 +38,12 @@ const shouldClearSessionOnRefreshFailure = (error) => {
 };
 
 const notifyAuthExpired = (reasonMessage) => {
+  const now = Date.now();
+  if (now - lastAuthExpiredNotifyAt < AUTH_EXPIRED_NOTIFY_COOLDOWN_MS) {
+    return;
+  }
+  lastAuthExpiredNotifyAt = now;
+
   window.dispatchEvent(
     new CustomEvent(AUTH_EXPIRED_EVENT, {
       detail: {
@@ -103,21 +112,31 @@ const applyAuthSession = ({
   scheduleRefresh();
 };
 
+const parseStoredSession = (raw) => {
+  const parsed = JSON.parse(raw);
+  if (
+    !parsed?.user?.userId ||
+    !parsed?.accessToken ||
+    !parsed?.refreshToken ||
+    !parsed?.accessTokenExpiresAt
+  ) {
+    throw new Error("invalid session payload");
+  }
+
+  return {
+    user: parsed.user,
+    accessToken: parsed.accessToken,
+    refreshToken: parsed.refreshToken,
+    accessTokenExpiresAt: parsed.accessTokenExpiresAt,
+  };
+};
+
 const restoreFromStorage = () => {
   const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
   if (!raw) return;
 
   try {
-    const parsed = JSON.parse(raw);
-    if (
-      !parsed?.user?.userId ||
-      !parsed?.accessToken ||
-      !parsed?.refreshToken ||
-      !parsed?.accessTokenExpiresAt
-    ) {
-      throw new Error("invalid session payload");
-    }
-
+    const parsed = parseStoredSession(raw);
     authState.user = parsed.user;
     authState.accessToken = parsed.accessToken;
     authState.refreshToken = parsed.refreshToken;
@@ -128,9 +147,40 @@ const restoreFromStorage = () => {
   }
 };
 
+const handleStorageSync = (event) => {
+  if (event.key !== AUTH_STORAGE_KEY) {
+    return;
+  }
+
+  if (!event.newValue) {
+    clearRefreshTimer();
+    authState.user = null;
+    authState.accessToken = "";
+    authState.refreshToken = "";
+    authState.accessTokenExpiresAt = 0;
+    return;
+  }
+
+  try {
+    const parsed = parseStoredSession(event.newValue);
+    authState.user = parsed.user;
+    authState.accessToken = parsed.accessToken;
+    authState.refreshToken = parsed.refreshToken;
+    authState.accessTokenExpiresAt = parsed.accessTokenExpiresAt;
+    scheduleRefresh();
+  } catch {
+    clearRefreshTimer();
+    authState.user = null;
+    authState.accessToken = "";
+    authState.refreshToken = "";
+    authState.accessTokenExpiresAt = 0;
+  }
+};
+
 export const initAuthSession = async () => {
   if (authState.initialized) return;
   restoreFromStorage();
+  window.addEventListener(AUTH_STORAGE_SYNC_EVENT, handleStorageSync);
   authState.initialized = true;
 
   if (!authState.refreshToken) return;

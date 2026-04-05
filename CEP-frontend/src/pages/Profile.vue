@@ -223,6 +223,24 @@
             </button>
           </div>
 
+          <div
+            v-else-if="tradeOrderStatusMenuKeys.includes(selectedMenu)"
+            class="review-tabs"
+          >
+            <button
+              v-for="tab in tradeOrderStatusTabs"
+              :key="tab.key"
+              :class="[
+                'review-tab',
+                currentTradeOrderStatus === tab.key ? 'review-tab--active' : '',
+              ]"
+              type="button"
+              @click="onTradeOrderStatusChange(tab.key)"
+            >
+              {{ tab.label }}
+            </button>
+          </div>
+
           <div v-if="selectedMenu === 'idle'" class="review-list">
             <div
               v-for="item in filteredReviewList"
@@ -409,9 +427,36 @@
                 <h4 class="section-item__title">{{ item.title }}</h4>
                 <p class="section-item__meta">
                   {{ item.price }} · {{ item.campus }} · {{ item.time }}
+                  <template
+                    v-if="tradeOrderStatusMenuKeys.includes(selectedMenu)"
+                  >
+                    · {{ mapTradeOrderStatusText(item.status) }}
+                  </template>
                 </p>
               </div>
               <div class="section-item__actions">
+                <button
+                  v-if="
+                    selectedMenu === 'trade-bought' &&
+                    item.status === 'PENDING_PAYMENT'
+                  "
+                  class="section-item__btn section-item__btn--edit"
+                  type="button"
+                  @click="goPay(item.orderId || item.id)"
+                >
+                  去付款
+                </button>
+                <button
+                  v-if="
+                    tradeOrderStatusMenuKeys.includes(selectedMenu) &&
+                    item.status === 'PENDING_PAYMENT'
+                  "
+                  class="section-item__btn section-item__btn--danger"
+                  type="button"
+                  @click="handleTradeOrderCancel(item)"
+                >
+                  取消订单
+                </button>
                 <button
                   class="section-item__btn"
                   type="button"
@@ -552,6 +597,7 @@ import {
   updateProfileBasic,
   uploadProfileAvatar,
 } from "../service/profile/profileApiService";
+import { cancelTradeOrder } from "../service/payment/paymentApiService";
 import {
   deleteMyPublishItem,
   fetchMyPublishItems,
@@ -618,6 +664,17 @@ const detailMenuKeys = [
   "trade-bought",
   "favorite",
 ];
+const tradeOrderStatusMenuKeys = ["trade-sold", "trade-bought"];
+const tradeOrderStatusTabs = [
+  { key: "all", label: "全部" },
+  { key: "pending-payment", label: "待付款" },
+  { key: "completed", label: "已完成" },
+  { key: "cancelled", label: "已取消" },
+];
+const activeTradeOrderStatusMap = reactive({
+  "trade-sold": "all",
+  "trade-bought": "all",
+});
 const sectionItemMap = reactive({
   "trade-published": [],
   "trade-sold": [],
@@ -658,6 +715,12 @@ const currentSection = computed(
 const currentSectionItems = computed(
   () => sectionItemMap[selectedMenu.value] || []
 );
+const currentTradeOrderStatus = computed(() => {
+  if (!tradeOrderStatusMenuKeys.includes(selectedMenu.value)) {
+    return "all";
+  }
+  return activeTradeOrderStatusMap[selectedMenu.value] || "all";
+});
 
 const normalizeListData = (responseBody) => {
   const payload = responseBody?.data;
@@ -771,6 +834,7 @@ const toPrice = (value) => {
 
 const mapTradeItem = (item) => ({
   id: item.id,
+  orderId: item.orderId || item.id,
   itemId: item.itemId || item.id,
   title: item.title || item.name || "未命名物品",
   price: toPrice(item.price),
@@ -784,6 +848,19 @@ const mapTradeItem = (item) => ({
   description: item.description || "",
   photoUrls: Array.isArray(item.photoUrls) ? item.photoUrls : [],
 });
+
+const mapTradeOrderStatusText = (status) => {
+  if (status === "PENDING_PAYMENT") {
+    return "待付款";
+  }
+  if (status === "PAID") {
+    return "已完成";
+  }
+  if (status === "CANCELLED") {
+    return "已取消";
+  }
+  return "进行中";
+};
 
 const getTradeItemPhoto = (item) => {
   if (item?.photoUrl) {
@@ -1091,7 +1168,11 @@ const loadPendingTrades = async () => {
 };
 
 const loadMenuData = async (menuKey, force = false) => {
-  if (!force && loadedMenus[menuKey]) {
+  if (
+    !force &&
+    loadedMenus[menuKey] &&
+    !tradeOrderStatusMenuKeys.includes(menuKey)
+  ) {
     return;
   }
 
@@ -1111,14 +1192,18 @@ const loadMenuData = async (menuKey, force = false) => {
   }
 
   if (menuKey === "trade-sold") {
-    const soldRes = await fetchSoldItems();
+    const soldRes = await fetchSoldItems(
+      activeTradeOrderStatusMap["trade-sold"]
+    );
     sectionItemMap["trade-sold"] = normalizeListData(soldRes).map(mapTradeItem);
     loadedMenus["trade-sold"] = true;
     return;
   }
 
   if (menuKey === "trade-bought") {
-    const boughtRes = await fetchBoughtItems();
+    const boughtRes = await fetchBoughtItems(
+      activeTradeOrderStatusMap["trade-bought"]
+    );
     sectionItemMap["trade-bought"] =
       normalizeListData(boughtRes).map(mapTradeItem);
     loadedMenus["trade-bought"] = true;
@@ -1129,6 +1214,50 @@ const loadMenuData = async (menuKey, force = false) => {
     const favoritesRes = await fetchFavoriteItems();
     sectionItemMap.favorite = normalizeListData(favoritesRes).map(mapTradeItem);
     loadedMenus.favorite = true;
+  }
+};
+
+const onTradeOrderStatusChange = async (status) => {
+  if (!tradeOrderStatusMenuKeys.includes(selectedMenu.value)) {
+    return;
+  }
+  activeTradeOrderStatusMap[selectedMenu.value] = status;
+  loadedMenus[selectedMenu.value] = false;
+  try {
+    await loadMenuData(selectedMenu.value, true);
+  } catch (error) {
+    ElMessage.error(error.message || "状态筛选失败");
+  }
+};
+
+const handleTradeOrderCancel = async (item) => {
+  const orderId = item?.orderId || item?.id;
+  if (!orderId) {
+    ElMessage.warning("订单信息无效");
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确认取消订单「${item.title || "当前订单"}」吗？`,
+      "取消订单确认",
+      {
+        confirmButtonText: "确认取消",
+        cancelButtonText: "再想想",
+        type: "warning",
+      }
+    );
+    await cancelTradeOrder(orderId);
+    await loadPendingTrades();
+    if (tradeOrderStatusMenuKeys.includes(selectedMenu.value)) {
+      await loadMenuData(selectedMenu.value, true);
+    }
+    ElMessage.success("订单已取消");
+  } catch (error) {
+    if (error === "cancel" || error === "close") {
+      return;
+    }
+    ElMessage.error(error.message || "取消订单失败");
   }
 };
 

@@ -18,6 +18,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class TradeOrderService {
     private static final String STATUS_PENDING_PAYMENT = "PENDING_PAYMENT";
     private static final String STATUS_PAID = "PAID";
+    private static final String STATUS_CANCELLED = "CANCELLED";
     private static final DateTimeFormatter ORDER_NO_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     private final TradeOrderRepository tradeOrderRepository;
@@ -49,6 +50,9 @@ public class TradeOrderService {
         TradeOrderItemSnapshot snapshot = tradeOrderRepository.findPublishedItemSnapshot(itemId);
         if (snapshot == null) {
             throw new BusinessException("物品不存在或不可交易");
+        }
+        if (tradeOrderRepository.existsPendingOrderForItem(itemId)) {
+            throw new BusinessException("该物品已有待付款订单，请先完成支付或取消后再下单");
         }
         if (snapshot.sellerUserId() == null || snapshot.sellerUserId() <= 0) {
             throw new BusinessException("物品发布者信息缺失，暂不可下单");
@@ -85,6 +89,45 @@ public class TradeOrderService {
             throw new BusinessException("订单不存在");
         }
         return toDto(order);
+    }
+
+    @Transactional
+    public TradeOrderDto cancelOrder(Long actorUserId, Long orderId) {
+        if (actorUserId == null || actorUserId <= 0) {
+            throw new BusinessException("登录状态已失效，请重新登录");
+        }
+        if (orderId == null || orderId <= 0) {
+            throw new BusinessException("订单信息无效");
+        }
+
+        TradeOrderRecord order = tradeOrderRepository.findOrderById(orderId);
+        if (order == null) {
+            throw new BusinessException("订单不存在");
+        }
+
+        boolean canOperate = actorUserId.equals(order.buyerUserId()) || actorUserId.equals(order.sellerUserId());
+        if (!canOperate) {
+            throw new BusinessException("无权限操作该订单");
+        }
+
+        if (STATUS_CANCELLED.equals(order.status())) {
+            return toDto(order);
+        }
+
+        if (!STATUS_PENDING_PAYMENT.equals(order.status())) {
+            throw new BusinessException("当前订单状态不可取消");
+        }
+
+        int updatedRows = tradeOrderRepository.cancelPendingOrder(orderId, actorUserId);
+        if (updatedRows <= 0) {
+            throw new BusinessException("订单取消失败，请稍后重试");
+        }
+
+        TradeOrderRecord updated = tradeOrderRepository.findOrderById(orderId);
+        if (updated == null) {
+            throw new BusinessException("订单取消失败，请稍后重试");
+        }
+        return toDto(updated);
     }
 
     @Transactional
