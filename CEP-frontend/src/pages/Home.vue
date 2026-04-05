@@ -217,9 +217,10 @@
                   >
                     <el-icon><UserFilled /></el-icon>
                   </el-avatar>
-                  <span class="item-card__credit">{{
-                    item.sellerCreditText
-                  }}</span>
+                  <span class="item-card__seller-name">{{ item.sellerName }}</span>
+                  <span class="item-card__credit-level"
+                    >卖家信用{{ item.sellerCredit }}</span
+                  >
                 </div>
               </div>
             </article>
@@ -1105,16 +1106,12 @@ const resolveSellerAvatarUrl = (item) => {
   return typeof target === "string" ? target.trim() : "";
 };
 
-const resolveSellerCreditText = (item) => {
-  const rawCredit = item.sellerCredit ?? item.publisherCredit ?? item.credit;
-  if (typeof rawCredit === "number" && Number.isFinite(rawCredit)) {
-    return `卖家信用${rawCredit.toFixed(1)}`;
-  }
-  if (typeof rawCredit === "string" && rawCredit.trim()) {
-    const creditText = rawCredit.trim();
-    return creditText.includes("信用") ? creditText : `卖家信用${creditText}`;
-  }
-  return "卖家信用良好";
+const resolveSellerName = (item) => {
+  const candidates = [item.sellerName, item.publisherName, item.username];
+  const target = candidates.find(
+    (value) => typeof value === "string" && value.trim()
+  );
+  return typeof target === "string" ? target.trim() : "校园用户";
 };
 
 const formatRelativeTime = (createdAt) => {
@@ -1154,7 +1151,11 @@ const mapHomeItem = (item) => ({
       ? item.badge.trim()
       : "",
   sellerAvatarUrl: resolveSellerAvatarUrl(item),
-  sellerCreditText: resolveSellerCreditText(item),
+  sellerName: resolveSellerName(item),
+  sellerCredit:
+    typeof item.sellerCredit === "string" && item.sellerCredit.trim()
+      ? item.sellerCredit.trim()
+      : "良好",
 });
 
 const mergeUniqueItemsById = (existing, incoming) => {
@@ -2679,8 +2680,16 @@ watch(
   border: 1px solid #dbeafe;
 }
 
-.item-card__credit {
+.item-card__seller-name {
   color: #8a90a8;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.item-card__credit-level {
+  margin-left: auto;
+  color: #666666;
+  font-weight: 400;
   line-height: 1;
   white-space: nowrap;
 }

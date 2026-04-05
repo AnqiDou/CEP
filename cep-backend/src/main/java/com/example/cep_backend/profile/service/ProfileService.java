@@ -202,17 +202,7 @@ public class ProfileService {
     }
 
     private String resolveCreditLabel(ProfileRepository.CreditStats stats) {
-        int score = 100 + stats.goodCount() - stats.badCount();
-        if (score < 90) {
-            return "较差";
-        }
-        if (score < 110) {
-            return "良好";
-        }
-        if (score < 140) {
-            return "优秀";
-        }
-        return "极好";
+        return CreditLevelResolver.resolveLabel(stats.goodCount(), stats.badCount());
     }
 
     private String normalizeRating(String rating) {

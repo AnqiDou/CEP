@@ -27,6 +27,10 @@ public class HomeRepository {
             rs.getLong("category_id"),
             rs.getLong("publisher_user_id"),
             rs.getBoolean("is_self"),
+            rs.getString("seller_name"),
+            rs.getString("seller_avatar_url"),
+            rs.getInt("seller_good_count"),
+            rs.getInt("seller_bad_count"),
             rs.getString("category_code"),
             rs.getString("category_name"),
             rs.getString("title"),
@@ -112,13 +116,29 @@ public class HomeRepository {
     public List<HomeItemRecord> findHotItems(int limit, Long currentUserId) {
         String isSelfExpr = currentUserId == null
                 ? "0"
-                : "CASE WHEN d.publisher_user_id = ? THEN 1 ELSE 0 END";
+                : "CASE WHEN COALESCE(i.publisher_user_id, d.publisher_user_id) = ? THEN 1 ELSE 0 END";
         String sql = """
                 SELECT
                     i.id,
                     i.category_id,
-                    d.publisher_user_id AS publisher_user_id,
+                    COALESCE(i.publisher_user_id, d.publisher_user_id) AS publisher_user_id,
                     %s AS is_self,
+                    COALESCE(NULLIF(u.username, ''), '校园用户') AS seller_name,
+                    up.avatar_url AS seller_avatar_url,
+                    (
+                        SELECT COUNT(1)
+                        FROM user_credit_reviews ucr
+                        WHERE ucr.target_user_id = COALESCE(i.publisher_user_id, d.publisher_user_id)
+                          AND ucr.target_role = 'SELLER'
+                          AND ucr.rating = 'good'
+                    ) AS seller_good_count,
+                    (
+                        SELECT COUNT(1)
+                        FROM user_credit_reviews ucr
+                        WHERE ucr.target_user_id = COALESCE(i.publisher_user_id, d.publisher_user_id)
+                          AND ucr.target_role = 'SELLER'
+                          AND ucr.rating = 'bad'
+                    ) AS seller_bad_count,
                     c.code AS category_code,
                     c.name AS category_name,
                     i.title,
@@ -142,6 +162,8 @@ public class HomeRepository {
                 FROM items i
                 INNER JOIN item_categories c ON c.id = i.category_id
                 LEFT JOIN item_details d ON d.item_id = i.id
+                LEFT JOIN users u ON u.id = COALESCE(i.publisher_user_id, d.publisher_user_id)
+                LEFT JOIN user_profiles up ON up.user_id = u.id
                 WHERE i.status = 'PUBLISHED'
                 ORDER BY is_self ASC, (i.favorite_count * 6 + i.view_count) DESC, i.created_at DESC
                 LIMIT ?
@@ -184,7 +206,7 @@ public class HomeRepository {
         StringBuilder sql = new StringBuilder();
         String isSelfExpr = currentUserId == null
                 ? "0"
-                : "CASE WHEN d.publisher_user_id = ? THEN 1 ELSE 0 END";
+                : "CASE WHEN COALESCE(i.publisher_user_id, d.publisher_user_id) = ? THEN 1 ELSE 0 END";
         if (countOnly) {
             sql.append("SELECT COUNT(1) ");
         } else {
@@ -192,8 +214,24 @@ public class HomeRepository {
                     SELECT
                         i.id,
                         i.category_id,
-                        d.publisher_user_id AS publisher_user_id,
+                        COALESCE(i.publisher_user_id, d.publisher_user_id) AS publisher_user_id,
                         %s AS is_self,
+                        COALESCE(NULLIF(u.username, ''), '校园用户') AS seller_name,
+                        up.avatar_url AS seller_avatar_url,
+                        (
+                            SELECT COUNT(1)
+                            FROM user_credit_reviews ucr
+                            WHERE ucr.target_user_id = COALESCE(i.publisher_user_id, d.publisher_user_id)
+                              AND ucr.target_role = 'SELLER'
+                              AND ucr.rating = 'good'
+                        ) AS seller_good_count,
+                        (
+                            SELECT COUNT(1)
+                            FROM user_credit_reviews ucr
+                            WHERE ucr.target_user_id = COALESCE(i.publisher_user_id, d.publisher_user_id)
+                              AND ucr.target_role = 'SELLER'
+                              AND ucr.rating = 'bad'
+                        ) AS seller_bad_count,
                         c.code AS category_code,
                         c.name AS category_name,
                         i.title,
@@ -224,6 +262,8 @@ public class HomeRepository {
                 FROM items i
                 INNER JOIN item_categories c ON c.id = i.category_id
                 LEFT JOIN item_details d ON d.item_id = i.id
+                LEFT JOIN users u ON u.id = COALESCE(i.publisher_user_id, d.publisher_user_id)
+                LEFT JOIN user_profiles up ON up.user_id = u.id
                 WHERE i.status = 'PUBLISHED'
                 """);
 
@@ -251,10 +291,10 @@ public class HomeRepository {
         }
 
         if (selfOnly && currentUserId != null) {
-            sql.append(" AND d.publisher_user_id = ?");
+            sql.append(" AND COALESCE(i.publisher_user_id, d.publisher_user_id) = ?");
             args.add(currentUserId);
         } else if (othersOnly && currentUserId != null) {
-            sql.append(" AND d.publisher_user_id <> ?");
+            sql.append(" AND COALESCE(i.publisher_user_id, d.publisher_user_id) <> ?");
             args.add(currentUserId);
         }
         return sql.toString();

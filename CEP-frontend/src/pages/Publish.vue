@@ -76,16 +76,19 @@
 
             <label class="form-field">
               <span class="form-label">分类</span>
-              <select v-model="form.category" class="form-input form-select">
-                <option disabled value="">请选择分类</option>
-                <option
+              <el-select
+                v-model="form.category"
+                class="publish-category-select"
+                placeholder="请选择分类"
+                popper-class="publish-category-popper"
+              >
+                <el-option
                   v-for="category in categories"
                   :key="category.value"
+                  :label="category.label"
                   :value="category.value"
-                >
-                  {{ category.label }}
-                </option>
-              </select>
+                />
+              </el-select>
             </label>
 
             <label class="form-field">
@@ -689,6 +692,91 @@ onBeforeUnmount(() => {
   appearance: none;
 }
 
+:deep(.publish-category-select) {
+  width: 100%;
+}
+
+:deep(.publish-category-select .el-select__wrapper) {
+  min-height: 44px;
+  border-radius: 14px;
+  border: 1px solid #ebe5ff;
+  padding: 0 14px;
+  background: linear-gradient(160deg, #fefcff 0%, #fbf8ff 58%, #fff9fd 100%);
+  box-shadow: 0 8px 18px rgba(140, 124, 240, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  transition: all 0.24s ease;
+}
+
+:deep(.publish-category-select .el-select__placeholder) {
+  color: #a094c8;
+  font-weight: 500;
+}
+
+:deep(.publish-category-select .el-select__selected-item) {
+  color: #5f596f;
+  font-weight: 600;
+}
+
+:deep(.publish-category-select .el-select__selected-item span),
+:deep(.publish-category-select .el-select__input) {
+  color: #5f596f !important;
+}
+
+:deep(.publish-category-select .el-select__caret) {
+  color: #8a7cd3;
+}
+
+:deep(.publish-category-select:hover .el-select__wrapper) {
+  border-color: #d9ccff;
+  box-shadow: 0 12px 22px rgba(140, 124, 240, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86);
+}
+
+:deep(.publish-category-select.is-focus .el-select__wrapper),
+:deep(.publish-category-select .el-select__wrapper.is-focused) {
+  border-color: #c6b9ff;
+  box-shadow: 0 0 0 4px rgba(198, 185, 255, 0.34),
+    0 12px 22px rgba(140, 124, 240, 0.14);
+}
+
+:deep(.publish-category-popper) {
+  --el-color-primary: #6a57c2;
+  --el-text-color-primary: #6a57c2;
+  border-radius: 18px;
+  border: 1px solid #ece5ff;
+  background: linear-gradient(180deg, #fdfbff 0%, #f8f5ff 68%, #fff8fc 100%);
+  box-shadow: 0 18px 36px rgba(140, 124, 240, 0.22);
+  padding: 6px;
+}
+
+:deep(.publish-category-popper .el-scrollbar__view) {
+  padding: 4px;
+}
+
+:deep(.publish-category-popper .el-select-dropdown__item) {
+  border-radius: 12px;
+  min-height: 38px;
+  line-height: 1.45;
+  padding: 8px 12px;
+  color: #6a57c2 !important;
+  font-weight: 500;
+}
+
+:deep(.publish-category-popper .el-select-dropdown__item span) {
+  color: inherit !important;
+}
+
+:deep(.publish-category-popper .el-select-dropdown__item:hover) {
+  background: linear-gradient(135deg, #f0eaff 0%, #ffeefa 100%);
+  color: #5a49a2;
+}
+
+:deep(.publish-category-popper .el-select-dropdown__item.is-selected) {
+  background: linear-gradient(135deg, #f0eaff 0%, #ffeefa 100%);
+  color: #5e4fb1 !important;
+  font-weight: 700;
+}
+
 :deep(.publish-date-picker) {
   width: 100%;
 }
@@ -991,5 +1079,27 @@ onBeforeUnmount(() => {
   .preview-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+</style>
+
+<style>
+/*
+  说明：el-select 下拉面板默认会 Teleport 到 body。
+  scoped 样式会带 data-v 属性选择器，可能匹配不到被 Teleport 的节点，
+  因此这里使用非 scoped 全局样式，确保下拉项颜色覆盖生效。
+*/
+.publish-category-popper {
+  --el-color-primary: #6a57c2;
+  --el-text-color-primary: #5f596f;
+}
+
+.publish-category-popper .el-select-dropdown__item {
+  color: #5f596f !important;
+}
+
+.publish-category-popper .el-select-dropdown__item.is-selected {
+  color: #5e4fb1 !important;
+  background: linear-gradient(135deg, #f0eaff 0%, #ffeefa 100%);
+  font-weight: 700;
 }
 </style>

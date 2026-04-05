@@ -9,6 +9,7 @@ import com.example.cep_backend.home.dto.HotKeywordDto;
 import com.example.cep_backend.home.model.HomeCategoryRecord;
 import com.example.cep_backend.home.model.HomeItemRecord;
 import com.example.cep_backend.home.repository.HomeRepository;
+import com.example.cep_backend.profile.service.CreditLevelResolver;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -152,6 +153,11 @@ public class HomeService {
                 record.categoryId(),
                 record.publisherUserId(),
                 Boolean.TRUE.equals(record.self()),
+                record.sellerName(),
+                record.sellerAvatarUrl(),
+                CreditLevelResolver.resolveLabel(
+                        record.sellerGoodCount() == null ? 0 : record.sellerGoodCount(),
+                        record.sellerBadCount() == null ? 0 : record.sellerBadCount()),
                 record.categoryCode(),
                 record.categoryName(),
                 record.title(),
