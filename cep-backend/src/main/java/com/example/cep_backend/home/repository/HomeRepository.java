@@ -36,7 +36,6 @@ public class HomeRepository {
             rs.getString("title"),
             rs.getString("description"),
             rs.getBigDecimal("price"),
-            rs.getString("campus"),
             rs.getString("badge"),
             rs.getString("ops_columns"),
             rs.getString("photo_url"),
@@ -144,7 +143,6 @@ public class HomeRepository {
                     i.title,
                     i.description,
                     i.price,
-                    i.campus,
                     i.badge,
                     (
                         SELECT GROUP_CONCAT(ioc.column_code ORDER BY ioc.column_code SEPARATOR ',')
@@ -237,7 +235,6 @@ public class HomeRepository {
                         i.title,
                         i.description,
                         i.price,
-                        i.campus,
                         i.badge,
                         (
                             SELECT GROUP_CONCAT(ioc.column_code ORDER BY ioc.column_code SEPARATOR ',')

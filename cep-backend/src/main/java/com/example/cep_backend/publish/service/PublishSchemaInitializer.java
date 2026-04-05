@@ -68,6 +68,19 @@ public class PublishSchemaInitializer {
                         jdbcTemplate.execute("ALTER TABLE items ADD COLUMN publisher_user_id BIGINT NULL");
                 }
 
+                Integer campusColumnCount = jdbcTemplate.queryForObject(
+                                """
+                                                SELECT COUNT(1)
+                                                FROM information_schema.columns
+                                                WHERE table_schema = DATABASE()
+                                                  AND table_name = 'items'
+                                                  AND column_name = 'campus'
+                                                """,
+                                Integer.class);
+                if (campusColumnCount != null && campusColumnCount > 0) {
+                        jdbcTemplate.execute("ALTER TABLE items DROP COLUMN campus");
+                }
+
                 jdbcTemplate.execute("""
                                 UPDATE items i
                                 INNER JOIN item_details d ON d.item_id = i.id

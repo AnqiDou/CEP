@@ -396,9 +396,7 @@
                     </div>
                   </div>
                 </div>
-                <p class="published-card__meta">
-                  {{ item.price }} · {{ item.campus }} · {{ item.time }}
-                </p>
+                <p class="published-card__meta">{{ item.price }} · {{ item.time }}</p>
                 <p
                   v-if="item.description"
                   class="published-card__desc"
@@ -426,7 +424,7 @@
               <div>
                 <h4 class="section-item__title">{{ item.title }}</h4>
                 <p class="section-item__meta">
-                  {{ item.price }} · {{ item.campus }} · {{ item.time }}
+                  {{ item.price }} · {{ item.time }}
                   <template
                     v-if="tradeOrderStatusMenuKeys.includes(selectedMenu)"
                   >
@@ -838,7 +836,6 @@ const mapTradeItem = (item) => ({
   itemId: item.itemId || item.id,
   title: item.title || item.name || "未命名物品",
   price: toPrice(item.price),
-  campus: item.campus || "校区未填写",
   time: item.time || "",
   photoUrl: item.photoUrl || "",
   status: item.status || "PUBLISHED",

@@ -970,7 +970,7 @@ const displayedItems = computed(() => {
     const normalizeText = (value) =>
       typeof value === "string" ? value.trim().toLowerCase() : "";
     const containsAnyKeyword = (item, keywordList) => {
-      const text = [item.title, item.desc, item.badge, item.campus]
+      const text = [item.title, item.desc, item.badge]
         .map(normalizeText)
         .filter(Boolean)
         .join(" ");
@@ -1009,7 +1009,6 @@ const displayedItems = computed(() => {
         item.title,
         item.desc,
         item.badge,
-        item.campus,
         priceText,
       ]
         .map(normalizeText)
@@ -1154,10 +1153,6 @@ const mapHomeItem = (item) => ({
   title: item.title,
   price: item.price,
   photoUrl: typeof item.photoUrl === "string" ? item.photoUrl.trim() : "",
-  campus:
-    typeof item.campus === "string" && item.campus.trim() !== "未填写"
-      ? item.campus.trim()
-      : "",
   desc:
     typeof item.description === "string" && item.description.trim()
       ? item.description.trim()

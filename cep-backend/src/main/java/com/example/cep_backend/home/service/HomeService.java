@@ -163,7 +163,6 @@ public class HomeService {
                 record.title(),
                 record.description(),
                 record.price(),
-                record.campus(),
                 record.badge(),
                 record.opsColumns(),
                 record.photoUrl(),

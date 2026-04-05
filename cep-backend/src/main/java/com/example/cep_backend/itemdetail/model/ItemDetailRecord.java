@@ -12,7 +12,6 @@ public record ItemDetailRecord(
                 String title,
                 String description,
                 BigDecimal price,
-                String campus,
                 LocalDateTime createdAt,
                 LocalDate purchaseDate,
                 String usageDuration,

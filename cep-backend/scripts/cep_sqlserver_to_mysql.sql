@@ -1,4 +1,4 @@
--- Auto generated: SQL Server => MySQL
+﻿-- Auto generated: SQL Server => MySQL
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 DROP DATABASE IF EXISTS `CEP`;
@@ -126,7 +126,6 @@ CREATE TABLE `items` (
   `title` VARCHAR(120) NOT NULL,
   `description` VARCHAR(500) NOT NULL,
   `price` DECIMAL(10,2) NOT NULL,
-  `campus` VARCHAR(50) NOT NULL,
   `badge` VARCHAR(20) NULL,
   `status` VARCHAR(20) NOT NULL DEFAULT 'PUBLISHED',
   `view_count` INT NOT NULL DEFAULT 0,
@@ -286,7 +285,6 @@ CREATE TABLE `user_profiles` (
   `id` BIGINT AUTO_INCREMENT NOT NULL,
   `user_id` BIGINT NOT NULL,
   `college` VARCHAR(80) NULL,
-  `campus` VARCHAR(50) NULL,
   `credit_score` DECIMAL(3,1) NULL,
   `note` VARCHAR(200) NULL,
   `created_at` DATETIME(6) NOT NULL,
@@ -358,14 +356,14 @@ INSERT INTO `email_verification_codes` (`id`, `email`, `purpose`, `code`, `used`
 (2, '3299166215@qq.com', 'RESET_PASSWORD', '496922', 1, '2026-03-29 14:48:18.918355', '2026-03-29 14:38:18.918355');
 
 INSERT INTO `item_categories` (`id`, `code`, `name`, `description`, `tags`, `sort_order`, `created_at`, `updated_at`) VALUES
-(1, 'digital', '数码产品', '手机、电脑、平板、耳机、充电器等', '手机,电脑,平板,耳机,充电器', 1, '2026-03-25 17:32:07.846666', '2026-03-25 17:32:07.846666'),
-(2, 'book', '图书教材', '课本、考研考公资料、小说、专业书', '课本,考研,考公,小说,专业书', 2, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
-(3, 'clothes', '服饰鞋包', '衣服、鞋子、包包、配饰', '衣服,鞋子,包包,配饰', 3, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
-(4, 'beauty', '美妆护肤', '化妆品、护肤品、香水', '化妆品,护肤品,香水', 4, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
-(5, 'sports', '运动器材', '篮球、羽毛球拍、瑜伽垫、自行车', '篮球,羽毛球拍,瑜伽垫,自行车', 5, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
-(6, 'daily', '生活用品', '收纳、小家电、锅碗瓢盆、寝室用品', '收纳,小家电,锅碗瓢盆,寝室用品', 6, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
-(7, 'stationery', '文具办公', '笔、本、计算器、文件夹等', '笔,本,计算器,文件夹', 7, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
-(8, 'other', '其他', '其他分类商品', '其他', 8, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000');
+(1, 'digital', '鏁扮爜浜у搧', '鎵嬫満銆佺數鑴戙€佸钩鏉裤€佽€虫満銆佸厖鐢靛櫒绛?, '鎵嬫満,鐢佃剳,骞虫澘,鑰虫満,鍏呯數鍣?, 1, '2026-03-25 17:32:07.846666', '2026-03-25 17:32:07.846666'),
+(2, 'book', '鍥句功鏁欐潗', '璇炬湰銆佽€冪爺鑰冨叕璧勬枡銆佸皬璇淬€佷笓涓氫功', '璇炬湰,鑰冪爺,鑰冨叕,灏忚,涓撲笟涔?, 2, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
+(3, 'clothes', '鏈嶉グ闉嬪寘', '琛ｆ湇銆侀瀷瀛愩€佸寘鍖呫€侀厤楗?, '琛ｆ湇,闉嬪瓙,鍖呭寘,閰嶉グ', 3, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
+(4, 'beauty', '缇庡鎶よ偆', '鍖栧鍝併€佹姢鑲ゅ搧銆侀姘?, '鍖栧鍝?鎶よ偆鍝?棣欐按', 4, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
+(5, 'sports', '杩愬姩鍣ㄦ潗', '绡悆銆佺窘姣涚悆鎷嶃€佺憸浼藉灚銆佽嚜琛岃溅', '绡悆,缇芥瘺鐞冩媿,鐟滀冀鍨?鑷杞?, 5, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
+(6, 'daily', '鐢熸椿鐢ㄥ搧', '鏀剁撼銆佸皬瀹剁數銆侀攨纰楃摙鐩嗐€佸瘽瀹ょ敤鍝?, '鏀剁撼,灏忓鐢?閿呯鐡㈢泦,瀵濆鐢ㄥ搧', 6, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
+(7, 'stationery', '鏂囧叿鍔炲叕', '绗斻€佹湰銆佽绠楀櫒銆佹枃浠跺す绛?, '绗?鏈?璁＄畻鍣?鏂囦欢澶?, 7, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
+(8, 'other', '鍏朵粬', '鍏朵粬鍒嗙被鍟嗗搧', '鍏朵粬', 8, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000');
 
 INSERT INTO `item_details` (`id`, `item_id`, `publisher_user_id`, `purchase_date`, `usage_duration`, `item_condition`, `accessories`, `detail_note`, `trade_location`, `original_price`, `created_at`, `updated_at`) VALUES
 (1, 7, 1, '2026-03-28 00:00:00.000000', '', '', '', '', '', NULL, '2026-03-28 18:38:19.060000', '2026-03-28 18:38:19.060000'),
@@ -380,12 +378,12 @@ INSERT INTO `item_photos` (`id`, `item_id`, `photo_url`, `sort_order`, `created_
 (3, 10, 'https://cep-project-1416369898.cos.ap-beijing.myqcloud.com/publish-images/2026-03-26/5615e9ae-7a9d-4968-bd17-35988ad41e3f.png', 1, '2026-03-26 21:50:04.715434'),
 (4, 11, 'https://cep-project-1416369898.cos.ap-beijing.myqcloud.com/publish-images/2026-03-27/ce87ea6d-979b-45cd-ba4c-ed2bde379e76.png', 1, '2026-03-27 13:26:18.316948');
 
-INSERT INTO `items` (`id`, `category_id`, `title`, `description`, `price`, `campus`, `badge`, `status`, `view_count`, `favorite_count`, `created_at`, `updated_at`, `publisher_user_id`) VALUES
-(7, 8, 'tset1', '', 1.00, '', NULL, 'PUBLISHED', 0, 0, '2026-03-26 21:13:49.451331', '2026-03-26 21:13:49.451331', 1),
-(8, 8, 'test2', '', 2.00, '', NULL, 'PUBLISHED', 1, 0, '2026-03-26 21:14:07.142872', '2026-03-30 15:48:47.233333', 1),
-(9, 8, 'test3', '', 3.00, '', NULL, 'PUBLISHED', 0, 0, '2026-03-26 21:37:07.652686', '2026-03-26 21:37:07.652686', 1),
-(10, 8, 't4', '', 4.00, '', NULL, 'PUBLISHED', 1, 0, '2026-03-26 21:50:04.715434', '2026-03-30 16:06:35.073333', 1),
-(11, 8, '5', '', 5.00, '', NULL, 'DELETED', 25, 0, '2026-03-27 13:26:18.316948', '2026-03-29 16:32:34.980340', 1);
+INSERT INTO `items` (`id`, `category_id`, `title`, `description`, `price`, `badge`, `status`, `view_count`, `favorite_count`, `created_at`, `updated_at`, `publisher_user_id`) VALUES
+(7, 8, 'tset1', '', 1.00, NULL, 'PUBLISHED', 0, 0, '2026-03-26 21:13:49.451331', '2026-03-26 21:13:49.451331', 1),
+(8, 8, 'test2', '', 2.00, NULL, 'PUBLISHED', 1, 0, '2026-03-26 21:14:07.142872', '2026-03-30 15:48:47.233333', 1),
+(9, 8, 'test3', '', 3.00, NULL, 'PUBLISHED', 0, 0, '2026-03-26 21:37:07.652686', '2026-03-26 21:37:07.652686', 1),
+(10, 8, 't4', '', 4.00, NULL, 'PUBLISHED', 1, 0, '2026-03-26 21:50:04.715434', '2026-03-30 16:06:35.073333', 1),
+(11, 8, '5', '', 5.00, NULL, 'DELETED', 25, 0, '2026-03-27 13:26:18.316948', '2026-03-29 16:32:34.980340', 1);
 
 
 
@@ -399,19 +397,19 @@ INSERT INTO `trade_orders` (`id`, `order_no`, `item_id`, `item_title`, `amount`,
 (1, 'CEP20260328162524239699', 11, '5', 5.00, 'https://cep-project-1416369898.cos.ap-beijing.myqcloud.com/publish-images/2026-03-27/ce87ea6d-979b-45cd-ba4c-ed2bde379e76.png', '1', '1', '1', 'PAID', '2026-03-28 16:25:30.648175', '2026-03-28 16:25:24.873333', '2026-03-28 16:25:30.673333', NULL, NULL);
 
 INSERT INTO `trade_payment_orders` (`id`, `order_no`, `item_id`, `buyer_user_id`, `seller_user_id`, `item_title`, `seller_name`, `amount`, `channel`, `status`, `payment_url`, `expire_at`, `paid_at`, `created_at`, `updated_at`) VALUES
-(1, 'CEP20260328155824399383', 11, 1, NULL, '5', '校园用户', 5.00, 'WECHAT_H5', 'PENDING', 'https://pay-mock.cep.local/wechat/h5?orderNo=CEP20260328155824399383', '2026-03-28 16:13:24.592891', NULL, '2026-03-28 15:58:24.592891', '2026-03-28 15:58:24.592891'),
-(2, 'CEP20260328155828718123', 11, 1, NULL, '5', '校园用户', 5.00, 'WECHAT_H5', 'PAID', 'https://pay-mock.cep.local/wechat/h5?orderNo=CEP20260328155828718123', '2026-03-28 16:13:28.730487', '2026-03-28 15:58:34.167421', '2026-03-28 15:58:28.730487', '2026-03-28 15:58:34.167421');
+(1, 'CEP20260328155824399383', 11, 1, NULL, '5', '鏍″洯鐢ㄦ埛', 5.00, 'WECHAT_H5', 'PENDING', 'https://pay-mock.cep.local/wechat/h5?orderNo=CEP20260328155824399383', '2026-03-28 16:13:24.592891', NULL, '2026-03-28 15:58:24.592891', '2026-03-28 15:58:24.592891'),
+(2, 'CEP20260328155828718123', 11, 1, NULL, '5', '鏍″洯鐢ㄦ埛', 5.00, 'WECHAT_H5', 'PAID', 'https://pay-mock.cep.local/wechat/h5?orderNo=CEP20260328155828718123', '2026-03-28 16:13:28.730487', '2026-03-28 15:58:34.167421', '2026-03-28 15:58:28.730487', '2026-03-28 15:58:34.167421');
 
 
 
 
 
-INSERT INTO `user_profiles` (`id`, `user_id`, `college`, `campus`, `credit_score`, `note`, `created_at`, `updated_at`, `avatar_url`) VALUES
-(1, 1, NULL, NULL, NULL, NULL, '2026-03-28 16:50:11.000000', '2026-03-28 16:57:02.952293', 'https://cep-project-1416369898.cos.ap-beijing.myqcloud.com/profile-avatars/2026-03-28/4e6116e3-f868-41c6-8289-1caedd8b082e.png'),
-(2, 2, NULL, NULL, NULL, NULL, '2026-03-28 18:21:22.563333', '2026-03-28 18:21:22.563333', NULL);
+INSERT INTO `user_profiles` (`id`, `user_id`, `college`, `credit_score`, `note`, `created_at`, `updated_at`, `avatar_url`) VALUES
+(1, 1, NULL, NULL, NULL, '2026-03-28 16:50:11.000000', '2026-03-28 16:57:02.952293', 'https://cep-project-1416369898.cos.ap-beijing.myqcloud.com/profile-avatars/2026-03-28/4e6116e3-f868-41c6-8289-1caedd8b082e.png'),
+(2, 2, NULL, NULL, NULL, '2026-03-28 18:21:22.563333', '2026-03-28 18:21:22.563333', NULL);
 
 INSERT INTO `users` (`id`, `email`, `username`, `password_hash`, `status`, `created_at`, `updated_at`, `last_login_at`) VALUES
-(1, 'anqidou@outlook.com', '安琪', '$2a$10$Mq32x0gxLZs7KXRbuOqkRuLTKw4ArcmMRYQbt6ijlXOuylv2vg7Tm', 'ACTIVE', '2026-03-24 13:42:16.199417', '2026-03-30 14:22:39.716395', '2026-03-30 14:22:39.716395'),
+(1, 'anqidou@outlook.com', '瀹夌惇', '$2a$10$Mq32x0gxLZs7KXRbuOqkRuLTKw4ArcmMRYQbt6ijlXOuylv2vg7Tm', 'ACTIVE', '2026-03-24 13:42:16.199417', '2026-03-30 14:22:39.716395', '2026-03-30 14:22:39.716395'),
 (2, '3299166215@qq.com', '', '$2a$10$IYyvw7fLn6YrkhQkcUbJOuCNnCyMjFeLdOS3ypiK/fn1CuoLhni8G', 'ACTIVE', '2026-03-27 13:45:14.976395', '2026-03-31 14:53:28.478509', '2026-03-31 14:53:28.478509');
 
 ALTER TABLE `admin_order_abnormal_records` ADD CONSTRAINT `fk_admin_order_abnormal_records_user` FOREIGN KEY (`handled_by_user_id`) REFERENCES `users` (`id`);
@@ -444,3 +442,5 @@ ALTER TABLE `user_follows` ADD CONSTRAINT `fk_user_follows_user` FOREIGN KEY (`u
 ALTER TABLE `user_follows` ADD CONSTRAINT `fk_user_follows_target` FOREIGN KEY (`target_user_id`) REFERENCES `users` (`id`);
 ALTER TABLE `user_profiles` ADD CONSTRAINT `fk_user_profiles_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`);
 SET FOREIGN_KEY_CHECKS = 1;
+
+

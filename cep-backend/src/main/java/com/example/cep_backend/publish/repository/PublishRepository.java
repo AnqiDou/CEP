@@ -54,12 +54,11 @@ public class PublishRepository {
                     title,
                     description,
                     price,
-                    campus,
                     badge,
                     status,
                     created_at,
                     updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'PUBLISHED', ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, 'PUBLISHED', ?, ?)
                 """;
 
         KeyHolder keyHolder = new GeneratedKeyHolder();
@@ -70,10 +69,9 @@ public class PublishRepository {
             statement.setString(3, itemName);
             statement.setString(4, description);
             statement.setBigDecimal(5, price);
-            statement.setString(6, "");
-            statement.setString(7, null);
+            statement.setString(6, null);
+            statement.setTimestamp(7, Timestamp.valueOf(now));
             statement.setTimestamp(8, Timestamp.valueOf(now));
-            statement.setTimestamp(9, Timestamp.valueOf(now));
             return statement;
         }, keyHolder);
 

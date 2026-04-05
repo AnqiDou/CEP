@@ -26,7 +26,6 @@ public class ProfileRepository {
                 rs.getLong("item_id"),
                 rs.getString("title"),
                 rs.getBigDecimal("price"),
-                rs.getString("campus"),
                 createdAt.format(DATE_TIME_FORMATTER),
                 rs.getString("photo_url"),
                 rs.getString("status"));
@@ -146,7 +145,6 @@ public class ProfileRepository {
                     i.id AS item_id,
                     i.title,
                     i.price,
-                    i.campus,
                     i.created_at,
                     (
                         SELECT p.photo_url
@@ -172,7 +170,6 @@ public class ProfileRepository {
                     o.item_id,
                     o.item_title AS title,
                     o.amount AS price,
-                    '' AS campus,
                     COALESCE(o.paid_at, o.created_at) AS created_at,
                     o.cover_photo_url AS photo_url,
                     o.status
@@ -202,7 +199,6 @@ public class ProfileRepository {
                     o.item_id,
                     o.item_title AS title,
                     o.amount AS price,
-                    '' AS campus,
                     COALESCE(o.paid_at, o.created_at) AS created_at,
                     o.cover_photo_url AS photo_url,
                     o.status
@@ -231,7 +227,6 @@ public class ProfileRepository {
                     i.id AS item_id,
                     i.title,
                     i.price,
-                    i.campus,
                     f.created_at,
                     (
                         SELECT p.photo_url

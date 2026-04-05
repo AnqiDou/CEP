@@ -91,7 +91,6 @@ CREATE TABLE items (
     title NVARCHAR (120) NOT NULL,
     description NVARCHAR (500) NOT NULL,
     price DECIMAL(10, 2) NOT NULL,
-    campus NVARCHAR (50) NOT NULL,
     badge NVARCHAR (20) NULL,
     status NVARCHAR (20) NOT NULL DEFAULT 'PUBLISHED',
     view_count INT NOT NULL DEFAULT 0,
@@ -271,8 +270,8 @@ INSERT INTO
 VALUES (
         'digital',
         '数码产品',
-        '手机、电脑、平板、耳机、充电器等',
-        '二手手机,笔记本,平板,耳机,充电器',
+        '手机、电脑、平板、耳机、充电器�?,
+        '二手手机,笔记�?平板,耳机,充电�?,
         1,
         CURRENT_TIMESTAMP,
         CURRENT_TIMESTAMP
@@ -281,7 +280,7 @@ VALUES (
         'book',
         '图书教材',
         '课本、考研考公资料、小说、专业书',
-        '课本,考研资料,考公资料,小说,专业书',
+        '课本,考研资料,考公资料,小说,专业�?,
         2,
         CURRENT_TIMESTAMP,
         CURRENT_TIMESTAMP
@@ -289,8 +288,8 @@ VALUES (
     (
         'clothes',
         '服饰鞋包',
-        '衣服、鞋子、包包、配饰',
-        '外套,球鞋,双肩包,配饰',
+        '衣服、鞋子、包包、配�?,
+        '外套,球鞋,双肩�?配饰',
         3,
         CURRENT_TIMESTAMP,
         CURRENT_TIMESTAMP
@@ -298,7 +297,7 @@ VALUES (
     (
         'beauty',
         '美妆护肤',
-        '化妆品、护肤品、香水',
+        '化妆品、护肤品、香�?,
         '口红,面霜,防晒,香水',
         4,
         CURRENT_TIMESTAMP,
@@ -308,7 +307,7 @@ VALUES (
         'sports',
         '运动器材',
         '篮球、羽毛球拍、瑜伽垫、自行车',
-        '篮球,羽毛球拍,瑜伽垫,自行车',
+        '篮球,羽毛球拍,瑜伽�?自行�?,
         5,
         CURRENT_TIMESTAMP,
         CURRENT_TIMESTAMP
@@ -316,8 +315,8 @@ VALUES (
     (
         'daily',
         '生活用品',
-        '收纳、小家电、锅碗瓢盆、寝室用品',
-        '收纳盒,小家电,锅具,寝室用品',
+        '收纳、小家电、锅碗瓢盆、寝室用�?,
+        '收纳�?小家�?锅具,寝室用品',
         6,
         CURRENT_TIMESTAMP,
         CURRENT_TIMESTAMP
@@ -325,8 +324,8 @@ VALUES (
     (
         'stationery',
         '文具办公',
-        '笔、本、计算器、文件夹等',
-        '中性笔,笔记本,计算器,文件夹',
+        '笔、本、计算器、文件夹�?,
+        '中性笔,笔记�?计算�?文件�?,
         7,
         CURRENT_TIMESTAMP,
         CURRENT_TIMESTAMP
@@ -347,7 +346,6 @@ INSERT INTO
         title,
         description,
         price,
-        campus,
         badge,
         status,
         view_count,
@@ -362,10 +360,10 @@ VALUES (
             WHERE
                 code = 'book'
         ),
-        '22级高数教材+辅导书全套',
-        '九成新，无笔记，适合低年级同学使用。',
+        '22级高数教�?辅导书全�?,
+        '九成新，无笔记，适合低年级同学使用�?,
         35.00,
-        '东校区',
+        '东校�?,
         '热门',
         'PUBLISHED',
         142,
@@ -380,10 +378,9 @@ VALUES (
             WHERE
                 code = 'digital'
         ),
-        'iPad 9 64G + 原装笔',
-        '用于记笔记，电池健康良好，附带原装包装盒。',
+        'iPad 9 64G + 原装�?,
+        '用于记笔记，电池健康良好，附带原装包装盒�?,
         1200.00,
-        '本部',
         '急售',
         'PUBLISHED',
         286,
@@ -399,9 +396,9 @@ VALUES (
                 code = 'book'
         ),
         '考研政治核心考点精讲',
-        '基本全新，少量划线，已顺利上岸转让。',
+        '基本全新，少量划线，已顺利上岸转让�?,
         20.00,
-        '南校区',
+        '南校�?,
         '',
         'PUBLISHED',
         98,
@@ -417,10 +414,9 @@ VALUES (
                 code = 'digital'
         ),
         '降噪无线蓝牙耳机',
-        '音质不错，适合通勤与自习使用。',
+        '音质不错，适合通勤与自习使用�?,
         80.00,
-        '本部',
-        '精选',
+        '精�?,
         'PUBLISHED',
         167,
         38,
@@ -443,9 +439,9 @@ VALUES (
                 code = 'daily'
         ),
         '宿舍护眼台灯（可调色温）',
-        '灯光柔和，支持三档调节，自习必备。',
+        '灯光柔和，支持三档调节，自习必备�?,
         28.00,
-        '东校区',
+        '东校�?,
         '新品',
         'PUBLISHED',
         123,
@@ -469,9 +465,8 @@ VALUES (
                 code = 'sports'
         ),
         '九成新山地自行车',
-        '通勤代步稳定，车况良好，可当面试骑。',
+        '通勤代步稳定，车况良好，可当面试骑�?,
         360.00,
-        '本部',
         '热销',
         'PUBLISHED',
         209,
@@ -494,11 +489,11 @@ VALUES (
             WHERE
                 code = 'digital'
         ),
-        '机械键盘青轴 87键',
-        '手感清脆，带灯效，送拔键器。',
+        '机械键盘青轴 87�?,
+        '手感清脆，带灯效，送拔键器�?,
         99.00,
-        '南校区',
-        '精选',
+        '南校�?,
+        '精�?,
         'PUBLISHED',
         88,
         16,
@@ -512,11 +507,10 @@ VALUES (
             WHERE
                 code = 'other'
         ),
-        '吉他入门教程 + 民谣谱合集',
-        '包含多本教材，适合零基础上手。',
+        '吉他入门教程 + 民谣谱合�?,
+        '包含多本教材，适合零基础上手�?,
         26.00,
-        '本部',
-        '超值',
+        '超�?,
         'PUBLISHED',
         76,
         11,
@@ -531,9 +525,9 @@ VALUES (
                 code = 'clothes'
         ),
         '冬季加绒外套',
-        '尺码M，穿过两次，保暖效果好。',
+        '尺码M，穿过两次，保暖效果好�?,
         59.00,
-        '北校区',
+        '北校�?,
         '',
         'PUBLISHED',
         61,
@@ -548,10 +542,10 @@ VALUES (
             WHERE
                 code = 'stationery'
         ),
-        '全新科学计算器',
-        '课程要求型号，现低价转让。',
+        '全新科学计算�?,
+        '课程要求型号，现低价转让�?,
         48.00,
-        '东校区',
+        '东校�?,
         '',
         'PUBLISHED',
         53,
@@ -580,7 +574,7 @@ VALUES (
         CURRENT_TIMESTAMP
     ),
     (
-        '四六级',
+        '四六�?,
         89,
         DATEADD (
             MINUTE,
@@ -613,7 +607,7 @@ VALUES (
         CURRENT_TIMESTAMP
     ),
     (
-        '自行车',
+        '自行�?,
         73,
         DATEADD (
             MINUTE,

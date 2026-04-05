@@ -7,7 +7,6 @@ public record ProfileTradeItemDto(
                 Long itemId,
                 String title,
                 BigDecimal price,
-                String campus,
                 String time,
                 String photoUrl,
                 String status) {
