@@ -308,10 +308,6 @@ CREATE TABLE `users` (
   UNIQUE KEY `UQ__users__AB6E6164AD7CE044` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO `admin_notices` (`id`, `content`, `created_at`, `updated_at`) VALUES
-(1, 'Please do not bypass platform transactions offline. Beware of fraud.', '2026-03-29 19:42:32.040000', '2026-03-29 19:42:32.040000'),
-(2, 'System maintenance will be performed this Sunday 02:00-03:00.', '2026-03-29 19:42:32.040000', '2026-03-29 19:42:32.040000');
-
 
 INSERT INTO `admin_support_conversations` (`id`, `title`, `preview`, `status`, `created_at`, `updated_at`) VALUES
 (1, 'Order dispute: item mismatch', 'User reported item does not match description', 'OPEN', '2026-03-29 19:42:32.030000', '2026-03-29 19:42:32.030000'),

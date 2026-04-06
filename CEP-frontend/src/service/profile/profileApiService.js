@@ -72,6 +72,22 @@ export const fetchPendingPaymentTrades = async () =>
     headers: await withAuthHeaders(),
   });
 
+export const fetchSoldOrderContact = async (orderId) =>
+  requestJson(`${PROFILE_API_BASE}/trades/sold/${orderId}/contact`, {
+    headers: await withAuthHeaders(),
+  });
+
+export const fetchBoughtOrderContact = async (orderId) =>
+  requestJson(`${PROFILE_API_BASE}/trades/bought/${orderId}/contact`, {
+    headers: await withAuthHeaders(),
+  });
+
+export const rebuyBoughtOrder = async (orderId) =>
+  requestJson(`${PROFILE_API_BASE}/trades/bought/${orderId}/rebuy`, {
+    method: "POST",
+    headers: await withAuthHeaders(),
+  });
+
 export const updateProfileBasic = async (payload) =>
   requestJson(`${PROFILE_API_BASE}/basic`, {
     method: "PUT",

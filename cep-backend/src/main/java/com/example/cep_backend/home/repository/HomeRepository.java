@@ -3,6 +3,7 @@ package com.example.cep_backend.home.repository;
 import com.example.cep_backend.home.model.HomeCategoryRecord;
 import com.example.cep_backend.home.model.HomeItemRecord;
 import com.example.cep_backend.home.model.HotKeywordRecord;
+import com.example.cep_backend.home.dto.HomeNoticeDto;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -44,6 +45,11 @@ public class HomeRepository {
     private final RowMapper<HotKeywordRecord> hotKeywordRowMapper = (rs, rowNum) -> new HotKeywordRecord(
             rs.getString("keyword"),
             rs.getLong("search_count"));
+
+    private final RowMapper<HomeNoticeDto> homeNoticeRowMapper = (rs, rowNum) -> new HomeNoticeDto(
+            rs.getLong("id"),
+            rs.getString("content"),
+            rs.getTimestamp("created_at").toLocalDateTime());
 
     public HomeRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
@@ -180,6 +186,16 @@ public class HomeRepository {
                 LIMIT ?
                 """;
         return jdbcTemplate.query(sql, hotKeywordRowMapper, limit);
+    }
+
+    public List<HomeNoticeDto> findHomeNotices(int limit) {
+        String sql = """
+                SELECT id, content, created_at
+                FROM admin_notices
+                ORDER BY created_at DESC, id DESC
+                LIMIT ?
+                """;
+        return jdbcTemplate.query(sql, homeNoticeRowMapper, limit);
     }
 
     public void recordSearchKeyword(String keyword, LocalDateTime now) {

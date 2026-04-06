@@ -12,6 +12,7 @@ import com.example.cep_backend.profile.dto.OtherProfileReviewSummaryDto;
 import com.example.cep_backend.profile.dto.ProfilePendingTradeDto;
 import com.example.cep_backend.profile.dto.ProfileReviewItemDto;
 import com.example.cep_backend.profile.dto.ProfileReviewSummaryDto;
+import com.example.cep_backend.profile.dto.ProfileTradeContactDto;
 import com.example.cep_backend.profile.dto.ProfileTradeItemDto;
 import com.example.cep_backend.profile.dto.ProfileUpdateRequest;
 import com.example.cep_backend.profile.repository.ProfileRepository;
@@ -99,6 +100,59 @@ public class ProfileService {
 
     public List<ProfilePendingTradeDto> getPendingPaymentTrades(Long userId) {
         return profileRepository.findPendingPaymentTrades(userId);
+    }
+
+    public ProfileTradeContactDto getSoldOrderBuyerContact(Long userId, Long orderId) {
+        validateOrderId(orderId);
+        ProfileRepository.TradeContactRecord record = profileRepository.findSoldOrderBuyerContact(userId, orderId);
+        if (record == null || record.peerUserId() == null || record.peerUserId() <= 0) {
+            throw new BusinessException("订单不存在或无操作权限");
+        }
+        return new ProfileTradeContactDto(
+                record.orderId(),
+                record.itemId(),
+                record.peerUserId(),
+                defaultPeerName(record.peerName()),
+                defaultItemTitle(record.itemTitle()));
+    }
+
+    public ProfileTradeContactDto getBoughtOrderSellerContact(Long userId, Long orderId) {
+        validateOrderId(orderId);
+        ProfileRepository.TradeContactRecord record = profileRepository.findBoughtOrderSellerContact(userId, orderId);
+        if (record == null || record.peerUserId() == null || record.peerUserId() <= 0) {
+            throw new BusinessException("订单不存在或无操作权限");
+        }
+        return new ProfileTradeContactDto(
+                record.orderId(),
+                record.itemId(),
+                record.peerUserId(),
+                defaultPeerName(record.peerName()),
+                defaultItemTitle(record.itemTitle()));
+    }
+
+    public ProfileTradeItemDto rebuyItem(Long userId, Long orderId) {
+        validateOrderId(orderId);
+        ProfileRepository.TradeContactRecord record = profileRepository.findBoughtOrderSellerContact(userId, orderId);
+        if (record == null) {
+            throw new BusinessException("订单不存在或无操作权限");
+        }
+        Long itemId = record.itemId();
+        Long sellerUserId = record.peerUserId();
+        if (itemId == null || itemId <= 0 || sellerUserId == null || sellerUserId <= 0) {
+            throw new BusinessException("订单关联物品信息无效");
+        }
+        if (!profileRepository.isPublishedItemOwnedBy(itemId, sellerUserId)) {
+            throw new BusinessException("当前商品已下架，暂不支持再次购买");
+        }
+
+        return new ProfileTradeItemDto(
+                orderId,
+                itemId,
+                defaultItemTitle(record.itemTitle()),
+                null,
+                "",
+                "",
+                "PUBLISHED");
     }
 
     public OtherProfileOverviewDto getOtherOverview(Long viewerUserId, Long userId, String username) {
@@ -290,5 +344,21 @@ public class ProfileService {
 
     private String normalizeText(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private void validateOrderId(Long orderId) {
+        if (orderId == null || orderId <= 0) {
+            throw new BusinessException("订单参数无效");
+        }
+    }
+
+    private String defaultPeerName(String value) {
+        String normalized = normalizeText(value);
+        return normalized.isEmpty() ? "校园用户" : normalized;
+    }
+
+    private String defaultItemTitle(String value) {
+        String normalized = normalizeText(value);
+        return normalized.isEmpty() ? "未命名物品" : normalized;
     }
 }

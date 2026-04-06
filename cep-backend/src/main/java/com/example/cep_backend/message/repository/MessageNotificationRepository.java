@@ -164,6 +164,50 @@ public class MessageNotificationRepository {
                 ownerUserId);
     }
 
+    public void insertOffShelfNotifications(
+            Long itemId,
+            Long ownerUserId,
+            String title,
+            String content,
+            LocalDateTime now) {
+        String sql = """
+                INSERT INTO message_notifications (
+                    user_id,
+                    notification_type,
+                    title,
+                    content,
+                    related_item_id,
+                    related_user_id,
+                    is_read,
+                    created_at,
+                    updated_at
+                )
+                SELECT
+                    f.user_id,
+                    'FAVORITE_OFF_SHELF',
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    0,
+                    ?,
+                    ?
+                FROM user_favorites f
+                WHERE f.item_id = ?
+                  AND f.user_id <> ?
+                """;
+        Timestamp timestamp = Timestamp.valueOf(now);
+        jdbcTemplate.update(sql,
+                title,
+                content,
+                itemId,
+                ownerUserId,
+                timestamp,
+                timestamp,
+                itemId,
+                ownerUserId);
+    }
+
     public String findUsernameByUserId(Long userId) {
         String sql = "SELECT COALESCE(NULLIF(username, ''), '校园用户') AS username FROM users WHERE id = ? LIMIT 1";
         List<String> list = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getString("username"), userId);

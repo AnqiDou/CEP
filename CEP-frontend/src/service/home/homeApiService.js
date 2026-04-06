@@ -77,3 +77,6 @@ export const fetchHotItems = (limit = 8, { viewerScope, accessToken } = {}) =>
 
 export const fetchHotKeywords = (limit = 10) =>
   requestJson(`${HOME_API_BASE}/hot-keywords${buildQuery({ limit })}`);
+
+export const fetchHomeNotices = (limit = 3) =>
+  requestJson(`${HOME_API_BASE}/notices${buildQuery({ limit })}`);

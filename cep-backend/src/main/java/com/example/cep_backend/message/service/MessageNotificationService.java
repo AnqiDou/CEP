@@ -79,4 +79,24 @@ public class MessageNotificationService {
                 content,
                 LocalDateTime.now());
     }
+
+    @Transactional
+    public void notifyFavoriteOffShelf(Long itemId, Long ownerUserId) {
+        if (itemId == null || ownerUserId == null) {
+            return;
+        }
+        if (itemId <= 0 || ownerUserId <= 0) {
+            return;
+        }
+
+        String itemTitle = messageNotificationRepository.findItemTitle(itemId);
+        String title = "收藏商品下架提醒";
+        String content = "你收藏的《" + itemTitle + "》已下架";
+        messageNotificationRepository.insertOffShelfNotifications(
+                itemId,
+                ownerUserId,
+                title,
+                content,
+                LocalDateTime.now());
+    }
 }

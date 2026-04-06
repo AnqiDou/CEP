@@ -1,4 +1,4 @@
 package com.example.cep_backend.admin.dto;
 
-public record AdminSupportReplyRequest(String content) {
+public record AdminSupportReplyRequest(String content, String imageUrl) {
 }

@@ -118,23 +118,6 @@ VALUES (
         CURRENT_TIMESTAMP
     );
 
-INSERT INTO
-    admin_notices (
-        content,
-        created_at,
-        updated_at
-    )
-VALUES (
-        'Please do not bypass platform transactions offline. Beware of fraud.',
-        CURRENT_TIMESTAMP,
-        CURRENT_TIMESTAMP
-    ),
-    (
-        'System maintenance will be performed this Sunday 02:00-03:00.',
-        CURRENT_TIMESTAMP,
-        CURRENT_TIMESTAMP
-    );
-
 -- 建表完成后的检查语句（手动执行）
 SELECT
     OBJECT_ID (

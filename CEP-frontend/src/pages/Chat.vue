@@ -50,18 +50,33 @@
 
         <div class="session-list">
           <article
-            v-for="conversation in filteredConversations"
+            v-for="conversation in displayConversations"
             :key="conversation.id"
             :class="[
               'session-item',
+              conversation.isNotification ? 'session-item--notification' : '',
               selectedConversationId === conversation.id
                 ? 'session-item--active'
                 : '',
             ]"
             @click="selectConversation(conversation.id)"
           >
-            <div class="session-item__avatar">
-              {{ conversation.sellerName.slice(0, 1) }}
+            <div
+              :class="[
+                'session-item__avatar',
+                conversation.isNotification
+                  ? 'session-item__avatar--notification'
+                  : '',
+              ]"
+            >
+              <span
+                v-if="conversation.isNotification"
+                class="session-item__avatar-icon"
+                >🔔</span
+              >
+              <template v-else>
+                {{ conversation.sellerName.slice(0, 1) }}
+              </template>
             </div>
             <div class="session-item__content">
               <div class="session-item__top">
@@ -72,7 +87,11 @@
                   conversation.lastTime
                 }}</time>
               </div>
-              <p class="session-item__item" :title="conversation.itemTitle">
+              <p
+                v-if="!conversation.isNotification"
+                class="session-item__item"
+                :title="conversation.itemTitle"
+              >
                 {{ conversation.itemTitle }}
               </p>
               <div class="session-item__bottom">
@@ -100,14 +119,19 @@
 
       <section class="conversation-panel">
         <template v-if="hasActivePanel">
-          <header class="conversation-topbar">
+          <header
+            :class="[
+              'conversation-topbar',
+              isNotificationPanel ? 'conversation-topbar--notification' : '',
+            ]"
+          >
             <div class="conversation-peer">
               <div class="conversation-peer__head">
                 <h3 class="conversation-peer__name">
                   {{ activePanelName }}
                 </h3>
                 <button
-                  v-if="activeConversation"
+                  v-if="activeConversation && !isNotificationPanel"
                   class="conversation-home-btn"
                   type="button"
                   @click="goToSellerHome"
@@ -116,7 +140,10 @@
                 </button>
               </div>
 
-              <div v-if="activeConversation" class="conversation-item-row">
+              <div
+                v-if="activeConversation && !isNotificationPanel"
+                class="conversation-item-row"
+              >
                 <div class="conversation-item-link" @click="goToItemDetail">
                   <img
                     v-if="activeConversation.itemImage"
@@ -175,7 +202,7 @@
             </article>
           </div>
 
-          <footer class="composer">
+          <footer v-if="!isNotificationPanel" class="composer">
             <div class="composer-tools">
               <button
                 ref="emojiToggleBtnRef"
@@ -244,6 +271,8 @@
               />
             </div>
           </footer>
+
+          <footer v-else class="composer composer--readonly"></footer>
         </template>
 
         <section v-else class="conversation-empty">
@@ -279,6 +308,8 @@ import {
   createOrGetDirectConversation,
   fetchConversationMessages,
   fetchMessageConversations,
+  fetchMessageNotifications,
+  markAllMessageNotificationsRead,
   markConversationRead,
 } from "../service/chat/chatApiService";
 import data from "emoji-mart-vue-fast/data/all.json";
@@ -314,6 +345,17 @@ const reconnectTimerRef = ref(null);
 const isManualClose = ref(false);
 const isLoadingConversations = ref(false);
 const isLoadingMessages = ref(false);
+const NOTIFICATION_CONVERSATION_ID = "notification-system";
+const SUPPORTED_NOTIFICATION_TYPES = new Set([
+  "ITEM_FAVORITED",
+  "FAVORITE_PRICE_DROP",
+  "FAVORITE_OFF_SHELF",
+  "FOLLOWED",
+]);
+const notificationMessages = ref([]);
+const notificationUnread = ref(0);
+const notificationLastTime = ref("");
+const notificationLastMessage = ref("暂无通知");
 
 const normalizeConversation = (raw) => ({
   id: String(raw?.conversationId ?? ""),
@@ -400,15 +442,44 @@ const filteredConversations = computed(() => {
   return sortedConversations.value;
 });
 
+const notificationConversation = computed(() => ({
+  id: NOTIFICATION_CONVERSATION_ID,
+  sellerUserId: null,
+  sellerName: "通知消息",
+  itemId: null,
+  itemTitle: "",
+  itemImage: "",
+  unread: notificationUnread.value,
+  lastMessage: notificationLastMessage.value,
+  lastTime: notificationLastTime.value,
+  updatedAt: Date.now(),
+  messages: notificationMessages.value,
+  isNotification: true,
+}));
+
+const displayConversations = computed(() => [
+  notificationConversation.value,
+  ...filteredConversations.value,
+]);
+
 const activeConversation = computed(() =>
   conversationList.value.find(
     (conversation) => conversation.id === selectedConversationId.value
   )
 );
 
-const hasActivePanel = computed(() => Boolean(activeConversation.value));
+const isNotificationPanel = computed(
+  () => selectedConversationId.value === NOTIFICATION_CONVERSATION_ID
+);
+
+const hasActivePanel = computed(
+  () => isNotificationPanel.value || Boolean(activeConversation.value)
+);
 
 const activePanelName = computed(() => {
+  if (isNotificationPanel.value) {
+    return "通知消息";
+  }
   if (activeConversation.value) {
     return activeConversation.value.sellerName;
   }
@@ -416,11 +487,61 @@ const activePanelName = computed(() => {
 });
 
 const activePanelMessages = computed(() => {
+  if (isNotificationPanel.value) {
+    return notificationMessages.value;
+  }
   if (activeConversation.value) {
     return activeConversation.value.messages;
   }
   return [];
 });
+
+const normalizeNotification = (raw) => ({
+  id: Number.isInteger(raw?.id) ? raw.id : Date.now(),
+  type: typeof raw?.type === "string" ? raw.type : "",
+  title: typeof raw?.title === "string" ? raw.title.trim() : "",
+  content: typeof raw?.content === "string" ? raw.content.trim() : "",
+  read: Boolean(raw?.read),
+  createdAt: typeof raw?.createdAt === "string" ? raw.createdAt.trim() : "",
+});
+
+const toNotificationMessage = (item) => ({
+  id: `notification-${item.id}`,
+  from: "other",
+  text: item.content,
+  imageUrl: "",
+  time: item.createdAt,
+  messageType: "SYSTEM_NOTIFICATION",
+  reviewOrderId: null,
+  reviewStatus: "",
+  notificationTitle: item.title,
+});
+
+const loadNotifications = async ({ markRead = false } = {}) => {
+  const responseBody = await fetchMessageNotifications(50);
+  const list = Array.isArray(responseBody?.data) ? responseBody.data : [];
+  const normalized = list
+    .map(normalizeNotification)
+    .filter((item) => SUPPORTED_NOTIFICATION_TYPES.has(item.type));
+
+  const unreadCount = normalized.filter((item) => !item.read).length;
+  notificationUnread.value = unreadCount;
+
+  if (normalized.length > 0) {
+    notificationLastMessage.value = normalized[0].content || "暂无通知";
+    notificationLastTime.value = normalized[0].createdAt || "";
+  } else {
+    notificationLastMessage.value = "暂无通知";
+    notificationLastTime.value = "";
+  }
+
+  notificationMessages.value = normalized.map(toNotificationMessage);
+
+  if (markRead && unreadCount > 0) {
+    await markAllMessageNotificationsRead();
+    notificationUnread.value = 0;
+  }
+};
 
 const getNowTime = () => {
   const date = new Date();
@@ -444,6 +565,18 @@ watch(
 );
 
 const selectConversation = (conversationId) => {
+  if (conversationId === NOTIFICATION_CONVERSATION_ID) {
+    selectedConversationId.value = conversationId;
+    loadNotifications({ markRead: true })
+      .then(() => {
+        scrollToBottom();
+      })
+      .catch((error) => {
+        ElMessage.error(error.message || "加载通知失败");
+      });
+    return;
+  }
+
   selectedConversationId.value = conversationId;
   loadMessages(conversationId);
   const current = conversationList.value.find(
@@ -458,14 +591,13 @@ const selectConversation = (conversationId) => {
 const loadConversations = async () => {
   isLoadingConversations.value = true;
   try {
-    const responseBody = await fetchMessageConversations("all");
+    const [responseBody] = await Promise.all([
+      fetchMessageConversations("all"),
+      loadNotifications(),
+    ]);
     const list = Array.isArray(responseBody?.data) ? responseBody.data : [];
     conversationList.value = list.map(normalizeConversation);
-    if (conversationList.value.length > 0) {
-      const firstId = conversationList.value[0].id;
-      selectedConversationId.value = firstId;
-      await loadMessages(firstId);
-    }
+    selectedConversationId.value = NOTIFICATION_CONVERSATION_ID;
   } catch (error) {
     ElMessage.error(error.message || "加载消息列表失败");
   } finally {
@@ -669,6 +801,11 @@ const handleClickOutsideEmojiPanel = (event) => {
 };
 
 const sendMessage = () => {
+  if (isNotificationPanel.value) {
+    ElMessage.warning("通知消息仅支持查看，不可回复");
+    return;
+  }
+
   const current = activeConversation.value;
   if (!current) {
     ElMessage.warning("请先选择一个会话");
@@ -915,6 +1052,7 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr);
   gap: 8px;
+  border: 1px solid transparent;
   background: #ffffff;
   cursor: pointer;
   transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
@@ -927,7 +1065,23 @@ onBeforeUnmount(() => {
 }
 
 .session-item--active {
+  background: #f3efff;
+}
+
+.session-item--notification {
+  border-color: transparent;
   background: #ffffff;
+}
+
+.session-item--notification:hover {
+  background: #ffffff;
+  box-shadow: 0 8px 16px rgba(140, 124, 240, 0.12);
+}
+
+.session-item--notification.session-item--active {
+  background: #fffdf5;
+  border-color: #f1e6b5;
+  box-shadow: 0 8px 16px rgba(216, 188, 83, 0.22);
 }
 
 .session-item__avatar {
@@ -941,6 +1095,16 @@ onBeforeUnmount(() => {
   color: #5e4eb6;
   font-size: 24px;
   font-weight: 700;
+}
+
+.session-item__avatar--notification {
+  background: linear-gradient(135deg, #8f7fee, #b891f4);
+  color: #f7f4ff;
+  font-size: 20px;
+}
+
+.session-item__avatar-icon {
+  line-height: 1;
 }
 
 .session-item__top {
@@ -1029,6 +1193,10 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   align-items: center;
   gap: 10px;
+}
+
+.conversation-topbar--notification {
+  border-bottom: none;
 }
 
 .conversation-topbar::after {
@@ -1207,6 +1375,14 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.composer--readonly {
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  border-top: none;
+  padding: 0;
 }
 
 .composer-tools {

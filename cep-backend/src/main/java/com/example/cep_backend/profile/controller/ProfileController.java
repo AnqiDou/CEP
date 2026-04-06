@@ -10,12 +10,14 @@ import com.example.cep_backend.profile.dto.OtherProfileReviewSummaryDto;
 import com.example.cep_backend.profile.dto.ProfileOverviewDto;
 import com.example.cep_backend.profile.dto.ProfilePendingTradeDto;
 import com.example.cep_backend.profile.dto.ProfileReviewSummaryDto;
+import com.example.cep_backend.profile.dto.ProfileTradeContactDto;
 import com.example.cep_backend.profile.dto.ProfileTradeItemDto;
 import com.example.cep_backend.profile.dto.ProfileUpdateRequest;
 import com.example.cep_backend.profile.service.ProfileService;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -86,6 +88,30 @@ public class ProfileController {
             @RequestHeader("Authorization") String authorization) {
         AuthUserDto user = authService.currentUser(authorization);
         return ApiResponse.ok("获取成功", profileService.getPendingPaymentTrades(user.userId()));
+    }
+
+    @GetMapping("/trades/sold/{orderId}/contact")
+    public ApiResponse<ProfileTradeContactDto> getSoldOrderBuyerContact(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long orderId) {
+        AuthUserDto user = authService.currentUser(authorization);
+        return ApiResponse.ok("获取成功", profileService.getSoldOrderBuyerContact(user.userId(), orderId));
+    }
+
+    @GetMapping("/trades/bought/{orderId}/contact")
+    public ApiResponse<ProfileTradeContactDto> getBoughtOrderSellerContact(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long orderId) {
+        AuthUserDto user = authService.currentUser(authorization);
+        return ApiResponse.ok("获取成功", profileService.getBoughtOrderSellerContact(user.userId(), orderId));
+    }
+
+    @PostMapping("/trades/bought/{orderId}/rebuy")
+    public ApiResponse<ProfileTradeItemDto> rebuyBoughtOrder(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long orderId) {
+        AuthUserDto user = authService.currentUser(authorization);
+        return ApiResponse.ok("获取成功", profileService.rebuyItem(user.userId(), orderId));
     }
 
     @PutMapping("/basic")

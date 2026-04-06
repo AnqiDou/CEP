@@ -396,7 +396,9 @@
                     </div>
                   </div>
                 </div>
-                <p class="published-card__meta">{{ item.price }} · {{ item.time }}</p>
+                <p class="published-card__meta">
+                  {{ item.price }} · {{ item.time }}
+                </p>
                 <p
                   v-if="item.description"
                   class="published-card__desc"
@@ -454,6 +456,30 @@
                   @click="handleTradeOrderCancel(item)"
                 >
                   取消订单
+                </button>
+                <button
+                  v-if="selectedMenu === 'trade-sold'"
+                  class="section-item__btn section-item__btn--contact"
+                  type="button"
+                  @click="handleContactBuyer(item)"
+                >
+                  联系买家
+                </button>
+                <button
+                  v-if="selectedMenu === 'trade-bought'"
+                  class="section-item__btn section-item__btn--contact"
+                  type="button"
+                  @click="handleContactSeller(item)"
+                >
+                  联系卖家
+                </button>
+                <button
+                  v-if="selectedMenu === 'trade-bought'"
+                  class="section-item__btn section-item__btn--rebuy"
+                  type="button"
+                  @click="handleRebuy(item)"
+                >
+                  再次购买
                 </button>
                 <button
                   class="section-item__btn"
@@ -586,11 +612,14 @@ import {
   logout,
 } from "../service/common/authSessionService";
 import {
+  fetchBoughtOrderContact,
   fetchBoughtItems,
   fetchFavoriteItems,
   fetchPendingPaymentTrades,
   fetchProfileOverview,
   fetchProfileReviews,
+  fetchSoldOrderContact,
+  rebuyBoughtOrder,
   fetchSoldItems,
   updateProfileBasic,
   uploadProfileAvatar,
@@ -1255,6 +1284,72 @@ const handleTradeOrderCancel = async (item) => {
       return;
     }
     ElMessage.error(error.message || "取消订单失败");
+  }
+};
+
+const getTradeOrderId = (item) => item?.orderId || item?.id;
+
+const openContactChat = async (item, fetchContactFn) => {
+  const orderId = getTradeOrderId(item);
+  if (!orderId) {
+    ElMessage.warning("订单信息无效");
+    return;
+  }
+
+  const responseBody = await fetchContactFn(orderId);
+  const contact = responseBody?.data || {};
+  const peerUserId = Number(contact.peerUserId || 0);
+  const itemId = Number(contact.itemId || item?.itemId || 0);
+  if (!peerUserId || !itemId) {
+    throw new Error("交易联系人信息无效");
+  }
+
+  await router.push({
+    name: "chat",
+    query: {
+      sellerUserId: String(peerUserId),
+      itemId: String(itemId),
+      sellerName: contact.peerName || "校园用户",
+      itemTitle: contact.itemTitle || item?.title || "未命名物品",
+    },
+  });
+};
+
+const handleContactBuyer = async (item) => {
+  try {
+    await openContactChat(item, fetchSoldOrderContact);
+  } catch (error) {
+    ElMessage.error(error.message || "打开会话失败");
+  }
+};
+
+const handleContactSeller = async (item) => {
+  try {
+    await openContactChat(item, fetchBoughtOrderContact);
+  } catch (error) {
+    ElMessage.error(error.message || "打开会话失败");
+  }
+};
+
+const handleRebuy = async (item) => {
+  const orderId = getTradeOrderId(item);
+  if (!orderId) {
+    ElMessage.warning("订单信息无效");
+    return;
+  }
+
+  try {
+    const responseBody = await rebuyBoughtOrder(orderId);
+    const itemId = Number(responseBody?.data?.itemId || item?.itemId || 0);
+    if (!itemId) {
+      throw new Error("商品信息无效，暂无法再次购买");
+    }
+    await router.push({
+      name: "confirm-order",
+      query: { itemId: String(itemId) },
+    });
+  } catch (error) {
+    ElMessage.error(error.message || "再次购买失败");
   }
 };
 
@@ -2027,7 +2122,8 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  background: #f7f3ff;
+  background: #ffffff;
+  border: 1px solid #ece8fb;
 }
 
 .section-item__title {
@@ -2071,6 +2167,14 @@ onMounted(async () => {
 
 .section-item__btn--shelf {
   background: #72c8a0;
+}
+
+.section-item__btn--contact {
+  background: #7f72e8;
+}
+
+.section-item__btn--rebuy {
+  background: #5ca7ee;
 }
 
 .edit-avatar-row {

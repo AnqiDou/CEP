@@ -157,9 +157,16 @@ public class PublishService {
         if (itemId == null || itemId <= 0) {
             throw new BusinessException("物品信息无效");
         }
+
+        PublishRepository.PublishOwnedItemBaseRecord existing = publishRepository.findOwnedItem(userId, itemId)
+                .orElseThrow(() -> new BusinessException("物品不存在或无操作权限"));
         int updated = publishRepository.markDeleted(userId, itemId, LocalDateTime.now());
         if (updated <= 0) {
             throw new BusinessException("物品不存在或无操作权限");
+        }
+
+        if (!STATUS_OFF_SHELF.equals(existing.status()) && !STATUS_DELETED.equals(existing.status())) {
+            messageNotificationService.notifyFavoriteOffShelf(itemId, userId);
         }
     }
 
@@ -176,6 +183,9 @@ public class PublishService {
         if (!STATUS_PUBLISHED.equals(normalized) && !STATUS_OFF_SHELF.equals(normalized)) {
             throw new BusinessException("状态无效，仅支持 PUBLISHED / OFF_SHELF");
         }
+
+        PublishRepository.PublishOwnedItemBaseRecord before = publishRepository.findOwnedItem(userId, itemId)
+                .orElseThrow(() -> new BusinessException("物品不存在或无操作权限"));
 
         int updated = publishRepository.updateStatus(userId, itemId, normalized, LocalDateTime.now());
         if (updated <= 0) {
@@ -198,6 +208,10 @@ public class PublishService {
                         item.usageDuration(),
                         now);
             }
+        }
+
+        if (STATUS_OFF_SHELF.equals(normalized) && !STATUS_OFF_SHELF.equals(before.status())) {
+            messageNotificationService.notifyFavoriteOffShelf(itemId, userId);
         }
 
         return toOwnedItemDto(item, publishRepository.findPhotoUrlsByItemId(itemId));

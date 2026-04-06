@@ -10,6 +10,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -111,13 +112,16 @@ public class AdminRepository {
         return result;
     }
 
-    public List<AdminUserDto> listUsers(String keyword) {
+    public List<AdminUserDto> listUsers(String keyword, String username, String phone, String email) {
         String normalized = keyword == null ? "" : keyword.trim();
+        String normalizedUsername = username == null ? "" : username.trim();
+        String normalizedPhone = phone == null ? "" : phone.trim();
+        String normalizedEmail = email == null ? "" : email.trim();
         String sql = """
                 SELECT
                     u.id,
                     COALESCE(NULLIF(u.username, ''), u.email) AS display_name,
-                    '' AS phone,
+                    COALESCE(p.phone, '') AS phone,
                     u.email,
                     u.created_at,
                     CASE WHEN u.status = 'DISABLED' THEN 1 ELSE 0 END AS disabled,
@@ -135,10 +139,16 @@ public class AdminRepository {
                 FROM users u
                 LEFT JOIN user_profiles p ON p.user_id = u.id
                 WHERE u.status <> 'DELETED'
-                  AND (? = '' OR u.email LIKE ? OR u.username LIKE ?)
+                  AND (? = '' OR u.email LIKE ? OR u.username LIKE ? OR p.phone LIKE ?)
+                  AND (? = '' OR u.username LIKE ?)
+                  AND (? = '' OR p.phone LIKE ?)
+                  AND (? = '' OR u.email LIKE ?)
                 ORDER BY u.created_at DESC, u.id DESC
                 """;
         String like = "%" + normalized + "%";
+        String likeUsername = "%" + normalizedUsername + "%";
+        String likePhone = "%" + normalizedPhone + "%";
+        String likeEmail = "%" + normalizedEmail + "%";
         return jdbcTemplate.query(sql, (rs, rowNum) -> new AdminUserDto(
                 rs.getLong("id"),
                 rs.getString("display_name"),
@@ -147,7 +157,17 @@ public class AdminRepository {
                 rs.getTimestamp("created_at").toLocalDateTime(),
                 rs.getBoolean("disabled"),
                 rs.getInt("item_count"),
-                rs.getInt("order_count")), normalized, like, like);
+                rs.getInt("order_count")),
+                normalized,
+                like,
+                like,
+                like,
+                normalizedUsername,
+                likeUsername,
+                normalizedPhone,
+                likePhone,
+                normalizedEmail,
+                likeEmail);
     }
 
     public int updateUserStatus(Long userId, String status, LocalDateTime now) {
@@ -172,8 +192,18 @@ public class AdminRepository {
         return jdbcTemplate.update(sql, Timestamp.valueOf(now), userId);
     }
 
-    public List<AdminItemDto> listItems(String keyword, String status) {
+    public List<AdminItemDto> listItems(
+            String keyword,
+            String title,
+            String category,
+            String price,
+            String publisher,
+            String status) {
         String normalizedKeyword = keyword == null ? "" : keyword.trim();
+        String normalizedTitle = title == null ? "" : title.trim();
+        String normalizedCategory = category == null ? "" : category.trim();
+        String normalizedPrice = price == null ? "" : price.trim();
+        String normalizedPublisher = publisher == null ? "" : publisher.trim();
         String normalizedStatus = status == null ? "all" : status.trim().toLowerCase();
         String itemStatus = mapItemStatus(normalizedStatus);
         String sql = """
@@ -194,18 +224,42 @@ public class AdminRepository {
                     LIMIT 1
                 ))
                 WHERE i.status <> 'DELETED'
-                  AND (? = '' OR i.title LIKE ? OR c.name LIKE ?)
+                  AND (? = '' OR i.title LIKE ? OR c.name LIKE ? OR COALESCE(u.username, '') LIKE ? OR COALESCE(u.email, '') LIKE ?)
+                  AND (? = '' OR i.title LIKE ?)
+                  AND (? = '' OR c.name LIKE ?)
+                  AND (? = '' OR CAST(i.price AS CHAR) LIKE ?)
+                  AND (? = '' OR COALESCE(u.username, '') LIKE ? OR COALESCE(u.email, '') LIKE ?)
                   AND (? = 'ALL' OR i.status = ?)
                 ORDER BY i.created_at DESC, i.id DESC
                 """;
         String like = "%" + normalizedKeyword + "%";
+        String likeTitle = "%" + normalizedTitle + "%";
+        String likeCategory = "%" + normalizedCategory + "%";
+        String likePrice = "%" + normalizedPrice + "%";
+        String likePublisher = "%" + normalizedPublisher + "%";
         return jdbcTemplate.query(sql, (rs, rowNum) -> new AdminItemDto(
                 rs.getLong("id"),
                 rs.getString("title"),
                 rs.getString("category_name"),
                 rs.getBigDecimal("price"),
                 rs.getString("owner_name"),
-                rs.getString("status")), normalizedKeyword, like, like, itemStatus, itemStatus);
+                rs.getString("status")),
+                normalizedKeyword,
+                like,
+                like,
+                like,
+                like,
+                normalizedTitle,
+                likeTitle,
+                normalizedCategory,
+                likeCategory,
+                normalizedPrice,
+                likePrice,
+                normalizedPublisher,
+                likePublisher,
+                likePublisher,
+                itemStatus,
+                itemStatus);
     }
 
     public int updateItemStatus(Long itemId, String status, LocalDateTime now) {
@@ -230,8 +284,18 @@ public class AdminRepository {
         return jdbcTemplate.update(sql, Timestamp.valueOf(now), itemId);
     }
 
-    public List<AdminOrderDto> listOrders(String keyword, String status) {
+    public List<AdminOrderDto> listOrders(
+            String keyword,
+            String orderNo,
+            String buyer,
+            String seller,
+            String itemTitle,
+            String status) {
         String normalizedKeyword = keyword == null ? "" : keyword.trim();
+        String normalizedOrderNo = orderNo == null ? "" : orderNo.trim();
+        String normalizedBuyer = buyer == null ? "" : buyer.trim();
+        String normalizedSeller = seller == null ? "" : seller.trim();
+        String normalizedItemTitle = itemTitle == null ? "" : itemTitle.trim();
         String normalizedStatus = status == null ? "all" : status.trim().toLowerCase();
         String orderStatus = mapOrderStatus(normalizedStatus);
         String sql = """
@@ -248,17 +312,43 @@ public class AdminRepository {
                 WHERE (? = '' OR o.order_no LIKE ? OR o.item_title LIKE ?
                     OR b.email LIKE ? OR b.username LIKE ?
                     OR s.email LIKE ? OR s.username LIKE ?)
+                  AND (? = '' OR o.order_no LIKE ?)
+                  AND (? = '' OR b.email LIKE ? OR b.username LIKE ?)
+                  AND (? = '' OR s.email LIKE ? OR s.username LIKE ?)
+                  AND (? = '' OR o.item_title LIKE ?)
                   AND (? = 'ALL' OR o.status = ?)
                 ORDER BY o.created_at DESC, o.id DESC
                 """;
         String like = "%" + normalizedKeyword + "%";
+        String likeOrderNo = "%" + normalizedOrderNo + "%";
+        String likeBuyer = "%" + normalizedBuyer + "%";
+        String likeSeller = "%" + normalizedSeller + "%";
+        String likeItemTitle = "%" + normalizedItemTitle + "%";
         return jdbcTemplate.query(sql, (rs, rowNum) -> new AdminOrderDto(
                 rs.getString("order_no"),
                 rs.getString("item_title"),
                 rs.getString("buyer_name"),
                 rs.getString("seller_name"),
                 rs.getBigDecimal("amount"),
-                rs.getString("status")), normalizedKeyword, like, like, like, like, like, like, orderStatus,
+                rs.getString("status")),
+                normalizedKeyword,
+                like,
+                like,
+                like,
+                like,
+                like,
+                like,
+                normalizedOrderNo,
+                likeOrderNo,
+                normalizedBuyer,
+                likeBuyer,
+                likeBuyer,
+                normalizedSeller,
+                likeSeller,
+                likeSeller,
+                normalizedItemTitle,
+                likeItemTitle,
+                orderStatus,
                 orderStatus);
     }
 
@@ -288,6 +378,7 @@ public class AdminRepository {
                     m.id AS message_id,
                     m.sender_type,
                     m.content,
+                    m.image_url,
                     m.created_at,
                     u.email AS reporter_email,
                     u.username AS reporter_username,
@@ -327,6 +418,7 @@ public class AdminRepository {
                         messageId.longValue(),
                         from,
                         String.valueOf(row.get("content")),
+                        toNullableString(row.get("image_url")),
                         createdAt));
             }
         }
@@ -359,16 +451,18 @@ public class AdminRepository {
         return list.isEmpty() ? null : list.getFirst();
     }
 
-    public int insertSupportMessage(Long conversationId, String senderType, String content, LocalDateTime now) {
+    public int insertSupportMessage(Long conversationId, String senderType, String content, String imageUrl,
+            LocalDateTime now) {
         String sql = """
                 INSERT INTO admin_support_messages (
                     conversation_id,
                     sender_type,
                     content,
+                    image_url,
                     created_at
-                ) VALUES (?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?)
                 """;
-        return jdbcTemplate.update(sql, conversationId, senderType, content, Timestamp.valueOf(now));
+        return jdbcTemplate.update(sql, conversationId, senderType, content, imageUrl, Timestamp.valueOf(now));
     }
 
     public int touchConversation(Long conversationId, String preview, LocalDateTime now) {
@@ -462,7 +556,7 @@ public class AdminRepository {
 
     public List<AdminSupportMessageDto> listSupportMessages(Long conversationId) {
         String sql = """
-                SELECT id, sender_type, content, created_at
+                SELECT id, sender_type, content, image_url, created_at
                 FROM admin_support_messages
                 WHERE conversation_id = ?
                 ORDER BY created_at ASC, id ASC
@@ -474,6 +568,7 @@ public class AdminRepository {
                     rs.getLong("id"),
                     from,
                     rs.getString("content"),
+                    rs.getString("image_url"),
                     rs.getTimestamp("created_at").toLocalDateTime());
         }, conversationId);
     }

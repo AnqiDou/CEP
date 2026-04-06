@@ -166,6 +166,7 @@
 
 - `ITEM_FAVORITED`：商品被收藏
 - `FAVORITE_PRICE_DROP`：收藏商品降价
+- `FAVORITE_OFF_SHELF`：收藏商品下架
 - `FOLLOWED`：被关注
 
 ---
@@ -212,4 +213,5 @@
 
 1. 商品被收藏：用户收藏他人商品后，向商品发布者发送 `ITEM_FAVORITED`
 2. 收藏商品降价：卖家编辑商品价格且新价格低于原价格时，向收藏该商品的用户发送 `FAVORITE_PRICE_DROP`
-3. 被关注：用户关注他人后，向被关注者发送 `FOLLOWED`
+3. 收藏商品下架：卖家将商品下架或删除时，向收藏该商品的用户发送 `FAVORITE_OFF_SHELF`
+4. 被关注：用户关注他人后，向被关注者发送 `FOLLOWED`

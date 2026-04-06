@@ -404,6 +404,65 @@ public class ProfileRepository {
         jdbcTemplate.update(sql, userId, targetUserId);
     }
 
+    public TradeContactRecord findSoldOrderBuyerContact(Long userId, Long orderId) {
+        String sql = """
+                SELECT
+                    o.id AS order_id,
+                    o.item_id,
+                    COALESCE(NULLIF(o.item_title, ''), '未命名物品') AS item_title,
+                    o.buyer_user_id AS peer_user_id,
+                    COALESCE(NULLIF(u.username, ''), '校园用户') AS peer_name
+                FROM trade_orders o
+                LEFT JOIN users u ON u.id = o.buyer_user_id
+                WHERE o.id = ?
+                  AND o.seller_user_id = ?
+                LIMIT 1
+                """;
+        List<TradeContactRecord> list = jdbcTemplate.query(sql, (rs, rowNum) -> new TradeContactRecord(
+                rs.getLong("order_id"),
+                rs.getLong("item_id"),
+                rs.getString("item_title"),
+                rs.getObject("peer_user_id", Long.class),
+                rs.getString("peer_name")), orderId, userId);
+        return list.isEmpty() ? null : list.getFirst();
+    }
+
+    public TradeContactRecord findBoughtOrderSellerContact(Long userId, Long orderId) {
+        String sql = """
+                SELECT
+                    o.id AS order_id,
+                    o.item_id,
+                    COALESCE(NULLIF(o.item_title, ''), '未命名物品') AS item_title,
+                    o.seller_user_id AS peer_user_id,
+                    COALESCE(NULLIF(u.username, ''), '校园用户') AS peer_name
+                FROM trade_orders o
+                LEFT JOIN users u ON u.id = o.seller_user_id
+                WHERE o.id = ?
+                  AND o.buyer_user_id = ?
+                LIMIT 1
+                """;
+        List<TradeContactRecord> list = jdbcTemplate.query(sql, (rs, rowNum) -> new TradeContactRecord(
+                rs.getLong("order_id"),
+                rs.getLong("item_id"),
+                rs.getString("item_title"),
+                rs.getObject("peer_user_id", Long.class),
+                rs.getString("peer_name")), orderId, userId);
+        return list.isEmpty() ? null : list.getFirst();
+    }
+
+    public boolean isPublishedItemOwnedBy(Long itemId, Long sellerUserId) {
+        String sql = """
+                SELECT COUNT(1)
+                FROM items i
+                LEFT JOIN item_details d ON d.item_id = i.id
+                WHERE i.id = ?
+                  AND i.status = 'PUBLISHED'
+                  AND COALESCE(i.publisher_user_id, d.publisher_user_id) = ?
+                """;
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, itemId, sellerUserId);
+        return count != null && count > 0;
+    }
+
     private OtherProfileItemDto mapOtherItem(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
         Timestamp timestamp = rs.getTimestamp("created_at");
         LocalDateTime createdAt = timestamp == null ? LocalDateTime.now() : timestamp.toLocalDateTime();
@@ -428,6 +487,14 @@ public class ProfileRepository {
         public int total() {
             return goodCount + badCount;
         }
+    }
+
+    public record TradeContactRecord(
+            Long orderId,
+            Long itemId,
+            String itemTitle,
+            Long peerUserId,
+            String peerName) {
     }
 
     private String mapTradeOrderStatus(String status) {

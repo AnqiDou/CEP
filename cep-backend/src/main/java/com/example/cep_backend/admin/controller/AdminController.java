@@ -49,9 +49,12 @@ public class AdminController {
     @GetMapping("/users")
     public ApiResponse<List<AdminUserDto>> users(
             @RequestHeader("Authorization") String authorization,
-            @RequestParam(required = false) String keyword) {
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String phone,
+            @RequestParam(required = false) String email) {
         ensureAdmin(authorization);
-        return ApiResponse.ok("获取成功", adminService.listUsers(keyword));
+        return ApiResponse.ok("获取成功", adminService.listUsers(keyword, username, phone, email));
     }
 
     @PatchMapping("/users/{userId}/status")
@@ -77,9 +80,14 @@ public class AdminController {
     public ApiResponse<List<AdminItemDto>> items(
             @RequestHeader("Authorization") String authorization,
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String title,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String price,
+            @RequestParam(required = false) String publisher,
             @RequestParam(required = false) String status) {
         ensureAdmin(authorization);
-        return ApiResponse.ok("获取成功", adminService.listItems(keyword, status));
+        return ApiResponse.ok("获取成功",
+                adminService.listItems(keyword, title, category, price, publisher, status));
     }
 
     @PostMapping("/items/{itemId}/approve")
@@ -113,9 +121,13 @@ public class AdminController {
     public ApiResponse<List<AdminOrderDto>> orders(
             @RequestHeader("Authorization") String authorization,
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String orderNo,
+            @RequestParam(required = false) String buyer,
+            @RequestParam(required = false) String seller,
+            @RequestParam(required = false) String itemTitle,
             @RequestParam(required = false) String status) {
         ensureAdmin(authorization);
-        return ApiResponse.ok("获取成功", adminService.listOrders(keyword, status));
+        return ApiResponse.ok("获取成功", adminService.listOrders(keyword, orderNo, buyer, seller, itemTitle, status));
     }
 
     @PostMapping("/orders/{orderNo}/handle-abnormal")
@@ -140,7 +152,10 @@ public class AdminController {
             @PathVariable Long conversationId,
             @RequestBody AdminSupportReplyRequest request) {
         ensureAdmin(authorization);
-        adminService.replyConversation(conversationId, request == null ? null : request.content());
+        adminService.replyConversation(
+                conversationId,
+                request == null ? null : request.content(),
+                request == null ? null : request.imageUrl());
         return ApiResponse.ok("发送成功");
     }
 

@@ -29,15 +29,27 @@
 
 ## 2. 用户管理
 
-- `GET /api/admin/users?keyword=xxx`
-  - `keyword` 可选，支持邮箱/用户名模糊搜索
+- `GET /api/admin/users`
+  - 支持参数（均可选）：
+    - `keyword`：全局关键字（用户名/邮箱/电话）
+    - `username`：按用户名搜索
+    - `phone`：按电话搜索
+    - `email`：按邮箱搜索
 - `PATCH /api/admin/users/{userId}/status`
   - 请求体：`{ "disabled": true }`
 - `DELETE /api/admin/users/{userId}`
 
 ## 3. 商品管理
 
-- `GET /api/admin/items?keyword=xxx&status=all|pending|online|offline`
+- `GET /api/admin/items`
+  - 支持参数（均可选）：
+    - `keyword`：全局关键字
+    - `title`：商品名称
+    - `category`：分类
+    - `minPrice`：最低价格
+    - `maxPrice`：最高价格
+    - `publisher`：发布者（用户名/邮箱）
+    - `status`：`all|pending|online|offline`
 - `POST /api/admin/items/{itemId}/approve`
 - `POST /api/admin/items/{itemId}/offline`
 - `DELETE /api/admin/items/{itemId}`
@@ -50,7 +62,14 @@
 
 ## 4. 订单管理
 
-- `GET /api/admin/orders?keyword=xxx&status=all|pending-pay|completed|cancelled`
+- `GET /api/admin/orders`
+  - 支持参数（均可选）：
+    - `keyword`：全局关键字
+    - `orderNo`：订单号
+    - `buyer`：买家
+    - `seller`：卖家
+    - `itemTitle`：商品
+    - `status`：`all|pending-pay|completed|cancelled`
 - `POST /api/admin/orders/{orderNo}/handle-abnormal`
 
 状态映射：

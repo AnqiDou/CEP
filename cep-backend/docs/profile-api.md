@@ -147,7 +147,99 @@
 
 ---
 
-## 8. 编辑资料
+## 8. 获取我卖出的订单联系买家信息
+
+- **URL**: `GET /api/profile/trades/sold/{orderId}/contact`
+
+### Path 参数
+
+| 字段    | 类型 | 必填 | 说明    |
+| ------- | ---- | ---- | ------- |
+| orderId | long | 是   | 订单 ID |
+
+### 成功响应示例
+
+```json
+{
+  "success": true,
+  "message": "获取成功",
+  "data": {
+    "orderId": 100,
+    "itemId": 301,
+    "peerUserId": 12,
+    "peerName": "计算机学院-王同学",
+    "itemTitle": "机械键盘"
+  }
+}
+```
+
+---
+
+## 9. 获取我买到的订单联系卖家信息
+
+- **URL**: `GET /api/profile/trades/bought/{orderId}/contact`
+
+### Path 参数
+
+| 字段    | 类型 | 必填 | 说明    |
+| ------- | ---- | ---- | ------- |
+| orderId | long | 是   | 订单 ID |
+
+### 成功响应示例
+
+```json
+{
+  "success": true,
+  "message": "获取成功",
+  "data": {
+    "orderId": 101,
+    "itemId": 302,
+    "peerUserId": 9,
+    "peerName": "信息学院-陈同学",
+    "itemTitle": "宿舍护眼台灯"
+  }
+}
+```
+
+---
+
+## 10. 我买到的再次购买校验接口
+
+- **URL**: `POST /api/profile/trades/bought/{orderId}/rebuy`
+
+### Path 参数
+
+| 字段    | 类型 | 必填 | 说明    |
+| ------- | ---- | ---- | ------- |
+| orderId | long | 是   | 订单 ID |
+
+### 说明
+
+- 校验该订单是否属于当前买家
+- 校验原商品是否仍为上架状态（`PUBLISHED`）
+- 通过后返回可再次购买的商品信息（前端据此跳转下单页）
+
+### 成功响应示例
+
+```json
+{
+  "success": true,
+  "message": "获取成功",
+  "data": {
+    "id": 101,
+    "itemId": 302,
+    "title": "宿舍护眼台灯",
+    "price": null,
+    "time": "",
+    "photoUrl": "",
+    "status": "PUBLISHED"
+  }
+}
+```
+
+---
+
+## 11. 编辑资料
 
 - **URL**: `PUT /api/profile/basic`
 - **Content-Type**: `application/json`
@@ -172,7 +264,7 @@
 
 ---
 
-## 9. 上传头像（腾讯云 COS）
+## 12. 上传头像（腾讯云 COS）
 
 - **URL**: `POST /api/profile/avatar`
 - **Content-Type**: `multipart/form-data`
@@ -197,7 +289,7 @@
 
 ---
 
-## 10. 已调整接口（支付下单）
+## 13. 已调整接口（支付下单）
 
 - **URL**: `POST /api/payment/orders`
 - **变更点**: 现在需要登录态（`Authorization: Bearer {accessToken}`），后端会自动记录买家/卖家用户 ID，用于“我买到的 / 我卖出的 / 待付款”列表。

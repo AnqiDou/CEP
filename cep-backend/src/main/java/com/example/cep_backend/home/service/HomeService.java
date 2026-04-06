@@ -5,6 +5,7 @@ import com.example.cep_backend.auth.service.AuthService;
 import com.example.cep_backend.home.dto.HomeCategoryDto;
 import com.example.cep_backend.home.dto.HomeItemDto;
 import com.example.cep_backend.home.dto.HomeItemListDto;
+import com.example.cep_backend.home.dto.HomeNoticeDto;
 import com.example.cep_backend.home.dto.HotKeywordDto;
 import com.example.cep_backend.home.model.HomeCategoryRecord;
 import com.example.cep_backend.home.model.HomeItemRecord;
@@ -139,6 +140,11 @@ public class HomeService {
                 .toList();
     }
 
+    public List<HomeNoticeDto> listHomeNotices(Integer limit) {
+        int safeLimit = normalizeNoticeLimit(limit);
+        return homeRepository.findHomeNotices(safeLimit);
+    }
+
     private HomeCategoryDto mapCategory(HomeCategoryRecord record) {
         List<String> tags = Arrays.stream(record.tags().split(","))
                 .map(String::trim)
@@ -206,6 +212,16 @@ public class HomeService {
         }
         if (limit < 1 || limit > 20) {
             throw new BusinessException("limit 必须在 1 到 20 之间");
+        }
+        return limit;
+    }
+
+    private int normalizeNoticeLimit(Integer limit) {
+        if (limit == null) {
+            return 3;
+        }
+        if (limit < 1 || limit > 10) {
+            throw new BusinessException("limit 必须在 1 到 10 之间");
         }
         return limit;
     }

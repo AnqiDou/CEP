@@ -50,6 +50,21 @@
       </div>
     </header>
 
+    <section v-if="visibleHomeNotice" class="home-notice" role="status">
+      <div class="home-notice__content">
+        <span class="home-notice__label">平台公告</span>
+        <span class="home-notice__text">{{ visibleHomeNotice.content }}</span>
+      </div>
+      <button
+        type="button"
+        class="home-notice__close"
+        aria-label="关闭公告"
+        @click="closeHomeNotice"
+      >
+        ×
+      </button>
+    </section>
+
     <section v-if="!isSearchListOnlyMode" class="home-hero">
       <aside v-if="!isOpsListOnlyMode" class="home-ops">
         <div class="home-ops__layout">
@@ -657,6 +672,7 @@ import {
   fetchHomeCategories,
   fetchHotKeywords,
   fetchHomeItems,
+  fetchHomeNotices,
 } from "../service/home/homeApiService";
 import {
   fetchMessageConversations,
@@ -666,6 +682,7 @@ import {
 const router = useRouter();
 const route = useRoute();
 const ADMIN_EMAIL = "3299166215@qq.com";
+const HOME_NOTICE_CLOSED_ID_KEY = "home.notice.closed.id";
 const keyword = ref("");
 const searchedKeyword = ref("");
 const authModalType = ref("");
@@ -770,6 +787,8 @@ const cardGridRef = ref(null);
 const homeScrollRef = ref(null);
 const hotKeywords = ref([]);
 const unreadMessageCount = ref(0);
+const homeNotices = ref([]);
+const closedHomeNoticeId = ref("");
 const OPS_COLUMNS = [
   {
     id: "ops-benefit",
@@ -961,6 +980,27 @@ const blockDesc = computed(() => {
   return "";
 });
 
+const visibleHomeNotice = computed(() => {
+  const currentNotice = homeNotices.value[0] || null;
+  if (!currentNotice) {
+    return null;
+  }
+  const currentNoticeId = String(currentNotice.id || "");
+  if (currentNoticeId && currentNoticeId === closedHomeNoticeId.value) {
+    return null;
+  }
+  return currentNotice;
+});
+
+const restoreClosedHomeNoticeId = () => {
+  try {
+    closedHomeNoticeId.value =
+      localStorage.getItem(HOME_NOTICE_CLOSED_ID_KEY) || "";
+  } catch {
+    closedHomeNoticeId.value = "";
+  }
+};
+
 const displayedItems = computed(() => {
   if (isSearchListOnlyMode.value) {
     return sortItemsByOwnerPriority(listItems.value);
@@ -1005,12 +1045,7 @@ const displayedItems = computed(() => {
       const priceText = Number.isFinite(Number(item?.price))
         ? String(item.price)
         : "";
-      const searchable = [
-        item.title,
-        item.desc,
-        item.badge,
-        priceText,
-      ]
+      const searchable = [item.title, item.desc, item.badge, priceText]
         .map(normalizeText)
         .filter(Boolean)
         .join(" ");
@@ -1217,6 +1252,30 @@ const loadHotKeywords = async () => {
       : ["耳机", "自行车", "计算器", "考研资料", "宿舍收纳"];
   } catch {
     hotKeywords.value = ["耳机", "自行车", "计算器", "考研资料", "宿舍收纳"];
+  }
+};
+
+const loadHomeNotices = async () => {
+  try {
+    const responseBody = await fetchHomeNotices(3);
+    homeNotices.value = Array.isArray(responseBody?.data)
+      ? responseBody.data
+      : [];
+  } catch {
+    homeNotices.value = [];
+  }
+};
+
+const closeHomeNotice = () => {
+  const currentNoticeId = String(visibleHomeNotice.value?.id || "");
+  if (!currentNoticeId) {
+    return;
+  }
+  closedHomeNoticeId.value = currentNoticeId;
+  try {
+    localStorage.setItem(HOME_NOTICE_CLOSED_ID_KEY, currentNoticeId);
+  } catch {
+    // ignore
   }
 };
 
@@ -1909,9 +1968,11 @@ const submitRegister = async () => {
 };
 
 onMounted(async () => {
+  restoreClosedHomeNoticeId();
   await initAuthSession();
   await consumeLoginRequiredQuery();
   await loadUnreadMessageCount();
+  await loadHomeNotices();
   homeError.value = "";
   try {
     if (isSearchListOnlyMode.value) {
@@ -2004,6 +2065,57 @@ watch(
   background: rgba(255, 255, 255, 0.88);
   border-bottom: 1px solid #efedf8;
   backdrop-filter: blur(10px);
+}
+
+.home-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 10px 28px 0;
+  padding: 10px 14px;
+  border: 1px solid #c4b5fd;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.home-notice__content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.home-notice__label {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6d28d9;
+  background: #efe7ff;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.home-notice__text {
+  min-width: 0;
+  color: #2f3150;
+  font-size: 16px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home-notice__close {
+  border: none;
+  background: transparent;
+  color: #000;
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 400;
+  padding: 0;
 }
 
 .home-header__left {
@@ -2991,6 +3103,11 @@ watch(
   .home-header__right {
     justify-content: flex-start;
     flex-wrap: wrap;
+  }
+
+  .home-notice {
+    margin-left: 16px;
+    margin-right: 16px;
   }
 
   .home-hero {

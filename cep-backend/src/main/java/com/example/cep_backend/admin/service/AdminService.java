@@ -83,8 +83,8 @@ public class AdminService {
                 stats);
     }
 
-    public List<AdminUserDto> listUsers(String keyword) {
-        return adminRepository.listUsers(keyword);
+    public List<AdminUserDto> listUsers(String keyword, String username, String phone, String email) {
+        return adminRepository.listUsers(keyword, username, phone, email);
     }
 
     @Transactional
@@ -110,8 +110,14 @@ public class AdminService {
         }
     }
 
-    public List<AdminItemDto> listItems(String keyword, String status) {
-        return adminRepository.listItems(keyword, status).stream()
+    public List<AdminItemDto> listItems(
+            String keyword,
+            String title,
+            String category,
+            String price,
+            String publisher,
+            String status) {
+        return adminRepository.listItems(keyword, title, category, price, publisher, status).stream()
                 .map(item -> new AdminItemDto(
                         item.id(),
                         item.title(),
@@ -143,8 +149,14 @@ public class AdminService {
         }
     }
 
-    public List<AdminOrderDto> listOrders(String keyword, String status) {
-        return adminRepository.listOrders(keyword, status).stream()
+    public List<AdminOrderDto> listOrders(
+            String keyword,
+            String orderNo,
+            String buyer,
+            String seller,
+            String itemTitle,
+            String status) {
+        return adminRepository.listOrders(keyword, orderNo, buyer, seller, itemTitle, status).stream()
                 .map(order -> new AdminOrderDto(
                         order.orderNo(),
                         order.itemTitle(),
@@ -171,27 +183,33 @@ public class AdminService {
     }
 
     @Transactional
-    public void replyConversation(Long conversationId, String content) {
+    public void replyConversation(Long conversationId, String content, String imageUrl) {
         if (conversationId == null || conversationId <= 0) {
             throw new BusinessException("会话参数无效");
         }
         if (!adminRepository.existsSupportConversation(conversationId)) {
             throw new BusinessException("会话不存在");
         }
-        if (content == null || content.trim().isEmpty()) {
-            throw new BusinessException("回复内容不能为空");
+        String trimmed = content == null ? "" : content.trim();
+        String normalizedImageUrl = imageUrl == null ? "" : imageUrl.trim();
+        if (trimmed.isEmpty() && normalizedImageUrl.isEmpty()) {
+            throw new BusinessException("回复内容或图片不能为空");
         }
-        String trimmed = content.trim();
         if (trimmed.length() > 500) {
             throw new BusinessException("回复内容不能超过500字");
         }
+        if (normalizedImageUrl.length() > 500) {
+            throw new BusinessException("图片地址过长");
+        }
+
+        String preview = trimmed.isEmpty() ? "[图片]" : trimmed;
 
         LocalDateTime now = LocalDateTime.now();
-        int inserted = adminRepository.insertSupportMessage(conversationId, "ADMIN", trimmed, now);
+        int inserted = adminRepository.insertSupportMessage(conversationId, "ADMIN", trimmed, normalizedImageUrl, now);
         if (inserted <= 0) {
             throw new BusinessException("会话不存在或回复失败");
         }
-        adminRepository.touchConversation(conversationId, trimmed, now);
+        adminRepository.touchConversation(conversationId, preview, now);
 
         Long reporterUserId = adminRepository.findReporterUserIdByConversationId(conversationId);
         if (reporterUserId != null && reporterUserId > 0) {
@@ -207,15 +225,15 @@ public class AdminService {
                             "客服工单",
                             "",
                             1,
-                            trimmed,
+                            preview,
                             now.toString()),
                     new MessageItemDto(
                             0L,
                             "other",
                             trimmed,
-                            "",
+                            normalizedImageUrl,
                             now.toString(),
-                            "TEXT",
+                            normalizedImageUrl.isEmpty() ? "TEXT" : "IMAGE",
                             null,
                             ""));
         }
@@ -239,7 +257,7 @@ public class AdminService {
         if (conversationId == null || conversationId <= 0) {
             conversationId = adminRepository.createSupportConversationForUser(
                     userId,
-                    "User support consultation",
+                    "客服咨询",
                     "OTHER",
                     trimmed,
                     trimmed.length() > 120 ? trimmed.substring(0, 120) : trimmed,
@@ -249,7 +267,7 @@ public class AdminService {
                 throw new BusinessException("创建客服会话失败");
             }
         }
-        adminRepository.insertSupportMessage(conversationId, "USER", trimmed, now);
+        adminRepository.insertSupportMessage(conversationId, "USER", trimmed, "", now);
         adminRepository.touchConversation(conversationId, trimmed, now);
 
         Long adminUserId = adminRepository.findUserIdByEmail(adminEmail);

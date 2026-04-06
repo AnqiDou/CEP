@@ -121,9 +121,12 @@ const formatTime = (value) => {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
+  const y = date.getFullYear();
+  const mon = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
   const h = String(date.getHours()).padStart(2, "0");
   const m = String(date.getMinutes()).padStart(2, "0");
-  return `${h}:${m}`;
+  return `${y}-${mon}-${d} ${h}:${m}`;
 };
 
 const parseMessagePayload = (content) => {
@@ -423,14 +426,14 @@ onBeforeUnmount(() => {
   max-width: min(72%, 620px);
   border-radius: 16px;
   padding: 10px 12px;
-  background: #f1ebff;
-  border: 1px solid #e4dbff;
+  background: #ffffff;
+  border: 1px solid #ece8ff;
   box-shadow: 0 8px 18px rgba(143, 125, 197, 0.12);
 }
 
 .message-item--self .message-bubble {
-  background: #fff3df;
-  border-color: #ffe1b8;
+  background: #f1ebff;
+  border-color: #ddcfff;
 }
 
 .message-image {
@@ -536,7 +539,7 @@ onBeforeUnmount(() => {
 
 .send-btn {
   border: none;
-  background: #f6ad62;
+  background: #7c3aed;
   color: #ffffff;
   border-radius: 999px;
   padding: 10px 22px;

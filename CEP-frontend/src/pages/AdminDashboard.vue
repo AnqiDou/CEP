@@ -14,7 +14,7 @@
             'menu-item',
             activeMenu === item.key ? 'menu-item--active' : '',
           ]"
-          @click="activeMenu = item.key"
+          @click="handleMenuClick(item.key)"
         >
           <span class="menu-item__label">{{ item.label }}</span>
           <span class="menu-item__count">{{ item.count }}</span>
@@ -33,7 +33,6 @@
         >
           <p class="metric-card__label">{{ metric.label }}</p>
           <p class="metric-card__value">{{ metric.value }}</p>
-          <p class="metric-card__desc">{{ metric.desc }}</p>
         </article>
 
         <article class="card panel chart-panel">
@@ -59,7 +58,6 @@
         <article class="card panel todo-panel">
           <h3>平台风险提醒</h3>
           <ul>
-            <li>今日待审核商品：{{ pendingItemCount }} 件</li>
             <li>待处理异常订单：{{ abnormalOrderCount }} 单</li>
             <li>待回复客服会话：{{ pendingConversationCount }} 条</li>
           </ul>
@@ -67,11 +65,11 @@
       </section>
 
       <section v-else-if="activeMenu === 'users'" class="card panel">
-        <div class="toolbar">
+        <div class="toolbar toolbar--multi">
           <input
             v-model.trim="userKeyword"
             class="toolbar-input"
-            placeholder="搜索昵称/邮箱/电话"
+            placeholder="搜索用户名 / 电话 / 邮箱"
           />
         </div>
         <div class="table-wrap">
@@ -89,7 +87,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="user in filteredUsers" :key="user.id">
+              <tr v-for="user in users" :key="user.id">
                 <td>{{ user.name }}</td>
                 <td>{{ user.phone || "-" }}</td>
                 <td>{{ user.email || "-" }}</td>
@@ -126,18 +124,52 @@
       </section>
 
       <section v-else-if="activeMenu === 'items'" class="card panel">
-        <div class="toolbar toolbar--multi">
+        <div class="toolbar toolbar--multi toolbar--grid4">
           <input
-            v-model.trim="itemKeyword"
+            v-model.trim="itemTitleKeyword"
             class="toolbar-input"
-            placeholder="搜索商品名/分类"
+            placeholder="商品名称"
           />
-          <select v-model="itemStatus" class="toolbar-select">
-            <option value="all">全部状态</option>
-            <option value="pending">待审核</option>
-            <option value="online">上架中</option>
-            <option value="offline">已下架</option>
-          </select>
+          <input
+            v-model.trim="itemCategoryKeyword"
+            class="toolbar-input"
+            placeholder="分类"
+          />
+          <input
+            v-model.trim="itemPriceKeyword"
+            class="toolbar-input"
+            placeholder="价格"
+          />
+          <input
+            v-model.trim="itemPublisherKeyword"
+            class="toolbar-input"
+            placeholder="发布者"
+          />
+          <div ref="itemStatusDropdownRef" class="status-select">
+            <button
+              type="button"
+              class="status-select__trigger"
+              @click="itemStatusOpen = !itemStatusOpen"
+            >
+              <span>{{ itemStatusLabel }}</span>
+              <span
+                class="status-select__arrow"
+                :class="{ 'is-open': itemStatusOpen }"
+                >▾</span
+              >
+            </button>
+            <ul v-if="itemStatusOpen" class="status-select__menu">
+              <li
+                v-for="option in itemStatusOptions"
+                :key="option.value"
+                class="status-select__option"
+                :class="{ 'is-selected': itemStatus === option.value }"
+                @click="selectItemStatus(option.value)"
+              >
+                {{ option.label }}
+              </li>
+            </ul>
+          </div>
         </div>
 
         <div class="table-wrap">
@@ -153,7 +185,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in filteredItems" :key="item.id">
+              <tr v-for="item in items" :key="item.id">
                 <td>{{ item.title }}</td>
                 <td>{{ item.category }}</td>
                 <td>￥{{ item.price }}</td>
@@ -194,18 +226,52 @@
       </section>
 
       <section v-else-if="activeMenu === 'orders'" class="card panel">
-        <div class="toolbar toolbar--multi">
+        <div class="toolbar toolbar--multi toolbar--grid4">
           <input
-            v-model.trim="orderKeyword"
+            v-model.trim="orderNoKeyword"
             class="toolbar-input"
-            placeholder="搜索订单号/买家/卖家/商品"
+            placeholder="订单号"
           />
-          <select v-model="orderState" class="toolbar-select">
-            <option value="all">全部状态</option>
-            <option value="pending-pay">待付款</option>
-            <option value="completed">已完成</option>
-            <option value="cancelled">已取消</option>
-          </select>
+          <input
+            v-model.trim="orderBuyerKeyword"
+            class="toolbar-input"
+            placeholder="买家"
+          />
+          <input
+            v-model.trim="orderSellerKeyword"
+            class="toolbar-input"
+            placeholder="卖家"
+          />
+          <input
+            v-model.trim="orderItemKeyword"
+            class="toolbar-input"
+            placeholder="商品"
+          />
+          <div ref="orderStateDropdownRef" class="status-select">
+            <button
+              type="button"
+              class="status-select__trigger"
+              @click="orderStateOpen = !orderStateOpen"
+            >
+              <span>{{ orderStateLabel }}</span>
+              <span
+                class="status-select__arrow"
+                :class="{ 'is-open': orderStateOpen }"
+                >▾</span
+              >
+            </button>
+            <ul v-if="orderStateOpen" class="status-select__menu">
+              <li
+                v-for="option in orderStateOptions"
+                :key="option.value"
+                class="status-select__option"
+                :class="{ 'is-selected': orderState === option.value }"
+                @click="selectOrderState(option.value)"
+              >
+                {{ option.label }}
+              </li>
+            </ul>
+          </div>
         </div>
         <div class="table-wrap">
           <table class="table">
@@ -221,7 +287,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="order in filteredOrders" :key="order.orderNo">
+              <tr v-for="order in orders" :key="order.orderNo">
                 <td>{{ order.orderNo }}</td>
                 <td>{{ order.itemTitle }}</td>
                 <td>{{ order.buyer }}</td>
@@ -260,47 +326,20 @@
               ]"
               @click="activeConversationId = session.id"
             >
-              <strong>{{ session.title }}</strong>
-              <span
+              <strong>{{ supportConversationTitle(session) }}</strong>
+              <span class="conversation-item__meta"
                 >{{ session.reporterName || "用户" }} ·
                 {{ mapReportTypeText(session.reportType) }}</span
               >
-              <span>{{ session.preview }}</span>
+              <span class="conversation-item__preview">{{
+                supportConversationPreview(session.preview)
+              }}</span>
             </button>
           </aside>
 
           <section class="conversation-main">
-            <h3>{{ currentConversation?.title || "请选择会话" }}</h3>
-            <div v-if="currentConversation" class="support-meta">
-              <span
-                :class="[
-                  'pill',
-                  supportStatusClass(currentConversation.status),
-                ]"
-              >
-                {{ supportStatusText(currentConversation.status) }}
-              </span>
-              <span>举报人：{{ currentConversation.reporterName || "-" }}</span>
-              <span>商品：{{ currentConversation.itemTitle || "-" }}</span>
-            </div>
-            <p v-if="currentConversation?.reportContent" class="report-content">
-              <strong>举报内容：</strong>{{ currentConversation.reportContent }}
-            </p>
-            <div class="chat-box">
-              <p
-                v-for="msg in currentConversation?.messages || []"
-                :key="msg.id"
-              >
-                <strong>{{ msg.from }}：</strong>{{ msg.content }}
-              </p>
-            </div>
-            <div class="toolbar">
-              <input
-                v-model.trim="supportReply"
-                class="toolbar-input"
-                placeholder="输入处理意见"
-              />
-              <button class="primary-btn" @click="appendReply">发送</button>
+            <div class="support-topbar">
+              <h3>{{ supportConversationTitle(currentConversation) }}</h3>
               <button
                 v-if="
                   currentConversation &&
@@ -320,26 +359,123 @@
                 重新打开
               </button>
             </div>
+            <div v-if="currentConversation" class="support-meta">
+              <span
+                :class="[
+                  'pill',
+                  supportStatusClass(currentConversation.status),
+                ]"
+              >
+                {{ supportStatusText(currentConversation.status) }}
+              </span>
+              <span>举报人：{{ currentConversation.reporterName || "-" }}</span>
+              <span>商品：{{ currentConversation.itemTitle || "-" }}</span>
+            </div>
+            <p v-if="currentConversation?.reportContent" class="report-content">
+              <strong>举报内容：</strong>{{ currentConversation.reportContent }}
+            </p>
+            <div class="chat-box">
+              <article
+                v-for="msg in currentConversation?.messages || []"
+                :key="msg.id"
+                :class="[
+                  'support-message',
+                  msg.from === '管理员'
+                    ? 'support-message--admin'
+                    : 'support-message--user',
+                ]"
+              >
+                <img
+                  v-if="getSupportMessageImageUrl(msg)"
+                  :src="getSupportMessageImageUrl(msg)"
+                  alt="客服图片"
+                  class="support-message__image"
+                />
+                <p
+                  v-if="getSupportMessageText(msg)"
+                  class="support-message__content"
+                >
+                  {{ getSupportMessageText(msg) }}
+                </p>
+                <time class="support-message__time">{{
+                  formatSupportMessageTime(msg.createdAt)
+                }}</time>
+              </article>
+            </div>
+            <div class="toolbar">
+              <input
+                ref="supportImageInputRef"
+                type="file"
+                class="support-image-input"
+                accept="image/*"
+                @change="handleSupportImageUpload"
+              />
+              <button
+                class="text-btn"
+                type="button"
+                :disabled="supportUploadingImage"
+                @click="openSupportImagePicker"
+              >
+                {{ supportUploadingImage ? "上传中..." : "发送图片" }}
+              </button>
+              <span v-if="pendingSupportImageUrl" class="support-image-ready"
+                >已选择图片</span
+              >
+              <input
+                v-model.trim="supportReply"
+                class="toolbar-input"
+                placeholder="输入处理意见"
+              />
+              <button class="primary-btn" @click="appendReply">发送</button>
+            </div>
           </section>
         </div>
       </section>
 
       <section v-else class="card panel">
         <div class="setting-block">
-          <h3>发布平台公告</h3>
-          <textarea
-            v-model="newNotice"
-            class="notice-input"
-            placeholder="请输入公告内容"
-          ></textarea>
-          <button class="primary-btn" @click="publishNotice">发布公告</button>
+          <div class="setting-header">
+            <h3>发布平台公告</h3>
+            <button class="primary-btn" @click="publishNotice">发布公告</button>
+          </div>
+          <div class="notice-editor">
+            <textarea
+              v-model="newNotice"
+              class="notice-input"
+              placeholder="请输入公告内容"
+            ></textarea>
+          </div>
+        </div>
+
+        <div class="setting-block">
+          <h3>当前公告</h3>
+          <div v-if="currentNotice" class="current-notice-card">
+            <div class="notice-item__content">
+              <p class="notice-item__text">{{ currentNotice.content }}</p>
+              <span class="notice-item__date"
+                >发布时间：{{ formatNoticeDate(currentNotice.createdAt) }}</span
+              >
+            </div>
+            <button
+              class="text-btn text-btn--danger"
+              @click="deleteNotice(currentNotice.id)"
+            >
+              删除
+            </button>
+          </div>
+          <p v-else class="notice-empty">暂无当前公告</p>
         </div>
 
         <div class="setting-block">
           <h3>历史公告</h3>
           <ul class="notice-list">
-            <li v-for="notice in notices" :key="notice.id">
-              <span>{{ notice.content }}</span>
+            <li v-for="notice in historyNotices" :key="notice.id">
+              <div class="notice-item__content">
+                <p class="notice-item__text">{{ notice.content }}</p>
+                <span class="notice-item__date"
+                  >发布时间：{{ formatNoticeDate(notice.createdAt) }}</span
+                >
+              </div>
               <button
                 class="text-btn text-btn--danger"
                 @click="deleteNotice(notice.id)"
@@ -355,11 +491,12 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { logout } from "../service/common/authSessionService";
 import { buildMessageWebSocketUrl } from "../service/chat/chatApiService";
+import { uploadPublishImage } from "../service/publish/publishApiService";
 import {
   approveAdminItem,
   createAdminNotice,
@@ -384,6 +521,7 @@ const loading = ref(false);
 const socketRef = ref(null);
 const reconnectTimerRef = ref(null);
 const isManualClose = ref(false);
+const ADMIN_ACTIVE_MENU_KEY = "admin.dashboard.activeMenu";
 
 const navItems = ref([
   { key: "dashboard", label: "仪表盘", count: "00" },
@@ -395,6 +533,7 @@ const navItems = ref([
 ]);
 
 const activeMenu = ref("dashboard");
+const loadedMenus = ref(new Set());
 
 const metrics = ref([]);
 const orderStateStats = ref([]);
@@ -406,56 +545,56 @@ const dashboardRaw = ref({
 
 const users = ref([]);
 const userKeyword = ref("");
-const filteredUsers = computed(() => {
-  if (!userKeyword.value) return users.value;
-  const keyword = userKeyword.value.toLowerCase();
-  return users.value.filter(
-    (item) =>
-      String(item.name || "")
-        .toLowerCase()
-        .includes(keyword) ||
-      String(item.phone || "").includes(keyword) ||
-      String(item.email || "")
-        .toLowerCase()
-        .includes(keyword)
-  );
-});
+const userSearchTimer = ref(null);
 
 const items = ref([]);
-const itemKeyword = ref("");
+const itemTitleKeyword = ref("");
+const itemCategoryKeyword = ref("");
+const itemPriceKeyword = ref("");
+const itemPublisherKeyword = ref("");
 const itemStatus = ref("all");
-const filteredItems = computed(() =>
-  items.value.filter((item) => {
-    const hitKeyword =
-      !itemKeyword.value ||
-      String(item.title || "").includes(itemKeyword.value) ||
-      String(item.category || "").includes(itemKeyword.value);
-    const hitStatus =
-      itemStatus.value === "all" || item.status === itemStatus.value;
-    return hitKeyword && hitStatus;
-  })
+const itemStatusOpen = ref(false);
+const itemStatusDropdownRef = ref(null);
+const itemSearchTimer = ref(null);
+const itemStatusOptions = [
+  { value: "all", label: "全部状态" },
+  { value: "pending", label: "待审核" },
+  { value: "online", label: "上架中" },
+  { value: "offline", label: "已下架" },
+];
+const itemStatusLabel = computed(
+  () =>
+    itemStatusOptions.find((option) => option.value === itemStatus.value)
+      ?.label || "全部状态"
 );
 
 const orders = ref([]);
-const orderKeyword = ref("");
+const orderNoKeyword = ref("");
+const orderBuyerKeyword = ref("");
+const orderSellerKeyword = ref("");
+const orderItemKeyword = ref("");
 const orderState = ref("all");
-const filteredOrders = computed(() =>
-  orders.value.filter((order) => {
-    const hitKeyword =
-      !orderKeyword.value ||
-      String(order.orderNo || "").includes(orderKeyword.value) ||
-      String(order.itemTitle || "").includes(orderKeyword.value) ||
-      String(order.buyer || "").includes(orderKeyword.value) ||
-      String(order.seller || "").includes(orderKeyword.value);
-    const hitStatus =
-      orderState.value === "all" || order.status === orderState.value;
-    return hitKeyword && hitStatus;
-  })
+const orderStateOpen = ref(false);
+const orderStateDropdownRef = ref(null);
+const orderSearchTimer = ref(null);
+const orderStateOptions = [
+  { value: "all", label: "全部状态" },
+  { value: "pending-pay", label: "待付款" },
+  { value: "completed", label: "已完成" },
+  { value: "cancelled", label: "已取消" },
+];
+const orderStateLabel = computed(
+  () =>
+    orderStateOptions.find((option) => option.value === orderState.value)
+      ?.label || "全部状态"
 );
 
 const conversations = ref([]);
 const activeConversationId = ref(null);
 const supportReply = ref("");
+const supportImageInputRef = ref(null);
+const pendingSupportImageUrl = ref("");
+const supportUploadingImage = ref(false);
 const currentConversation = computed(() =>
   conversations.value.find(
     (session) => session.id === activeConversationId.value
@@ -464,10 +603,9 @@ const currentConversation = computed(() =>
 
 const notices = ref([]);
 const newNotice = ref("");
+const currentNotice = computed(() => notices.value[0] || null);
+const historyNotices = computed(() => notices.value.slice(1));
 
-const pendingItemCount = computed(
-  () => dashboardRaw.value.pendingItemCount || 0
-);
 const abnormalOrderCount = computed(
   () => dashboardRaw.value.abnormalOrderCount || 0
 );
@@ -486,6 +624,56 @@ const moneyText = (value) => {
   return number.toFixed(2);
 };
 
+const formatNoticeDate = (value) => {
+  if (!value) return "-";
+  const raw = String(value).replace("T", " ");
+  if (raw.length >= 16) {
+    return raw.slice(0, 16);
+  }
+  return raw;
+};
+
+const formatSupportMessageTime = (value) => {
+  if (!value) return "";
+  const raw = String(value).replace("T", " ");
+  return raw.length >= 16 ? raw.slice(0, 16) : raw;
+};
+
+const SUPPORT_IMAGE_PREFIX = "【图片】";
+
+const parseSupportMessagePayload = (msg) => {
+  const imageUrl = String(msg?.imageUrl || "").trim();
+  const contentRaw = String(msg?.content || "").trim();
+
+  if (imageUrl) {
+    return { imageUrl, text: contentRaw };
+  }
+
+  if (!contentRaw) {
+    return { imageUrl: "", text: "" };
+  }
+
+  if (contentRaw.startsWith(SUPPORT_IMAGE_PREFIX)) {
+    const lines = contentRaw.split("\n");
+    return {
+      imageUrl: lines[0].replace(SUPPORT_IMAGE_PREFIX, "").trim(),
+      text: lines.slice(1).join("\n").trim(),
+    };
+  }
+
+  const directImageUrlPattern =
+    /^https?:\/\/\S+\.(png|jpe?g|webp|gif|bmp|svg)(\?.*)?$/i;
+  if (directImageUrlPattern.test(contentRaw)) {
+    return { imageUrl: contentRaw, text: "" };
+  }
+
+  return { imageUrl: "", text: contentRaw };
+};
+
+const getSupportMessageImageUrl = (msg) =>
+  parseSupportMessagePayload(msg).imageUrl;
+const getSupportMessageText = (msg) => parseSupportMessagePayload(msg).text;
+
 const applyDashboard = (data = {}) => {
   dashboardRaw.value = {
     pendingItemCount: Number(data.pendingItemCount || 0),
@@ -497,32 +685,26 @@ const applyDashboard = (data = {}) => {
     {
       label: "今日新增用户",
       value: String(data.todayNewUsers ?? 0),
-      desc: `总用户 ${data.totalUsers ?? 0}`,
     },
     {
       label: "总用户数",
       value: String(data.totalUsers ?? 0),
-      desc: "累计注册用户",
     },
     {
       label: "今日新增商品",
       value: String(data.todayNewItems ?? 0),
-      desc: `待审核 ${data.pendingItemCount ?? 0} 件`,
     },
     {
       label: "总商品数",
       value: String(data.totalItems ?? 0),
-      desc: "非删除商品总量",
     },
     {
       label: "今日订单数",
       value: String(data.todayOrders ?? 0),
-      desc: `异常订单 ${data.abnormalOrderCount ?? 0} 单`,
     },
     {
       label: "今日销售额",
       value: `￥${moneyText(data.todaySales)}`,
-      desc: "按已支付订单统计",
     },
   ];
 
@@ -552,7 +734,9 @@ const loadDashboard = async () => {
 };
 
 const loadUsers = async () => {
-  const { data } = await fetchAdminUsers("");
+  const { data } = await fetchAdminUsers({
+    keyword: userKeyword.value,
+  });
   users.value = (data || []).map((item) => ({
     ...item,
     registeredAt: normalizeDate(item.registeredAt),
@@ -561,15 +745,60 @@ const loadUsers = async () => {
 };
 
 const loadItems = async () => {
-  const { data } = await fetchAdminItems({ keyword: "", status: "all" });
+  const { data } = await fetchAdminItems({
+    title: itemTitleKeyword.value,
+    category: itemCategoryKeyword.value,
+    price: itemPriceKeyword.value,
+    publisher: itemPublisherKeyword.value,
+    status: itemStatus.value,
+  });
   items.value = data || [];
   updateNavCount();
 };
 
 const loadOrders = async () => {
-  const { data } = await fetchAdminOrders({ keyword: "", status: "all" });
+  const { data } = await fetchAdminOrders({
+    orderNo: orderNoKeyword.value,
+    buyer: orderBuyerKeyword.value,
+    seller: orderSellerKeyword.value,
+    itemTitle: orderItemKeyword.value,
+    status: orderState.value,
+  });
   orders.value = data || [];
   updateNavCount();
+};
+
+const scheduleUsersReload = () => {
+  if (activeMenu.value !== "users" || !loadedMenus.value.has("users")) return;
+  if (userSearchTimer.value) clearTimeout(userSearchTimer.value);
+  userSearchTimer.value = window.setTimeout(() => {
+    userSearchTimer.value = null;
+    loadUsers().catch((error) =>
+      ElMessage.error(error.message || "用户搜索失败")
+    );
+  }, 260);
+};
+
+const scheduleItemsReload = () => {
+  if (activeMenu.value !== "items" || !loadedMenus.value.has("items")) return;
+  if (itemSearchTimer.value) clearTimeout(itemSearchTimer.value);
+  itemSearchTimer.value = window.setTimeout(() => {
+    itemSearchTimer.value = null;
+    loadItems().catch((error) =>
+      ElMessage.error(error.message || "商品搜索失败")
+    );
+  }, 260);
+};
+
+const scheduleOrdersReload = () => {
+  if (activeMenu.value !== "orders" || !loadedMenus.value.has("orders")) return;
+  if (orderSearchTimer.value) clearTimeout(orderSearchTimer.value);
+  orderSearchTimer.value = window.setTimeout(() => {
+    orderSearchTimer.value = null;
+    loadOrders().catch((error) =>
+      ElMessage.error(error.message || "订单搜索失败")
+    );
+  }, 260);
 };
 
 const loadConversations = async () => {
@@ -625,20 +854,60 @@ const loadNotices = async () => {
   updateNavCount();
 };
 
-const loadAll = async () => {
-  if (loading.value) return;
+const persistActiveMenu = (menuKey) => {
+  try {
+    localStorage.setItem(ADMIN_ACTIVE_MENU_KEY, menuKey);
+  } catch {
+    // ignore
+  }
+};
+
+const restoreActiveMenu = () => {
+  try {
+    const saved = localStorage.getItem(ADMIN_ACTIVE_MENU_KEY);
+    const existed = navItems.value.some((item) => item.key === saved);
+    return existed ? saved : "dashboard";
+  } catch {
+    return "dashboard";
+  }
+};
+
+const ensureMenuDataLoaded = async (menuKey, options = {}) => {
+  const { force = false } = options;
+  if (!force && loadedMenus.value.has(menuKey)) return;
+
   loading.value = true;
   try {
-    await Promise.all([
-      loadDashboard(),
-      loadUsers(),
-      loadItems(),
-      loadOrders(),
-      loadConversations(),
-      loadNotices(),
-    ]);
+    if (menuKey === "dashboard") {
+      await loadDashboard();
+    } else if (menuKey === "users") {
+      await loadUsers();
+    } else if (menuKey === "items") {
+      await loadItems();
+    } else if (menuKey === "orders") {
+      await loadOrders();
+    } else if (menuKey === "support") {
+      await loadConversations();
+    } else if (menuKey === "settings") {
+      await loadNotices();
+    }
+    loadedMenus.value.add(menuKey);
   } finally {
     loading.value = false;
+  }
+};
+
+const handleMenuClick = async (menuKey) => {
+  if (activeMenu.value === menuKey) {
+    await ensureMenuDataLoaded(menuKey);
+    return;
+  }
+  activeMenu.value = menuKey;
+  persistActiveMenu(menuKey);
+  try {
+    await ensureMenuDataLoaded(menuKey);
+  } catch (error) {
+    ElMessage.error(error.message || "数据加载失败");
   }
 };
 
@@ -687,6 +956,53 @@ const mapReportTypeText = (type) => {
     OTHER: "其他",
   };
   return map[String(type || "").toUpperCase()] || "违规举报";
+};
+
+const supportConversationTitle = (session) => {
+  if (!session) return "请选择会话";
+  const reportTypeText = mapReportTypeText(session.reportType);
+  const base = reportTypeText === "其他" ? "客服咨询" : reportTypeText;
+  if (session.itemTitle) {
+    return `${base} · ${session.itemTitle}`;
+  }
+  return base;
+};
+
+const supportConversationPreview = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const imagePrefix = "【图片】";
+  if (raw.startsWith(imagePrefix)) return "[图片]";
+  const directImageUrlPattern =
+    /^https?:\/\/\S+\.(png|jpe?g|webp|gif|bmp|svg)(\?.*)?$/i;
+  if (directImageUrlPattern.test(raw)) return "[图片]";
+  return raw;
+};
+
+const selectItemStatus = (value) => {
+  itemStatus.value = value;
+  itemStatusOpen.value = false;
+};
+
+const selectOrderState = (value) => {
+  orderState.value = value;
+  orderStateOpen.value = false;
+};
+
+const handleDocumentClick = (event) => {
+  const target = event.target;
+  if (
+    itemStatusDropdownRef.value &&
+    !itemStatusDropdownRef.value.contains(target)
+  ) {
+    itemStatusOpen.value = false;
+  }
+  if (
+    orderStateDropdownRef.value &&
+    !orderStateDropdownRef.value.contains(target)
+  ) {
+    orderStateOpen.value = false;
+  }
 };
 
 const toggleUserState = (user) => {
@@ -745,19 +1061,48 @@ const markAbnormalHandled = (order) => {
 };
 
 const appendReply = () => {
-  if (!supportReply.value) {
-    ElMessage.warning("请输入回复内容");
+  if (!supportReply.value && !pendingSupportImageUrl.value) {
+    ElMessage.warning("请输入回复内容或上传图片");
     return;
   }
   const target = currentConversation.value;
   if (!target) return;
-  replyAdminConversation(target.id, supportReply.value)
+  replyAdminConversation(target.id, {
+    content: supportReply.value,
+    imageUrl: pendingSupportImageUrl.value,
+  })
     .then(async () => {
       supportReply.value = "";
+      pendingSupportImageUrl.value = "";
       await Promise.all([loadConversations(), loadDashboard()]);
       ElMessage.success("回复已发送");
     })
     .catch((error) => ElMessage.error(error.message || "发送失败"));
+};
+
+const openSupportImagePicker = () => {
+  supportImageInputRef.value?.click();
+};
+
+const handleSupportImageUpload = async (event) => {
+  const input = event.target;
+  const file = input?.files?.[0];
+  if (!file) return;
+  supportUploadingImage.value = true;
+  try {
+    const response = await uploadPublishImage(file);
+    const url = String(response?.data?.url || "").trim();
+    if (!url) {
+      throw new Error("图片上传失败");
+    }
+    pendingSupportImageUrl.value = url;
+    ElMessage.success("图片已上传");
+  } catch (error) {
+    ElMessage.error(error.message || "图片上传失败");
+  } finally {
+    supportUploadingImage.value = false;
+    if (input) input.value = "";
+  }
 };
 
 const resolveConversation = () => {
@@ -817,12 +1162,52 @@ const handleLogout = async () => {
 };
 
 onMounted(async () => {
+  document.addEventListener("click", handleDocumentClick);
+  activeMenu.value = restoreActiveMenu();
+  persistActiveMenu(activeMenu.value);
   try {
-    await loadAll();
+    await ensureMenuDataLoaded(activeMenu.value);
     connectWebSocket();
   } catch (error) {
     ElMessage.error(error.message || "管理后台数据加载失败");
   }
+});
+
+watch([userKeyword], () => {
+  scheduleUsersReload();
+});
+
+watch(
+  [
+    itemTitleKeyword,
+    itemCategoryKeyword,
+    itemPriceKeyword,
+    itemPublisherKeyword,
+    itemStatus,
+  ],
+  () => {
+    scheduleItemsReload();
+  }
+);
+
+watch(
+  [
+    orderNoKeyword,
+    orderBuyerKeyword,
+    orderSellerKeyword,
+    orderItemKeyword,
+    orderState,
+  ],
+  () => {
+    scheduleOrdersReload();
+  }
+);
+
+onBeforeUnmount(() => {
+  document.removeEventListener("click", handleDocumentClick);
+  if (userSearchTimer.value) clearTimeout(userSearchTimer.value);
+  if (itemSearchTimer.value) clearTimeout(itemSearchTimer.value);
+  if (orderSearchTimer.value) clearTimeout(orderSearchTimer.value);
 });
 </script>
 
@@ -833,7 +1218,7 @@ onMounted(async () => {
   grid-template-columns: 260px minmax(0, 1fr);
   gap: 16px;
   padding: 16px;
-  background: #f5f7fb;
+  background: #f5f4fb;
   color: #1f2933;
 }
 
@@ -853,7 +1238,7 @@ onMounted(async () => {
 .brand h1 {
   margin: 0;
   font-size: 24px;
-  color: #2563eb;
+  color: #7c3aed;
 }
 
 .brand p {
@@ -887,8 +1272,8 @@ onMounted(async () => {
 }
 
 .menu-item--active {
-  background: #eef4ff;
-  color: #1d4ed8;
+  background: #ede9fe;
+  color: #6d28d9;
 }
 
 .menu-item__count {
@@ -936,12 +1321,6 @@ onMounted(async () => {
   color: #0f172a;
 }
 
-.metric-card__desc {
-  margin: 0;
-  color: #1d4ed8;
-  font-size: 13px;
-}
-
 .panel {
   padding: 16px;
 }
@@ -973,7 +1352,7 @@ onMounted(async () => {
 
 .status-bar-fill {
   height: 100%;
-  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  background: linear-gradient(135deg, #7c3aed, #a78bfa);
 }
 
 .todo-panel ul {
@@ -990,17 +1369,24 @@ onMounted(async () => {
 }
 
 .toolbar--multi {
-  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.toolbar--grid4 .toolbar-input {
+  flex: 1 1 calc(25% - 8px);
+  min-width: 160px;
 }
 
 .toolbar-input,
 .toolbar-select,
 .notice-input {
-  border: 1px solid #cbd5e1;
+  border: 1px solid #d8ccff;
   border-radius: 10px;
   outline: none;
   padding: 10px 12px;
   font-size: 14px;
+  box-sizing: border-box;
 }
 
 .toolbar-input {
@@ -1009,6 +1395,77 @@ onMounted(async () => {
 
 .toolbar-select {
   min-width: 140px;
+}
+
+.status-select {
+  position: relative;
+  min-width: 140px;
+  width: 160px;
+  flex: 0 0 auto;
+}
+
+.status-select__trigger {
+  width: 100%;
+  border: 1px solid #d8ccff;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #1f2937;
+  padding: 10px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+
+.status-select__trigger:focus-visible {
+  outline: 2px solid #c4b5fd;
+  outline-offset: 1px;
+}
+
+.status-select__arrow {
+  color: #7c3aed;
+  transition: transform 0.2s ease;
+}
+
+.status-select__arrow.is-open {
+  transform: rotate(180deg);
+}
+
+.status-select__menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 8px 0;
+  list-style: none;
+  border: 1px solid #e9ddff;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 10px 26px rgba(76, 29, 149, 0.12);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.status-select__option {
+  padding: 10px 14px;
+  color: #4b5563;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.status-select__option:hover {
+  background: #f4efff;
+  color: #5b21b6;
+}
+
+.status-select__option.is-selected {
+  background: #ece2ff;
+  color: #5b21b6;
+  font-weight: 600;
 }
 
 .table-wrap {
@@ -1070,7 +1527,7 @@ onMounted(async () => {
 .primary-btn {
   border: none;
   background: transparent;
-  color: #1d4ed8;
+  color: #6d28d9;
   cursor: pointer;
   font-size: 13px;
 }
@@ -1089,51 +1546,99 @@ onMounted(async () => {
   padding: 8px 16px;
   color: #fff;
   font-weight: 600;
-  background: linear-gradient(135deg, #2563eb, #3b82f6);
-  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.33);
+  background: linear-gradient(135deg, #7c3aed, #a78bfa);
+  box-shadow: 0 6px 14px rgba(124, 58, 237, 0.33);
 }
 
 .support-layout {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: 320px minmax(0, 1fr);
   gap: 14px;
+  min-height: calc(100vh - 64px);
 }
 
 .conversation-list {
-  border-right: 1px solid #e5e7eb;
-  padding-right: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.conversation-item {
-  border: none;
-  border-radius: 10px;
   background: #f8fafc;
-  cursor: pointer;
-  text-align: left;
+  border-radius: 12px;
+  border: 1px solid #e6edf5;
   padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 10px;
+}
+
+.conversation-item {
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: #ffffff;
+  cursor: pointer;
+  text-align: left;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: all 0.15s ease;
+  min-height: 108px;
+}
+
+.conversation-item:hover {
+  border-color: #d8ccff;
+  box-shadow: 0 6px 14px rgba(76, 29, 149, 0.08);
 }
 
 .conversation-item strong {
   color: #0f172a;
+  font-size: 15px;
 }
 
 .conversation-item span {
   color: #64748b;
   font-size: 12px;
+  line-height: 1.5;
+}
+
+.conversation-item__meta,
+.conversation-item__preview {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-all;
+}
+
+.conversation-item__meta {
+  -webkit-line-clamp: 1;
+}
+
+.conversation-item__preview {
+  -webkit-line-clamp: 2;
 }
 
 .conversation-item--active {
-  background: #eef4ff;
+  border-color: #cdb7ff;
+  background: #f5f0ff;
+  box-shadow: 0 8px 18px rgba(124, 58, 237, 0.15);
+}
+
+.conversation-main {
+  border-radius: 12px;
+  padding: 14px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.support-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
 }
 
 .conversation-main h3 {
-  margin-top: 0;
+  margin: 0;
 }
 
 .support-meta {
@@ -1155,33 +1660,146 @@ onMounted(async () => {
 }
 
 .chat-box {
-  min-height: 220px;
-  border: 1px solid #e5e7eb;
+  flex: 1;
+  min-height: 300px;
   border-radius: 10px;
-  padding: 10px;
+  padding: 12px;
   margin-bottom: 12px;
-  background: #fcfdff;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+.support-message {
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px 12px;
+  max-width: 72%;
+}
+
+.support-message__image {
+  max-width: min(320px, 100%);
+  max-height: 260px;
+  border-radius: 8px;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.support-message__content {
+  margin: 0;
+  color: #1f2937;
+  line-height: 1.65;
+  word-break: break-word;
+}
+
+.support-message__time {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.support-message--admin {
+  align-self: flex-end;
+  background: #ede9fe;
+}
+
+.support-message--user {
+  align-self: flex-start;
+}
+
+.support-image-input {
+  display: none;
+}
+
+.support-image-ready {
+  font-size: 12px;
+  color: #16a34a;
+  align-self: center;
 }
 
 .setting-block + .setting-block {
   margin-top: 22px;
 }
 
+.setting-block {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent;
+  padding: 0;
+}
+
+.setting-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.setting-header h3 {
+  margin: 0;
+}
+
+.notice-editor {
+  display: block;
+}
+
 .notice-input {
   display: block;
   width: 100%;
+  max-width: 100%;
   min-height: 90px;
   resize: vertical;
-  margin-bottom: 10px;
+  margin-bottom: 0;
 }
 
 .notice-list {
   list-style: none;
-  padding: 0;
+  padding: 10px;
   margin: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-height: 120px;
+  background: #fff;
+  border-radius: 10px;
+}
+
+.current-notice-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px;
+  background: #fff;
+}
+
+.notice-item__content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.notice-item__text {
+  margin: 0;
+  color: #1f2937;
+  word-break: break-word;
+}
+
+.notice-item__date {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.notice-empty {
+  margin: 0;
+  color: #6b7280;
+  font-size: 13px;
 }
 
 .notice-list li {
@@ -1214,10 +1832,20 @@ onMounted(async () => {
   }
 
   .conversation-list {
-    border-right: none;
     border-bottom: 1px solid #e5e7eb;
-    padding-right: 0;
     padding-bottom: 10px;
+  }
+
+  .support-message {
+    max-width: 88%;
+  }
+
+  .setting-header {
+    flex-wrap: wrap;
+  }
+
+  .setting-header .primary-btn {
+    align-self: flex-start;
   }
 }
 </style>

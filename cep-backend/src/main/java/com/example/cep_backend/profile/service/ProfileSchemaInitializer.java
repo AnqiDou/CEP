@@ -79,6 +79,9 @@ public class ProfileSchemaInitializer {
         if (!columnExists(TABLE_USER_PROFILES, "avatar_url")) {
             jdbcTemplate.execute("ALTER TABLE user_profiles ADD COLUMN avatar_url VARCHAR(500) NULL");
         }
+        if (!columnExists(TABLE_USER_PROFILES, "phone")) {
+            jdbcTemplate.execute("ALTER TABLE user_profiles ADD COLUMN phone VARCHAR(30) NULL");
+        }
     }
 
     private void dropColumnIfExists(String tableName, String columnName) throws SQLException {

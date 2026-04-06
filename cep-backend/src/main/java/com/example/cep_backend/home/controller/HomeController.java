@@ -4,6 +4,7 @@ import com.example.cep_backend.common.api.ApiResponse;
 import com.example.cep_backend.home.dto.HomeCategoryDto;
 import com.example.cep_backend.home.dto.HomeItemDto;
 import com.example.cep_backend.home.dto.HomeItemListDto;
+import com.example.cep_backend.home.dto.HomeNoticeDto;
 import com.example.cep_backend.home.dto.HotKeywordDto;
 import com.example.cep_backend.home.service.HomeService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -62,5 +63,10 @@ public class HomeController {
     @GetMapping("/hot-keywords")
     public ApiResponse<List<HotKeywordDto>> hotKeywords(@RequestParam(required = false) Integer limit) {
         return ApiResponse.ok("获取成功", homeService.listHotKeywords(limit));
+    }
+
+    @GetMapping("/notices")
+    public ApiResponse<List<HomeNoticeDto>> notices(@RequestParam(required = false) Integer limit) {
+        return ApiResponse.ok("获取成功", homeService.listHomeNotices(limit));
     }
 }

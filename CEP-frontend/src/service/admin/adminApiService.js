@@ -32,13 +32,18 @@ export const fetchAdminDashboard = async () =>
     headers: await withAuthHeaders(),
   });
 
-export const fetchAdminUsers = async (keyword = "") =>
-  requestJson(
-    `${ADMIN_API_BASE}/users?keyword=${encodeURIComponent(keyword.trim())}`,
-    {
-      headers: await withAuthHeaders(),
-    },
-  );
+export const fetchAdminUsers = async (params = {}) => {
+  const normalized =
+    typeof params === "string" ? { keyword: params } : { ...(params || {}) };
+  const query = new URLSearchParams();
+  ["keyword", "username", "phone", "email"].forEach((key) => {
+    const value = String(normalized[key] || "").trim();
+    if (value) query.set(key, value);
+  });
+  return requestJson(`${ADMIN_API_BASE}/users?${query.toString()}`, {
+    headers: await withAuthHeaders(),
+  });
+};
 
 export const updateAdminUserStatus = async (userId, disabled) =>
   requestJson(`${ADMIN_API_BASE}/users/${userId}/status`, {
@@ -55,13 +60,27 @@ export const deleteAdminUser = async (userId) =>
     headers: await withAuthHeaders(),
   });
 
-export const fetchAdminItems = async ({ keyword = "", status = "all" } = {}) =>
-  requestJson(
-    `${ADMIN_API_BASE}/items?keyword=${encodeURIComponent(keyword.trim())}&status=${encodeURIComponent(status)}`,
-    {
-      headers: await withAuthHeaders(),
+export const fetchAdminItems = async (params = {}) => {
+  const normalized = {
+    keyword: "",
+    title: "",
+    category: "",
+    price: "",
+    publisher: "",
+    status: "all",
+    ...(params || {}),
+  };
+  const query = new URLSearchParams();
+  ["keyword", "title", "category", "price", "publisher", "status"].forEach(
+    (key) => {
+      const value = String(normalized[key] || "").trim();
+      if (value) query.set(key, value);
     },
   );
+  return requestJson(`${ADMIN_API_BASE}/items?${query.toString()}`, {
+    headers: await withAuthHeaders(),
+  });
+};
 
 export const approveAdminItem = async (itemId) =>
   requestJson(`${ADMIN_API_BASE}/items/${itemId}/approve`, {
@@ -81,13 +100,27 @@ export const deleteAdminItem = async (itemId) =>
     headers: await withAuthHeaders(),
   });
 
-export const fetchAdminOrders = async ({ keyword = "", status = "all" } = {}) =>
-  requestJson(
-    `${ADMIN_API_BASE}/orders?keyword=${encodeURIComponent(keyword.trim())}&status=${encodeURIComponent(status)}`,
-    {
-      headers: await withAuthHeaders(),
+export const fetchAdminOrders = async (params = {}) => {
+  const normalized = {
+    keyword: "",
+    orderNo: "",
+    buyer: "",
+    seller: "",
+    itemTitle: "",
+    status: "all",
+    ...(params || {}),
+  };
+  const query = new URLSearchParams();
+  ["keyword", "orderNo", "buyer", "seller", "itemTitle", "status"].forEach(
+    (key) => {
+      const value = String(normalized[key] || "").trim();
+      if (value) query.set(key, value);
     },
   );
+  return requestJson(`${ADMIN_API_BASE}/orders?${query.toString()}`, {
+    headers: await withAuthHeaders(),
+  });
+};
 
 export const handleAdminOrderAbnormal = async (orderNo) =>
   requestJson(
@@ -103,7 +136,7 @@ export const fetchAdminConversations = async () =>
     headers: await withAuthHeaders(),
   });
 
-export const replyAdminConversation = async (conversationId, content) =>
+export const replyAdminConversation = async (conversationId, payload) =>
   requestJson(
     `${ADMIN_API_BASE}/support/conversations/${conversationId}/messages`,
     {
@@ -111,7 +144,10 @@ export const replyAdminConversation = async (conversationId, content) =>
       headers: await withAuthHeaders({
         "Content-Type": "application/json",
       }),
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({
+        content: String(payload?.content || "").trim(),
+        imageUrl: String(payload?.imageUrl || "").trim(),
+      }),
     },
   );
 
