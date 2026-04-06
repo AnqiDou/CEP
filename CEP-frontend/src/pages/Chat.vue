@@ -96,16 +96,6 @@
             当前筛选下暂无会话
           </div>
         </div>
-
-        <footer class="session-panel__foot">
-          <div class="soft-mini-card">
-            <p class="soft-mini-card__label">今日提醒</p>
-            <p class="soft-mini-card__value">{{ totalUnread }} 条未读消息</p>
-            <div class="soft-mini-card__bar">
-              <span :style="{ width: unreadProgress + '%' }"></span>
-            </div>
-          </div>
-        </footer>
       </aside>
 
       <section class="conversation-panel">
@@ -126,23 +116,27 @@
                 </button>
               </div>
 
-              <div
-                v-if="activeConversation"
-                class="conversation-item-row"
-                @click="goToItemDetail"
-              >
-                <img
-                  v-if="activeConversation.itemImage"
-                  :src="activeConversation.itemImage"
-                  :alt="activeConversation.itemTitle"
-                  class="conversation-item-thumb"
-                />
-                <div class="conversation-item-text">
-                  <p class="conversation-item-title">
-                    {{ activeConversation.itemTitle }}
-                  </p>
-                  <p class="conversation-item-sub">点击查看物品详情</p>
+              <div v-if="activeConversation" class="conversation-item-row">
+                <div class="conversation-item-link" @click="goToItemDetail">
+                  <img
+                    v-if="activeConversation.itemImage"
+                    :src="activeConversation.itemImage"
+                    :alt="activeConversation.itemTitle"
+                    class="conversation-item-thumb"
+                  />
+                  <div class="conversation-item-text">
+                    <p class="conversation-item-title">
+                      {{ activeConversation.itemTitle }}
+                    </p>
+                  </div>
                 </div>
+                <button
+                  class="conversation-trade-btn"
+                  type="button"
+                  @click="applyTradeFromConversation"
+                >
+                  申请交易
+                </button>
               </div>
             </div>
           </header>
@@ -428,17 +422,6 @@ const activePanelMessages = computed(() => {
   return [];
 });
 
-const unreadTotal = computed(() =>
-  conversationList.value.reduce(
-    (total, conversation) => total + (conversation.unread || 0),
-    0
-  )
-);
-
-const totalUnread = computed(() => unreadTotal.value);
-
-const unreadProgress = computed(() => Math.min(100, totalUnread.value * 10));
-
 const getNowTime = () => {
   const date = new Date();
   const hour = String(date.getHours()).padStart(2, "0");
@@ -591,6 +574,21 @@ watch(
     ensureConversationFromQuery();
   }
 );
+
+const applyTradeFromConversation = () => {
+  const current = activeConversation.value;
+  if (!current?.itemId) {
+    ElMessage.warning("当前会话暂无可交易物品");
+    return;
+  }
+
+  router.push({
+    name: "confirm-order",
+    query: {
+      itemId: String(current.itemId),
+    },
+  });
+};
 
 const goToItemDetail = () => {
   const current = activeConversation.value;
@@ -834,8 +832,10 @@ onBeforeUnmount(() => {
   min-height: 0;
   display: grid;
   grid-template-columns: 360px minmax(0, 1fr);
-  gap: 18px;
-  background: transparent;
+  gap: 0;
+  background: #ffffff;
+  border-radius: 26px;
+  overflow: hidden;
 }
 
 .card {
@@ -847,9 +847,10 @@ onBeforeUnmount(() => {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  border-radius: 26px;
+  border-radius: 0;
   background: #ffffff;
-  box-shadow: 0 12px 30px rgba(142, 126, 229, 0.14);
+  box-shadow: none;
+  border-right: 1px solid #ece8fb;
 }
 
 .session-panel__header {
@@ -1011,53 +1012,14 @@ onBeforeUnmount(() => {
   color: #847ca8;
 }
 
-.session-panel__foot {
-  padding: 0 16px 16px;
-}
-
-.soft-mini-card {
-  background: linear-gradient(150deg, #f4f0ff, #fff6fb);
-  border-radius: 16px;
-  padding: 12px;
-  box-shadow: 0 8px 18px rgba(140, 124, 240, 0.12);
-}
-
-.soft-mini-card__label {
-  margin: 0;
-  font-size: 12px;
-  color: #8f87b1;
-}
-
-.soft-mini-card__value {
-  margin: 6px 0 10px;
-  font-size: 14px;
-  color: #4a3f87;
-  font-weight: 700;
-}
-
-.soft-mini-card__bar {
-  width: 100%;
-  height: 8px;
-  border-radius: 999px;
-  background: #ece7ff;
-  overflow: hidden;
-}
-
-.soft-mini-card__bar > span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(135deg, #9f8fff, #ffc4a8);
-}
-
 .conversation-panel {
   height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border-radius: 26px;
+  border-radius: 0;
   background: linear-gradient(155deg, #ffffff 0%, #fcfaff 100%);
-  box-shadow: 0 12px 30px rgba(142, 126, 229, 0.14);
+  box-shadow: none;
 }
 
 .conversation-topbar {
@@ -1067,6 +1029,10 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   align-items: center;
   gap: 10px;
+}
+
+.conversation-topbar::after {
+  pointer-events: none;
 }
 
 .conversation-peer {
@@ -1079,7 +1045,7 @@ onBeforeUnmount(() => {
 .conversation-peer__head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 10px;
 }
 
@@ -1096,11 +1062,19 @@ onBeforeUnmount(() => {
   gap: 8px;
   border-radius: 10px;
   padding: 4px 6px;
-  cursor: pointer;
 }
 
 .conversation-item-row:hover {
-  background: #f6f3ff;
+  background: transparent;
+}
+
+.conversation-item-link {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
 }
 
 .conversation-item-thumb {
@@ -1113,6 +1087,7 @@ onBeforeUnmount(() => {
 
 .conversation-item-text {
   min-width: 0;
+  flex: 1;
 }
 
 .conversation-item-title {
@@ -1124,10 +1099,20 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
 }
 
-.conversation-item-sub {
-  margin: 2px 0 0;
-  font-size: 12px;
-  color: #8a82ab;
+.conversation-trade-btn {
+  border: 1px solid #d9cffd;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #6252b5;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.conversation-trade-btn:hover {
+  background: #f7f3ff;
 }
 
 .conversation-home-btn {
@@ -1444,6 +1429,7 @@ onBeforeUnmount(() => {
   }
 
   .session-panel {
+    border-right: none;
     border-bottom: 1px solid #ece7fa;
   }
 
