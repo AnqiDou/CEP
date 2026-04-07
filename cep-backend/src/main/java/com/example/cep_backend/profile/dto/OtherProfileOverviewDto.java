@@ -1,12 +1,16 @@
 package com.example.cep_backend.profile.dto;
 
+import java.math.BigDecimal;
+
 public record OtherProfileOverviewDto(
-                Long userId,
-                String avatar,
-                String username,
-                long fans,
-                long following,
-                String sellerCredit,
-                String buyerCredit,
-                boolean followed) {
+        Long userId,
+        String avatar,
+        String username,
+        long fans,
+        long following,
+        BigDecimal sellerCreditScore,
+        BigDecimal buyerCreditScore,
+        String sellerCredit,
+        String buyerCredit,
+        boolean followed) {
 }

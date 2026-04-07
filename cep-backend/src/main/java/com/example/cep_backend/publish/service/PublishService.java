@@ -1,5 +1,6 @@
 package com.example.cep_backend.publish.service;
 
+import com.example.cep_backend.admin.service.AdminService;
 import com.example.cep_backend.auth.BusinessException;
 import com.example.cep_backend.message.service.MessageNotificationService;
 import com.example.cep_backend.publish.dto.PublishItemDto;
@@ -42,10 +43,14 @@ public class PublishService {
 
     private final PublishRepository publishRepository;
     private final MessageNotificationService messageNotificationService;
+    private final AdminService adminService;
 
-    public PublishService(PublishRepository publishRepository, MessageNotificationService messageNotificationService) {
+    public PublishService(PublishRepository publishRepository,
+            MessageNotificationService messageNotificationService,
+            AdminService adminService) {
         this.publishRepository = publishRepository;
         this.messageNotificationService = messageNotificationService;
+        this.adminService = adminService;
     }
 
     @Transactional
@@ -53,6 +58,7 @@ public class PublishService {
         if (userId == null || userId <= 0) {
             throw new BusinessException("用户信息无效，请重新登录");
         }
+        validateUserPublishCredit(userId);
 
         String itemName = validateText(request.name(), "物品名称", 120);
         String categoryCode = normalizeCategoryCode(request.categoryCode());
@@ -183,6 +189,9 @@ public class PublishService {
         if (!STATUS_PUBLISHED.equals(normalized) && !STATUS_OFF_SHELF.equals(normalized)) {
             throw new BusinessException("状态无效，仅支持 PUBLISHED / OFF_SHELF");
         }
+        if (STATUS_PUBLISHED.equals(normalized)) {
+            validateUserPublishCredit(userId);
+        }
 
         PublishRepository.PublishOwnedItemBaseRecord before = publishRepository.findOwnedItem(userId, itemId)
                 .orElseThrow(() -> new BusinessException("物品不存在或无操作权限"));
@@ -215,6 +224,13 @@ public class PublishService {
         }
 
         return toOwnedItemDto(item, publishRepository.findPhotoUrlsByItemId(itemId));
+    }
+
+    private void validateUserPublishCredit(Long userId) {
+        var score = adminService.resolveUserCreditScoreOrDefault(userId, "SELLER");
+        if (score.compareTo(AdminService.PUBLISH_CREDIT_THRESHOLD) < 0) {
+            throw new BusinessException("信用分过低（当前 " + score + "），低于 85 分禁止发布物品");
+        }
     }
 
     private void refreshItemOpsColumns(Long itemId,

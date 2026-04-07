@@ -80,6 +80,8 @@
                 <th>电话</th>
                 <th>邮箱</th>
                 <th>注册时间</th>
+                <th>卖家信用分</th>
+                <th>买家信用分</th>
                 <th>状态</th>
                 <th>发布商品</th>
                 <th>订单数</th>
@@ -92,6 +94,8 @@
                 <td>{{ user.phone || "-" }}</td>
                 <td>{{ user.email || "-" }}</td>
                 <td>{{ user.registeredAt }}</td>
+                <td>{{ user.sellerCreditScore ?? "100.0" }}</td>
+                <td>{{ user.buyerCreditScore ?? "100.0" }}</td>
                 <td>
                   <span
                     :class="[
@@ -106,6 +110,9 @@
                 <td>{{ user.orderCount }}</td>
                 <td>
                   <div class="actions">
+                    <button class="text-btn" @click="editUserCreditScore(user)">
+                      修改信用分
+                    </button>
                     <button class="text-btn" @click="toggleUserState(user)">
                       {{ user.disabled ? "解封" : "禁用" }}
                     </button>
@@ -487,6 +494,61 @@
         </div>
       </section>
     </main>
+
+    <div
+      v-if="creditModalVisible"
+      class="credit-modal-mask"
+      @click.self="closeCreditModal"
+    >
+      <section class="credit-modal card">
+        <header class="credit-modal__header">
+          <h3>修改信用分</h3>
+        </header>
+        <p class="credit-modal__subtitle">
+          用户：{{ creditModalTarget?.name || creditModalTarget?.email || "-" }}
+        </p>
+        <label class="credit-modal__label" for="seller-credit-score-input"
+          >卖家信用分</label
+        >
+        <input
+          id="seller-credit-score-input"
+          v-model.trim="creditModalSellerValue"
+          class="toolbar-input credit-modal__input"
+          placeholder="请输入卖家信用分"
+          :disabled="creditModalSubmitting"
+          @keydown.enter.prevent="submitCreditModal"
+        />
+        <label class="credit-modal__label" for="buyer-credit-score-input"
+          >买家信用分</label
+        >
+        <input
+          id="buyer-credit-score-input"
+          v-model.trim="creditModalBuyerValue"
+          class="toolbar-input credit-modal__input"
+          placeholder="请输入买家信用分"
+          :disabled="creditModalSubmitting"
+          @keydown.enter.prevent="submitCreditModal"
+        />
+        <footer class="credit-modal__actions">
+          <button
+            class="text-btn"
+            type="button"
+            :disabled="creditModalSubmitting"
+            @click="closeCreditModal"
+          >
+            取消
+          </button>
+          <button
+            class="primary-btn"
+            type="button"
+            :disabled="creditModalSubmitting"
+            @click="submitCreditModal"
+          >
+            {{ creditModalSubmitting ? "保存中..." : "确认保存" }}
+          </button>
+        </footer>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -513,6 +575,7 @@ import {
   offlineAdminItem,
   replyAdminConversation,
   updateAdminConversationStatus,
+  updateAdminUserCreditScore,
   updateAdminUserStatus,
 } from "../service/admin/adminApiService";
 
@@ -546,6 +609,11 @@ const dashboardRaw = ref({
 const users = ref([]);
 const userKeyword = ref("");
 const userSearchTimer = ref(null);
+const creditModalVisible = ref(false);
+const creditModalSellerValue = ref("100.0");
+const creditModalBuyerValue = ref("100.0");
+const creditModalTarget = ref(null);
+const creditModalSubmitting = ref(false);
 
 const items = ref([]);
 const itemTitleKeyword = ref("");
@@ -1021,6 +1089,62 @@ const removeUser = (id) => {
       ElMessage.success("用户已删除");
     })
     .catch((error) => ElMessage.error(error.message || "删除失败"));
+};
+
+const editUserCreditScore = (user) => {
+  if (!user?.id) return;
+  const sellerCurrent = Number(user?.sellerCreditScore ?? 100);
+  const buyerCurrent = Number(user?.buyerCreditScore ?? 100);
+  creditModalTarget.value = user;
+  creditModalSellerValue.value = Number.isFinite(sellerCurrent)
+    ? sellerCurrent.toFixed(1)
+    : "100.0";
+  creditModalBuyerValue.value = Number.isFinite(buyerCurrent)
+    ? buyerCurrent.toFixed(1)
+    : "100.0";
+  creditModalVisible.value = true;
+};
+
+const closeCreditModal = () => {
+  if (creditModalSubmitting.value) return;
+  creditModalVisible.value = false;
+  creditModalTarget.value = null;
+};
+
+const submitCreditModal = async () => {
+  if (!creditModalTarget.value?.id || creditModalSubmitting.value) return;
+
+  const sellerNext = Number(String(creditModalSellerValue.value || "").trim());
+  const buyerNext = Number(String(creditModalBuyerValue.value || "").trim());
+  if (!Number.isFinite(sellerNext) || !Number.isFinite(buyerNext)) {
+    ElMessage.warning("请输入有效数字信用分");
+    return;
+  }
+
+  creditModalSubmitting.value = true;
+  try {
+    const normalizedSeller = Math.round(sellerNext * 10) / 10;
+    const normalizedBuyer = Math.round(buyerNext * 10) / 10;
+    await Promise.all([
+      updateAdminUserCreditScore(
+        creditModalTarget.value.id,
+        "SELLER",
+        normalizedSeller
+      ),
+      updateAdminUserCreditScore(
+        creditModalTarget.value.id,
+        "BUYER",
+        normalizedBuyer
+      ),
+    ]);
+    await Promise.all([loadUsers(), loadDashboard()]);
+    ElMessage.success("用户买卖信用分已更新");
+    closeCreditModal();
+  } catch (error) {
+    ElMessage.error(error.message || "更新信用分失败");
+  } finally {
+    creditModalSubmitting.value = false;
+  }
 };
 
 const approveItem = (item) => {
@@ -1521,6 +1645,61 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.credit-modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(17, 24, 39, 0.45);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.credit-modal {
+  width: min(460px, 100%);
+  padding: 18px;
+  border-radius: 16px;
+}
+
+.credit-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.credit-modal__header h3 {
+  margin: 0;
+  color: #1f2937;
+  font-size: 18px;
+}
+
+.credit-modal__subtitle {
+  margin: 8px 0 12px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.credit-modal__label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #374151;
+}
+
+.credit-modal__input {
+  width: 100%;
+}
+
+.credit-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
 }
 
 .text-btn,

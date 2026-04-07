@@ -3,6 +3,7 @@ package com.example.cep_backend.profile.service;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -62,7 +63,8 @@ public class ProfileSchemaInitializer {
                     id BIGINT AUTO_INCREMENT PRIMARY KEY,
                     user_id BIGINT NOT NULL UNIQUE,
                     college VARCHAR(80) NULL,
-                    credit_score DECIMAL(3, 1) NULL,
+                    seller_credit_score DECIMAL(10, 1) NOT NULL DEFAULT 100.0,
+                    buyer_credit_score DECIMAL(10, 1) NOT NULL DEFAULT 100.0,
                     avatar_url VARCHAR(500) NULL,
                     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -76,11 +78,38 @@ public class ProfileSchemaInitializer {
     private void ensureUserProfilesColumns() throws SQLException {
         dropColumnIfExists(TABLE_USER_PROFILES, "campus");
         dropColumnIfExists(TABLE_USER_PROFILES, "note");
+        migrateCreditScoreColumnsSafely();
         if (!columnExists(TABLE_USER_PROFILES, "avatar_url")) {
             jdbcTemplate.execute("ALTER TABLE user_profiles ADD COLUMN avatar_url VARCHAR(500) NULL");
         }
         if (!columnExists(TABLE_USER_PROFILES, "phone")) {
             jdbcTemplate.execute("ALTER TABLE user_profiles ADD COLUMN phone VARCHAR(30) NULL");
+        }
+    }
+
+    private void migrateCreditScoreColumnsSafely() {
+        try {
+            if (!columnExists(TABLE_USER_PROFILES, "seller_credit_score")) {
+                jdbcTemplate
+                        .execute(
+                                "ALTER TABLE user_profiles ADD COLUMN seller_credit_score DECIMAL(10, 1) NOT NULL DEFAULT 100.0");
+            }
+            if (!columnExists(TABLE_USER_PROFILES, "buyer_credit_score")) {
+                jdbcTemplate
+                        .execute(
+                                "ALTER TABLE user_profiles ADD COLUMN buyer_credit_score DECIMAL(10, 1) NOT NULL DEFAULT 100.0");
+            }
+
+            if (columnExists(TABLE_USER_PROFILES, "credit_score")) {
+                jdbcTemplate.execute("""
+                        UPDATE user_profiles
+                        SET seller_credit_score = COALESCE(credit_score, seller_credit_score, 100.0),
+                            buyer_credit_score = COALESCE(credit_score, buyer_credit_score, 100.0)
+                        """);
+                dropColumnIfExists(TABLE_USER_PROFILES, "credit_score");
+            }
+        } catch (SQLException | DataAccessException ex) {
+            log.warn("Skip migrating user_profiles credit columns: {}", ex.getMessage());
         }
     }
 

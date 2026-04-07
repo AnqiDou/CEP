@@ -124,6 +124,8 @@ public class AdminRepository {
                     COALESCE(p.phone, '') AS phone,
                     u.email,
                     u.created_at,
+                    COALESCE(p.seller_credit_score, 100.0) AS seller_credit_score,
+                    COALESCE(p.buyer_credit_score, 100.0) AS buyer_credit_score,
                     CASE WHEN u.status = 'DISABLED' THEN 1 ELSE 0 END AS disabled,
                     (
                         SELECT COUNT(1) FROM items i
@@ -155,6 +157,8 @@ public class AdminRepository {
                 rs.getString("phone"),
                 rs.getString("email"),
                 rs.getTimestamp("created_at").toLocalDateTime(),
+                rs.getBigDecimal("seller_credit_score"),
+                rs.getBigDecimal("buyer_credit_score"),
                 rs.getBoolean("disabled"),
                 rs.getInt("item_count"),
                 rs.getInt("order_count")),
@@ -168,6 +172,35 @@ public class AdminRepository {
                 likePhone,
                 normalizedEmail,
                 likeEmail);
+    }
+
+    public BigDecimal findUserCreditScore(Long userId, String role) {
+        String normalizedRole = role == null ? "" : role.trim().toUpperCase();
+        String column = "SELLER".equals(normalizedRole) ? "seller_credit_score" : "buyer_credit_score";
+        String sql = """
+                SELECT COALESCE(%s, 100.0)
+                FROM user_profiles
+                WHERE user_id = ?
+                """.formatted(column);
+        List<BigDecimal> scores = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getBigDecimal(1), userId);
+        return scores.isEmpty() ? null : scores.getFirst();
+    }
+
+    public int upsertUserCreditScore(Long userId, String role, BigDecimal creditScore, LocalDateTime now) {
+        String normalizedRole = role == null ? "" : role.trim().toUpperCase();
+        if (!"SELLER".equals(normalizedRole) && !"BUYER".equals(normalizedRole)) {
+            return 0;
+        }
+        String column = "SELLER".equals(normalizedRole) ? "seller_credit_score" : "buyer_credit_score";
+        String sql = """
+                INSERT INTO user_profiles (user_id, seller_credit_score, buyer_credit_score, created_at, updated_at)
+                VALUES (?, 100.0, 100.0, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    %s = ?,
+                    updated_at = VALUES(updated_at)
+                """.formatted(column);
+        Timestamp ts = Timestamp.valueOf(now);
+        return jdbcTemplate.update(sql, userId, ts, ts, creditScore);
     }
 
     public int updateUserStatus(Long userId, String status, LocalDateTime now) {

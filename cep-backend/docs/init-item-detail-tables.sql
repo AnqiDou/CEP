@@ -5,7 +5,7 @@ BEGIN
         user_id BIGINT NOT NULL UNIQUE,
         college NVARCHAR(80) NULL,
         campus NVARCHAR(50) NULL,
-        credit_score DECIMAL(3, 1) NULL,
+        credit_score DECIMAL(10, 1) NOT NULL DEFAULT 100.0,
         note NVARCHAR(200) NULL,
         created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -45,6 +45,18 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_item_details_item' AN
 BEGIN
     CREATE INDEX idx_item_details_item ON item_details (item_id, publisher_user_id);
 END;
+GO
+
+IF COL_LENGTH('dbo.user_profiles', 'credit_score') IS NULL
+BEGIN
+    ALTER TABLE user_profiles ADD credit_score DECIMAL(10, 1) NOT NULL DEFAULT 100.0;
+END;
+GO
+
+ALTER TABLE user_profiles ALTER COLUMN credit_score DECIMAL(10, 1) NOT NULL;
+GO
+
+UPDATE user_profiles SET credit_score = 100.0 WHERE credit_score IS NULL;
 GO
 
 SELECT

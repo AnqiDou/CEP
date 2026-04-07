@@ -54,6 +54,15 @@ export const updateAdminUserStatus = async (userId, disabled) =>
     body: JSON.stringify({ disabled }),
   });
 
+export const updateAdminUserCreditScore = async (userId, role, creditScore) =>
+  requestJson(`${ADMIN_API_BASE}/users/${userId}/credit-score`, {
+    method: "PATCH",
+    headers: await withAuthHeaders({
+      "Content-Type": "application/json",
+    }),
+    body: JSON.stringify({ role, creditScore }),
+  });
+
 export const deleteAdminUser = async (userId) =>
   requestJson(`${ADMIN_API_BASE}/users/${userId}`, {
     method: "DELETE",

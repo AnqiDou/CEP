@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -51,15 +52,17 @@ public class ProfileService {
         if (baseInfo == null) {
             throw new BusinessException("用户不存在");
         }
-        ProfileRepository.CreditStats sellerStats = profileRepository.findCreditStats(userId, ROLE_SELLER);
-        ProfileRepository.CreditStats buyerStats = profileRepository.findCreditStats(userId, ROLE_BUYER);
+        BigDecimal sellerCreditScore = profileRepository.findUserCreditScore(userId, ROLE_SELLER);
+        BigDecimal buyerCreditScore = profileRepository.findUserCreditScore(userId, ROLE_BUYER);
         return new ProfileOverviewDto(
                 baseInfo.avatar(),
                 baseInfo.username(),
                 baseInfo.fans(),
                 baseInfo.following(),
-                resolveCreditLabel(sellerStats),
-                resolveCreditLabel(buyerStats));
+                sellerCreditScore,
+                buyerCreditScore,
+                resolveCreditLabel(sellerCreditScore),
+                resolveCreditLabel(buyerCreditScore));
     }
 
     public ProfileReviewSummaryDto getReviews(Long userId, String rating) {
@@ -165,14 +168,18 @@ public class ProfileService {
         ProfileRepository.CreditStats sellerStats = profileRepository.findCreditStats(targetUserId, ROLE_SELLER);
         ProfileRepository.CreditStats buyerStats = profileRepository.findCreditStats(targetUserId, ROLE_BUYER);
         boolean followed = profileRepository.isFollowing(viewerUserId, targetUserId);
+        BigDecimal sellerCreditScore = profileRepository.findUserCreditScore(targetUserId, ROLE_SELLER);
+        BigDecimal buyerCreditScore = profileRepository.findUserCreditScore(targetUserId, ROLE_BUYER);
         return new OtherProfileOverviewDto(
                 targetUserId,
                 baseInfo.avatar(),
                 baseInfo.username(),
                 baseInfo.fans(),
                 baseInfo.following(),
-                resolveCreditLabel(sellerStats),
-                resolveCreditLabel(buyerStats),
+                sellerCreditScore,
+                buyerCreditScore,
+                resolveCreditLabel(sellerCreditScore),
+                resolveCreditLabel(buyerCreditScore),
                 followed);
     }
 
@@ -263,6 +270,10 @@ public class ProfileService {
 
     private String resolveCreditLabel(ProfileRepository.CreditStats stats) {
         return CreditLevelResolver.resolveLabel(stats.goodCount(), stats.badCount());
+    }
+
+    private String resolveCreditLabel(BigDecimal score) {
+        return CreditLevelResolver.resolveLabel(score);
     }
 
     private String normalizeRating(String rating) {

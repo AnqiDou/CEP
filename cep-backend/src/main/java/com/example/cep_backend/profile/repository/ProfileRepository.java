@@ -8,6 +8,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -90,6 +91,18 @@ public class ProfileRepository {
                 )
                 """;
         jdbcTemplate.update(sql, userId, userId);
+    }
+
+    public BigDecimal findUserCreditScore(Long userId, String role) {
+        String normalizedRole = role == null ? "" : role.trim().toUpperCase();
+        String column = "SELLER".equals(normalizedRole) ? "seller_credit_score" : "buyer_credit_score";
+        String sql = """
+                SELECT COALESCE(%s, 100.0)
+                FROM user_profiles
+                WHERE user_id = ?
+                """.formatted(column);
+        List<BigDecimal> scores = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getBigDecimal(1), userId);
+        return scores.isEmpty() ? new BigDecimal("100.0") : scores.getFirst();
     }
 
     public CreditStats findCreditStats(Long userId, String role) {

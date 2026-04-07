@@ -9,6 +9,7 @@ import com.example.cep_backend.admin.dto.AdminSupportConversationDto;
 import com.example.cep_backend.admin.dto.AdminSupportMessageDto;
 import com.example.cep_backend.admin.dto.AdminSupportReplyRequest;
 import com.example.cep_backend.admin.dto.AdminSupportStatusRequest;
+import com.example.cep_backend.admin.dto.AdminUserCreditScoreRequest;
 import com.example.cep_backend.admin.dto.AdminUserDto;
 import com.example.cep_backend.admin.dto.AdminUserStatusRequest;
 import com.example.cep_backend.admin.service.AdminService;
@@ -64,6 +65,19 @@ public class AdminController {
             @RequestBody AdminUserStatusRequest request) {
         ensureAdmin(authorization);
         adminService.updateUserStatus(userId, request == null ? null : request.disabled());
+        return ApiResponse.ok("更新成功");
+    }
+
+    @PatchMapping("/users/{userId}/credit-score")
+    public ApiResponse<Void> updateUserCreditScore(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long userId,
+            @RequestBody AdminUserCreditScoreRequest request) {
+        ensureAdmin(authorization);
+        adminService.updateUserCreditScore(
+                userId,
+                request == null ? null : request.role(),
+                request == null ? null : request.creditScore());
         return ApiResponse.ok("更新成功");
     }
 

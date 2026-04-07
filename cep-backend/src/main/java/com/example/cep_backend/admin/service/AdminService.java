@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -26,6 +27,8 @@ import java.util.Map;
 
 @Service
 public class AdminService {
+    public static final BigDecimal PUBLISH_CREDIT_THRESHOLD = new BigDecimal("85.0");
+
     private final AdminRepository adminRepository;
     private final String adminEmail;
     private final MessageWebSocketNotifier messageWebSocketNotifier;
@@ -97,6 +100,39 @@ public class AdminService {
         if (updated <= 0) {
             throw new BusinessException("用户不存在或已删除");
         }
+    }
+
+    @Transactional
+    public void updateUserCreditScore(Long userId, String role, BigDecimal creditScore) {
+        if (userId == null || userId <= 0) {
+            throw new BusinessException("用户参数无效");
+        }
+        String normalizedRole = role == null ? "" : role.trim().toUpperCase();
+        if (!"SELLER".equals(normalizedRole) && !"BUYER".equals(normalizedRole)) {
+            throw new BusinessException("信用角色参数无效");
+        }
+        if (creditScore == null) {
+            throw new BusinessException("信用分不能为空");
+        }
+
+        BigDecimal normalized = creditScore.setScale(1, RoundingMode.HALF_UP);
+
+        int updated = adminRepository.upsertUserCreditScore(userId, normalizedRole, normalized, LocalDateTime.now());
+        if (updated <= 0) {
+            throw new BusinessException("更新用户信用分失败");
+        }
+    }
+
+    public BigDecimal resolveUserCreditScoreOrDefault(Long userId, String role) {
+        if (userId == null || userId <= 0) {
+            return new BigDecimal("100.0");
+        }
+        String normalizedRole = role == null ? "" : role.trim().toUpperCase();
+        if (!"SELLER".equals(normalizedRole) && !"BUYER".equals(normalizedRole)) {
+            normalizedRole = "SELLER";
+        }
+        BigDecimal score = adminRepository.findUserCreditScore(userId, normalizedRole);
+        return score == null ? new BigDecimal("100.0") : score;
     }
 
     @Transactional
