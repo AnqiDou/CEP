@@ -72,7 +72,7 @@ public class AdminRepository {
                 SELECT IFNULL(SUM(amount), 0)
                 FROM trade_orders
                 WHERE CAST(created_at AS DATE) = CAST(CURRENT_TIMESTAMP AS DATE)
-                  AND status = 'PAID'
+                  AND status = 'COMPLETED'
                 """;
         return jdbcTemplate.queryForObject(sql, java.math.BigDecimal.class);
     }
@@ -83,7 +83,7 @@ public class AdminRepository {
     }
 
     public Integer countAbnormalOrders() {
-        String sql = "SELECT COUNT(1) FROM trade_orders WHERE status <> 'PAID'";
+        String sql = "SELECT COUNT(1) FROM trade_orders WHERE status <> 'COMPLETED'";
         return jdbcTemplate.queryForObject(sql, Integer.class);
     }
 
@@ -388,7 +388,7 @@ public class AdminRepository {
     public int markOrderHandled(String orderNo, LocalDateTime now) {
         String sql = """
                 UPDATE trade_orders
-                SET status = 'PAID',
+                SET status = 'COMPLETED',
                     paid_at = COALESCE(paid_at, ?),
                     updated_at = ?
                 WHERE order_no = ?
@@ -644,7 +644,8 @@ public class AdminRepository {
     private String mapOrderStatus(String status) {
         return switch (status) {
             case "pending-pay" -> "PENDING_PAYMENT";
-            case "completed" -> "PAID";
+            case "pending-confirm" -> "PENDING_CONFIRMATION";
+            case "completed" -> "COMPLETED";
             case "cancelled" -> "CANCELLED";
             default -> "ALL";
         };

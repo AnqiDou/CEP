@@ -41,6 +41,10 @@ public class TradeOrderRepository {
             rs.getString("receiver_name"),
             rs.getString("receiver_phone"),
             rs.getString("receiver_address"),
+            rs.getObject("buyer_confirmed", Boolean.class),
+            rs.getObject("seller_confirmed", Boolean.class),
+            rs.getString("refund_status"),
+            rs.getString("refund_type"),
             rs.getTimestamp("created_at").toLocalDateTime(),
             rs.getTimestamp("paid_at") == null ? null : rs.getTimestamp("paid_at").toLocalDateTime());
 
@@ -104,6 +108,10 @@ public class TradeOrderRepository {
                     receiver_name,
                     receiver_phone,
                     receiver_address,
+                    buyer_confirmed,
+                    seller_confirmed,
+                    refund_status,
+                    refund_type,
                     created_at,
                     paid_at
                 FROM trade_orders
@@ -181,6 +189,10 @@ public class TradeOrderRepository {
                     receiver_name,
                     receiver_phone,
                     receiver_address,
+                    buyer_confirmed,
+                    seller_confirmed,
+                    refund_status,
+                    refund_type,
                     created_at,
                     paid_at
                 FROM trade_orders
@@ -194,12 +206,92 @@ public class TradeOrderRepository {
     public int markOrderPaid(Long orderId, LocalDateTime paidAt) {
         String sql = """
                 UPDATE trade_orders
-                SET status = 'PAID',
+                SET status = 'PENDING_CONFIRMATION',
                     paid_at = ?,
+                    buyer_confirmed = FALSE,
+                    seller_confirmed = FALSE,
+                    refund_status = 'NONE',
+                    refund_type = NULL,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ? AND status = 'PENDING_PAYMENT'
                 """;
         return jdbcTemplate.update(sql, Timestamp.valueOf(paidAt), orderId);
+    }
+
+    public int markSellerConfirmedDelivery(Long orderId) {
+        String sql = """
+                UPDATE trade_orders
+                SET seller_confirmed = TRUE,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                  AND status = 'PENDING_CONFIRMATION'
+                """;
+        return jdbcTemplate.update(sql, orderId);
+    }
+
+    public int markBuyerConfirmedReceived(Long orderId) {
+        String sql = """
+                UPDATE trade_orders
+                SET buyer_confirmed = TRUE,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                  AND status = 'PENDING_CONFIRMATION'
+                """;
+        return jdbcTemplate.update(sql, orderId);
+    }
+
+    public int completeOrderWhenBothConfirmed(Long orderId) {
+        String sql = """
+                UPDATE trade_orders
+                SET status = 'COMPLETED',
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                  AND status = 'PENDING_CONFIRMATION'
+                  AND buyer_confirmed = TRUE
+                  AND seller_confirmed = TRUE
+                """;
+        return jdbcTemplate.update(sql, orderId);
+    }
+
+    public int applyRefund(Long orderId, String refundType) {
+        String sql = """
+                UPDATE trade_orders
+                SET refund_status = 'APPLIED',
+                    refund_type = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                  AND status = 'PENDING_CONFIRMATION'
+                  AND COALESCE(refund_status, 'NONE') = 'NONE'
+                """;
+        return jdbcTemplate.update(sql, refundType, orderId);
+    }
+
+    public int approveRefundNoReceipt(Long orderId) {
+        String sql = """
+                UPDATE trade_orders
+                SET status = 'CANCELLED',
+                    refund_status = 'APPROVED',
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                  AND status = 'PENDING_CONFIRMATION'
+                  AND refund_status = 'APPLIED'
+                  AND refund_type = 'NO_RECEIPT'
+                """;
+        return jdbcTemplate.update(sql, orderId);
+    }
+
+    public int approveRefundAfterReturn(Long orderId) {
+        String sql = """
+                UPDATE trade_orders
+                SET status = 'CANCELLED',
+                    refund_status = 'APPROVED',
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                  AND status = 'PENDING_CONFIRMATION'
+                  AND refund_status = 'APPLIED'
+                  AND refund_type = 'RETURN_AFTER_RECEIPT'
+                """;
+        return jdbcTemplate.update(sql, orderId);
     }
 
     public int cancelPendingOrder(Long orderId, Long actorUserId) {
@@ -224,6 +316,17 @@ public class TradeOrderRepository {
                   AND status = 'PENDING_PAYMENT'
                 """;
         return jdbcTemplate.update(sql, buyerUserId, itemId);
+    }
+
+    public boolean restoreOneStockOnRefund(Long itemId) {
+        String sql = """
+                UPDATE items
+                SET sold_quantity = GREATEST(COALESCE(sold_quantity, 0) - 1, 0),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """;
+        int updated = jdbcTemplate.update(sql, itemId);
+        return updated > 0;
     }
 
     public boolean consumeOneStockOnPaid(Long itemId) {

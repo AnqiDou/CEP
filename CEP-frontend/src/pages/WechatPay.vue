@@ -36,9 +36,16 @@ import { computed, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
 import { useRoute, useRouter } from "vue-router";
 import {
+  buildMessageWebSocketUrl,
+  createOrGetDirectConversation,
+} from "../service/chat/chatApiService";
+import {
   fetchTradeOrder,
   markTradeOrderPaid,
 } from "../service/payment/paymentApiService";
+import { fetchBoughtOrderContact } from "../service/profile/profileApiService";
+
+const TRADE_REMINDER_PREFIX = "[TRADE_REMINDER]";
 
 const route = useRoute();
 const router = useRouter();
@@ -80,6 +87,121 @@ const sleep = (milliseconds) =>
     setTimeout(resolve, milliseconds);
   });
 
+const buildTradeReminderText = ({
+  type,
+  orderId,
+  itemTitle,
+  content,
+  actionText,
+  targetMenu,
+}) =>
+  `${TRADE_REMINDER_PREFIX}${JSON.stringify({
+    type: String(type || "TRADE_REMINDER").trim() || "TRADE_REMINDER",
+    orderId: Number(orderId) > 0 ? Number(orderId) : null,
+    itemTitle: String(itemTitle || "").trim(),
+    content: String(content || "").trim(),
+    actionText: String(actionText || "去处理").trim() || "去处理",
+    targetMenu: String(targetMenu || "").trim(),
+  })}`;
+
+const sendConversationTextBySocket = async (conversationId, text) => {
+  const wsUrl = await buildMessageWebSocketUrl();
+  await new Promise((resolve, reject) => {
+    const socket = new WebSocket(wsUrl);
+    let settled = false;
+
+    const settle = (error) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.close();
+      }
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    };
+
+    const timeout = window.setTimeout(() => {
+      settle(new Error("消息提醒发送超时"));
+    }, 6000);
+
+    socket.onopen = () => {
+      try {
+        socket.send(
+          JSON.stringify({
+            action: "SEND_MESSAGE",
+            conversationId: Number(conversationId),
+            text,
+            imageUrl: "",
+          })
+        );
+        window.setTimeout(() => settle(), 120);
+      } catch (error) {
+        settle(error instanceof Error ? error : new Error("消息提醒发送失败"));
+      }
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event?.data || "{}");
+        if (String(payload?.eventType || "").toUpperCase() === "ERROR") {
+          settle(new Error(payload?.message || "消息提醒发送失败"));
+        }
+      } catch {
+        // ignore invalid payload
+      }
+    };
+
+    socket.onerror = () => {
+      settle(new Error("消息提醒发送失败"));
+    };
+
+    socket.onclose = () => {
+      if (!settled) {
+        settle();
+      }
+    };
+  });
+};
+
+const notifySellerOrderPaid = async (paidOrder) => {
+  const orderId = Number(paidOrder?.id || 0);
+  if (!orderId) return;
+
+  const contactBody = await fetchBoughtOrderContact(orderId);
+  const contact = contactBody?.data || {};
+  const peerUserId = Number(contact.peerUserId || 0);
+  const itemId = Number(contact.itemId || paidOrder?.itemId || 0);
+  if (!peerUserId || !itemId) {
+    throw new Error("交易联系人信息无效，无法发送支付提醒");
+  }
+
+  const conversationBody = await createOrGetDirectConversation({
+    peerUserId,
+    itemId,
+  });
+  const rawConversation = conversationBody?.data || {};
+  const conversationId = Number(
+    rawConversation.conversationId || rawConversation.id || 0
+  );
+  if (!conversationId) {
+    throw new Error("会话信息无效，无法发送支付提醒");
+  }
+
+  const reminderText = buildTradeReminderText({
+    type: "BUYER_PAID_PENDING_CONFIRMATION",
+    orderId,
+    itemTitle: paidOrder?.itemTitle || contact.itemTitle || "",
+    content: "买家已完成支付，订单已进入待确认，请确认是否已交付物品。",
+    actionText: "确认已交付物品",
+    targetMenu: "trade-sold",
+  });
+  await sendConversationTextBySocket(conversationId, reminderText);
+};
+
 const loadOrder = async () => {
   if (!orderId.value) {
     loadError.value = "订单信息无效";
@@ -113,6 +235,10 @@ const confirmPay = async () => {
     if (!paidOrder?.id) {
       throw new Error("支付失败，请重试");
     }
+
+    await notifySellerOrderPaid(paidOrder).catch((error) => {
+      ElMessage.warning(error.message || "支付成功，但卖家提醒发送失败");
+    });
 
     router.replace({
       name: "payment-result",

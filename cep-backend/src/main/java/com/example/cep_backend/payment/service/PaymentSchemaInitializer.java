@@ -36,6 +36,14 @@ public class PaymentSchemaInitializer {
                     "CREATE INDEX idx_trade_orders_item ON trade_orders (item_id, created_at DESC)");
             createIndexIfMissing("idx_trade_orders_status",
                     "CREATE INDEX idx_trade_orders_status ON trade_orders (status, created_at DESC)");
+
+            ensureColumnExists("buyer_confirmed",
+                    "ALTER TABLE trade_orders ADD COLUMN buyer_confirmed TINYINT(1) NOT NULL DEFAULT 0");
+            ensureColumnExists("seller_confirmed",
+                    "ALTER TABLE trade_orders ADD COLUMN seller_confirmed TINYINT(1) NOT NULL DEFAULT 0");
+            ensureColumnExists("refund_status",
+                    "ALTER TABLE trade_orders ADD COLUMN refund_status VARCHAR(30) NOT NULL DEFAULT 'NONE'");
+            ensureColumnExists("refund_type", "ALTER TABLE trade_orders ADD COLUMN refund_type VARCHAR(40) NULL");
         } catch (SQLException ex) {
             throw new IllegalStateException("初始化支付表结构失败", ex);
         }
@@ -57,6 +65,10 @@ public class PaymentSchemaInitializer {
                     receiver_address VARCHAR(200) NOT NULL,
                     status VARCHAR(30) NOT NULL DEFAULT 'PENDING_PAYMENT',
                     paid_at DATETIME(6) NULL,
+                    buyer_confirmed TINYINT(1) NOT NULL DEFAULT 0,
+                    seller_confirmed TINYINT(1) NOT NULL DEFAULT 0,
+                    refund_status VARCHAR(30) NOT NULL DEFAULT 'NONE',
+                    refund_type VARCHAR(40) NULL,
                     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     CONSTRAINT fk_trade_orders_item FOREIGN KEY (item_id) REFERENCES items (id),
@@ -69,6 +81,13 @@ public class PaymentSchemaInitializer {
 
     private void createIndexIfMissing(String indexName, String ddl) throws SQLException {
         if (indexExists(TABLE_NAME, indexName)) {
+            return;
+        }
+        jdbcTemplate.execute(ddl);
+    }
+
+    private void ensureColumnExists(String columnName, String ddl) throws SQLException {
+        if (columnExists(TABLE_NAME, columnName)) {
             return;
         }
         jdbcTemplate.execute(ddl);
@@ -92,6 +111,14 @@ public class PaymentSchemaInitializer {
                     }
                 }
                 return false;
+            }
+        });
+    }
+
+    private boolean columnExists(String tableName, String columnName) throws SQLException {
+        return matchMetadataTableName(tableName, (metaData, normalizedTableName) -> {
+            try (ResultSet columns = metaData.getColumns(null, null, normalizedTableName, columnName)) {
+                return columns.next();
             }
         });
     }

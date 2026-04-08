@@ -17,8 +17,13 @@ import java.util.concurrent.ThreadLocalRandom;
 @Service
 public class TradeOrderService {
     private static final String STATUS_PENDING_PAYMENT = "PENDING_PAYMENT";
-    private static final String STATUS_PAID = "PAID";
+    private static final String STATUS_PENDING_CONFIRMATION = "PENDING_CONFIRMATION";
+    private static final String STATUS_COMPLETED = "COMPLETED";
     private static final String STATUS_CANCELLED = "CANCELLED";
+    private static final String REFUND_STATUS_NONE = "NONE";
+    private static final String REFUND_STATUS_APPLIED = "APPLIED";
+    private static final String REFUND_TYPE_NO_RECEIPT = "NO_RECEIPT";
+    private static final String REFUND_TYPE_RETURN_AFTER_RECEIPT = "RETURN_AFTER_RECEIPT";
     private static final DateTimeFormatter ORDER_NO_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     private final TradeOrderRepository tradeOrderRepository;
@@ -145,7 +150,7 @@ public class TradeOrderService {
             throw new BusinessException("订单不存在");
         }
 
-        if (STATUS_PAID.equals(order.status())) {
+        if (STATUS_PENDING_CONFIRMATION.equals(order.status()) || STATUS_COMPLETED.equals(order.status())) {
             return toDto(order);
         }
 
@@ -162,8 +167,106 @@ public class TradeOrderService {
         if (updated == null) {
             throw new BusinessException("支付状态更新失败，请稍后重试");
         }
+        return toDto(updated);
+    }
 
-        reviewService.ensureReviewInvite(updated.id(), updated.itemId(), updated.buyerUserId(), updated.sellerUserId());
+    @Transactional
+    public TradeOrderDto confirmSellerDelivered(Long actorUserId, Long orderId) {
+        TradeOrderRecord order = requireOrderActorAndPendingConfirmation(actorUserId, orderId);
+        if (!actorUserId.equals(order.sellerUserId())) {
+            throw new BusinessException("仅卖家可确认已交付物品");
+        }
+        if (REFUND_STATUS_APPLIED.equals(order.refundStatus())) {
+            throw new BusinessException("当前订单已申请退款，无法确认交付");
+        }
+
+        tradeOrderRepository.markSellerConfirmedDelivery(orderId);
+        tradeOrderRepository.completeOrderWhenBothConfirmed(orderId);
+
+        TradeOrderRecord updated = tradeOrderRepository.findOrderById(orderId);
+        if (updated == null) {
+            throw new BusinessException("订单状态更新失败，请稍后重试");
+        }
+        if (STATUS_COMPLETED.equals(updated.status())) {
+            reviewService.ensureReviewInvite(updated.id(), updated.itemId(), updated.buyerUserId(),
+                    updated.sellerUserId());
+        }
+        return toDto(updated);
+    }
+
+    @Transactional
+    public TradeOrderDto confirmBuyerReceived(Long actorUserId, Long orderId) {
+        TradeOrderRecord order = requireOrderActorAndPendingConfirmation(actorUserId, orderId);
+        if (!actorUserId.equals(order.buyerUserId())) {
+            throw new BusinessException("仅买家可确认已收到物品");
+        }
+        if (REFUND_STATUS_APPLIED.equals(order.refundStatus())) {
+            throw new BusinessException("当前订单已申请退款，无法确认收货");
+        }
+
+        tradeOrderRepository.markBuyerConfirmedReceived(orderId);
+        tradeOrderRepository.completeOrderWhenBothConfirmed(orderId);
+
+        TradeOrderRecord updated = tradeOrderRepository.findOrderById(orderId);
+        if (updated == null) {
+            throw new BusinessException("订单状态更新失败，请稍后重试");
+        }
+        if (STATUS_COMPLETED.equals(updated.status())) {
+            reviewService.ensureReviewInvite(updated.id(), updated.itemId(), updated.buyerUserId(),
+                    updated.sellerUserId());
+        }
+        return toDto(updated);
+    }
+
+    @Transactional
+    public TradeOrderDto applyRefund(Long actorUserId, Long orderId, String refundType) {
+        TradeOrderRecord order = requireOrderActorAndPendingConfirmation(actorUserId, orderId);
+        if (!actorUserId.equals(order.buyerUserId())) {
+            throw new BusinessException("仅买家可申请退款");
+        }
+        if (Boolean.TRUE.equals(order.buyerConfirmed())) {
+            throw new BusinessException("买家已确认收货，无法申请退款");
+        }
+        String normalizedType = normalizeRefundType(refundType);
+        int updatedRows = tradeOrderRepository.applyRefund(orderId, normalizedType);
+        if (updatedRows <= 0) {
+            throw new BusinessException("退款申请失败，订单可能已在处理中");
+        }
+
+        TradeOrderRecord updated = tradeOrderRepository.findOrderById(orderId);
+        if (updated == null) {
+            throw new BusinessException("退款申请失败，请稍后重试");
+        }
+        return toDto(updated);
+    }
+
+    @Transactional
+    public TradeOrderDto approveRefund(Long actorUserId, Long orderId) {
+        TradeOrderRecord order = requireOrderActorAndPendingConfirmation(actorUserId, orderId);
+        if (!actorUserId.equals(order.sellerUserId())) {
+            throw new BusinessException("仅卖家可处理退款");
+        }
+        if (!REFUND_STATUS_APPLIED.equals(order.refundStatus())) {
+            throw new BusinessException("当前订单未处于退款申请状态");
+        }
+
+        int updatedRows;
+        if (REFUND_TYPE_NO_RECEIPT.equals(order.refundType())) {
+            updatedRows = tradeOrderRepository.approveRefundNoReceipt(orderId);
+        } else if (REFUND_TYPE_RETURN_AFTER_RECEIPT.equals(order.refundType())) {
+            updatedRows = tradeOrderRepository.approveRefundAfterReturn(orderId);
+        } else {
+            throw new BusinessException("退款类型无效");
+        }
+        if (updatedRows <= 0) {
+            throw new BusinessException("退款处理失败，请稍后重试");
+        }
+
+        tradeOrderRepository.restoreOneStockOnRefund(order.itemId());
+        TradeOrderRecord updated = tradeOrderRepository.findOrderById(orderId);
+        if (updated == null) {
+            throw new BusinessException("退款处理失败，请稍后重试");
+        }
         return toDto(updated);
     }
 
@@ -179,8 +282,43 @@ public class TradeOrderService {
                 record.receiverName(),
                 record.receiverPhone(),
                 record.receiverAddress(),
+                record.buyerConfirmed(),
+                record.sellerConfirmed(),
+                record.refundStatus(),
+                record.refundType(),
                 record.createdAt(),
                 record.paidAt());
+    }
+
+    private TradeOrderRecord requireOrderActorAndPendingConfirmation(Long actorUserId, Long orderId) {
+        if (actorUserId == null || actorUserId <= 0) {
+            throw new BusinessException("登录状态已失效，请重新登录");
+        }
+        if (orderId == null || orderId <= 0) {
+            throw new BusinessException("订单信息无效");
+        }
+
+        TradeOrderRecord order = tradeOrderRepository.findOrderById(orderId);
+        if (order == null) {
+            throw new BusinessException("订单不存在");
+        }
+
+        boolean canOperate = actorUserId.equals(order.buyerUserId()) || actorUserId.equals(order.sellerUserId());
+        if (!canOperate) {
+            throw new BusinessException("无权限操作该订单");
+        }
+        if (!STATUS_PENDING_CONFIRMATION.equals(order.status())) {
+            throw new BusinessException("当前订单状态不可操作");
+        }
+        return order;
+    }
+
+    private String normalizeRefundType(String refundType) {
+        String normalized = refundType == null ? "" : refundType.trim().toUpperCase();
+        if (REFUND_TYPE_NO_RECEIPT.equals(normalized) || REFUND_TYPE_RETURN_AFTER_RECEIPT.equals(normalized)) {
+            return normalized;
+        }
+        throw new BusinessException("退款类型无效");
     }
 
     private String requireText(String value, String message) {

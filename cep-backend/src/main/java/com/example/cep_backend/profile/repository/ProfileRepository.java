@@ -30,7 +30,11 @@ public class ProfileRepository {
                 rs.getBigDecimal("price"),
                 createdAt.format(DATE_TIME_FORMATTER),
                 rs.getString("photo_url"),
-                rs.getString("status"));
+                rs.getString("status"),
+                rs.getObject("buyer_confirmed", Boolean.class),
+                rs.getObject("seller_confirmed", Boolean.class),
+                rs.getString("refund_status"),
+                rs.getString("refund_type"));
     };
 
     private final RowMapper<ProfilePendingTradeDto> pendingTradeRowMapper = (rs, rowNum) -> {
@@ -183,7 +187,11 @@ public class ProfileRepository {
                         ORDER BY p.sort_order ASC, p.id ASC
                         LIMIT 1
                     ) AS photo_url,
-                    i.status
+                    i.status,
+                    NULL AS buyer_confirmed,
+                    NULL AS seller_confirmed,
+                    NULL AS refund_status,
+                    NULL AS refund_type
                 FROM items i
                 LEFT JOIN item_details d ON d.item_id = i.id
                 WHERE COALESCE(i.publisher_user_id, d.publisher_user_id) = ?
@@ -202,7 +210,11 @@ public class ProfileRepository {
                     o.amount AS price,
                     COALESCE(o.paid_at, o.created_at) AS created_at,
                     o.cover_photo_url AS photo_url,
-                    o.status
+                    o.status,
+                    o.buyer_confirmed,
+                    o.seller_confirmed,
+                    o.refund_status,
+                    o.refund_type
                 FROM trade_orders o
                 WHERE o.seller_user_id = ?
                   AND NOT EXISTS (
@@ -231,7 +243,11 @@ public class ProfileRepository {
                     o.amount AS price,
                     COALESCE(o.paid_at, o.created_at) AS created_at,
                     o.cover_photo_url AS photo_url,
-                    o.status
+                    o.status,
+                    o.buyer_confirmed,
+                    o.seller_confirmed,
+                    o.refund_status,
+                    o.refund_type
                 FROM trade_orders o
                 WHERE o.buyer_user_id = ?
                   AND NOT EXISTS (
@@ -265,7 +281,11 @@ public class ProfileRepository {
                         ORDER BY p.sort_order ASC, p.id ASC
                         LIMIT 1
                     ) AS photo_url,
-                    i.status
+                    i.status,
+                    NULL AS buyer_confirmed,
+                    NULL AS seller_confirmed,
+                    NULL AS refund_status,
+                    NULL AS refund_type
                 FROM user_favorites f
                 INNER JOIN items i ON i.id = f.item_id
                 WHERE f.user_id = ?
@@ -377,7 +397,7 @@ public class ProfileRepository {
                         o.paid_at AS created_at
                     FROM trade_orders o
                     WHERE o.seller_user_id = ?
-                      AND o.status = 'PAID'
+                      AND o.status = 'COMPLETED'
                     """);
         } else {
             sql.append("""
@@ -411,7 +431,7 @@ public class ProfileRepository {
                             o.paid_at AS created_at
                         FROM trade_orders o
                         WHERE o.seller_user_id = ?
-                          AND o.status = 'PAID'
+                          AND o.status = 'COMPLETED'
                     ) t
                     """);
         }
@@ -578,7 +598,8 @@ public class ProfileRepository {
         }
         return switch (status.trim().toLowerCase()) {
             case "pending-payment" -> "PENDING_PAYMENT";
-            case "completed" -> "PAID";
+            case "pending-confirmation" -> "PENDING_CONFIRMATION";
+            case "completed" -> "COMPLETED";
             case "cancelled" -> "CANCELLED";
             default -> "ALL";
         };

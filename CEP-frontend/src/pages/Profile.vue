@@ -15,18 +15,6 @@
           <span>我的评价</span>
         </button>
 
-        <button
-          :class="[
-            'menu-item',
-            selectedMenu === 'pending-trade' ? 'menu-item--active' : '',
-          ]"
-          type="button"
-          @click="selectMenu('pending-trade')"
-        >
-          <el-icon><Tickets /></el-icon>
-          <span>待处理交易</span>
-        </button>
-
         <div class="menu-group">
           <button
             class="menu-title"
@@ -190,7 +178,7 @@
               <span
                 v-else-if="detailMenuKeys.includes(selectedMenu)"
                 class="section-count"
-                >共 {{ currentSectionItems.length }} 条</span
+                >共 {{ displaySectionItems.length }} 条</span
               >
             </div>
             <div
@@ -281,53 +269,6 @@
                   <span class="review-time">{{ item.time }}</span>
                 </div>
               </div>
-            </div>
-          </div>
-
-          <div
-            v-else-if="selectedMenu === 'pending-trade'"
-            class="pending-list"
-          >
-            <article
-              v-for="item in pendingTrades"
-              :key="item.id"
-              class="pending-item"
-            >
-              <div class="pending-item__head">
-                <button
-                  type="button"
-                  class="pending-item__title pending-item__title--link"
-                  @click="goToItemDetail(item.itemId)"
-                >
-                  {{ item.title }}
-                </button>
-                <span class="pending-item__status">{{ item.statusText }}</span>
-              </div>
-              <div class="pending-item__meta">
-                <span>交易对象：{{ item.partner }}</span>
-                <span>约定地点：{{ item.location }}</span>
-                <span>约定时间：{{ item.time }}</span>
-              </div>
-              <div class="pending-item__actions">
-                <button
-                  type="button"
-                  class="pending-btn pending-btn--confirm"
-                  @click="goPay(item.orderId)"
-                >
-                  去付款
-                </button>
-                <button
-                  type="button"
-                  class="pending-btn pending-btn--cancel"
-                  @click="goToItemDetail(item.itemId)"
-                >
-                  查看商品
-                </button>
-              </div>
-            </article>
-
-            <div v-if="!pendingTrades.length" class="pending-empty">
-              当前没有待处理交易
             </div>
           </div>
 
@@ -479,7 +420,7 @@
 
             <template v-else>
               <article
-                v-for="item in currentSectionItems"
+                v-for="item in displaySectionItems"
                 :key="item.id"
                 class="section-item"
               >
@@ -490,7 +431,7 @@
                     <template
                       v-if="tradeOrderStatusMenuKeys.includes(selectedMenu)"
                     >
-                      · {{ mapTradeOrderStatusText(item.status) }}
+                      · {{ mapTradeOrderStatusText(item.status, item) }}
                     </template>
                   </p>
                 </div>
@@ -518,6 +459,71 @@
                     取消订单
                   </button>
                   <button
+                    v-if="
+                      selectedMenu === 'trade-sold' &&
+                      item.status === 'PENDING_CONFIRMATION' &&
+                      !item.sellerConfirmed
+                    "
+                    class="section-item__btn section-item__btn--edit"
+                    type="button"
+                    @click="handleSellerConfirmDelivered(item)"
+                  >
+                    确认已交付物品
+                  </button>
+                  <button
+                    v-if="
+                      selectedMenu === 'trade-bought' &&
+                      item.status === 'PENDING_CONFIRMATION' &&
+                      !item.buyerConfirmed &&
+                      !isRefundAfterSaleOrder(item)
+                    "
+                    class="section-item__btn section-item__btn--edit"
+                    type="button"
+                    @click="handleBuyerConfirmReceived(item)"
+                  >
+                    确认已收到物品
+                  </button>
+                  <button
+                    v-if="
+                      selectedMenu === 'trade-bought' &&
+                      item.status === 'PENDING_CONFIRMATION' &&
+                      item.refundStatus !== 'APPLIED'
+                    "
+                    class="section-item__btn section-item__btn--danger"
+                    type="button"
+                    @click="handleApplyRefund(item, 'NO_RECEIPT')"
+                  >
+                    申请退款（未收到货）
+                  </button>
+                  <button
+                    v-if="
+                      selectedMenu === 'trade-bought' &&
+                      item.status === 'PENDING_CONFIRMATION' &&
+                      item.refundStatus !== 'APPLIED'
+                    "
+                    class="section-item__btn section-item__btn--danger"
+                    type="button"
+                    @click="handleApplyRefund(item, 'RETURN_AFTER_RECEIPT')"
+                  >
+                    申请退款（已收到货）
+                  </button>
+                  <button
+                    v-if="
+                      selectedMenu === 'trade-sold' &&
+                      item.status === 'PENDING_CONFIRMATION' &&
+                      item.refundStatus === 'APPLIED'
+                    "
+                    class="section-item__btn section-item__btn--danger"
+                    type="button"
+                    @click="handleApproveRefund(item)"
+                  >
+                    {{
+                      item.refundType === "RETURN_AFTER_RECEIPT"
+                        ? "确认收到退货并退款"
+                        : "同意退款"
+                    }}
+                  </button>
+                  <button
                     v-if="selectedMenu === 'trade-sold'"
                     class="section-item__btn section-item__btn--contact"
                     type="button"
@@ -534,7 +540,11 @@
                     联系卖家
                   </button>
                   <button
-                    v-if="selectedMenu === 'trade-bought'"
+                    v-if="
+                      selectedMenu === 'trade-bought' &&
+                      item.status !== 'PENDING_CONFIRMATION' &&
+                      !isRefundAfterSaleOrder(item)
+                    "
                     class="section-item__btn section-item__btn--rebuy"
                     type="button"
                     @click="handleRebuy(item)"
@@ -554,14 +564,14 @@
 
             <div
               v-if="
-                !currentSectionItems.length &&
+                !displaySectionItems.length &&
                 (selectedMenu === 'following' || selectedMenu === 'fans')
               "
               class="pending-empty"
             >
               暂无用户
             </div>
-            <div v-else-if="!currentSectionItems.length" class="pending-empty">
+            <div v-else-if="!displaySectionItems.length" class="pending-empty">
               当前暂无物品
             </div>
           </div>
@@ -687,7 +697,6 @@ import {
   ArrowRight,
   Goods,
   Star,
-  Tickets,
   User,
   UserFilled,
 } from "@element-plus/icons-vue";
@@ -702,7 +711,6 @@ import {
   fetchFavoriteItems,
   fetchFansUsers,
   fetchFollowingUsers,
-  fetchPendingPaymentTrades,
   fetchProfileOverview,
   fetchProfileReviews,
   fetchSoldOrderContact,
@@ -711,7 +719,18 @@ import {
   updateProfileBasic,
   uploadProfileAvatar,
 } from "../service/profile/profileApiService";
-import { cancelTradeOrder } from "../service/payment/paymentApiService";
+import {
+  buildMessageWebSocketUrl,
+  createOrGetDirectConversation,
+} from "../service/chat/chatApiService";
+import {
+  applyTradeOrderRefund,
+  approveTradeOrderRefund,
+  cancelTradeOrder,
+  confirmBuyerReceived,
+  confirmSellerDelivered,
+  rejectTradeOrderRefund,
+} from "../service/payment/paymentApiService";
 import {
   deleteMyPublishItem,
   fetchMyPublishItems,
@@ -721,6 +740,7 @@ import {
 
 const router = useRouter();
 const PROFILE_SELECTED_MENU_KEY = "profile:selectedMenu";
+const TRADE_REMINDER_PREFIX = "[TRADE_REMINDER]";
 
 const userInfo = reactive({
   avatar: "",
@@ -780,7 +800,6 @@ const reviewList = ref([]);
 
 const sectionMap = {
   idle: { title: "我的评价" },
-  "pending-trade": { title: "待处理交易" },
   "trade-published": { title: "我发布的" },
   "trade-sold": { title: "我卖出的" },
   "trade-bought": { title: "我买到的" },
@@ -800,6 +819,8 @@ const tradeOrderStatusMenuKeys = ["trade-sold", "trade-bought"];
 const tradeOrderStatusTabs = [
   { key: "all", label: "全部" },
   { key: "pending-payment", label: "待付款" },
+  { key: "pending-confirmation", label: "待确认" },
+  { key: "refund-after-sale", label: "退款/售后" },
   { key: "completed", label: "已完成" },
   { key: "cancelled", label: "已取消" },
 ];
@@ -817,7 +838,6 @@ const sectionItemMap = reactive({
 });
 const loadedMenus = reactive({
   idle: false,
-  "pending-trade": false,
   "trade-published": false,
   "trade-sold": false,
   "trade-bought": false,
@@ -825,8 +845,6 @@ const loadedMenus = reactive({
   following: false,
   fans: false,
 });
-
-const pendingTrades = ref([]);
 
 const reviewTotal = computed(() => reviewStats.total);
 const reviewTabs = computed(() => [
@@ -858,6 +876,37 @@ const currentTradeOrderStatus = computed(() => {
   return activeTradeOrderStatusMap[selectedMenu.value] || "all";
 });
 
+const isRefundAfterSaleOrder = (item) => {
+  const refundStatus = String(item?.refundStatus || "")
+    .trim()
+    .toUpperCase();
+  return refundStatus === "APPLIED" || refundStatus === "APPROVED";
+};
+
+const getTradeOrderApiStatus = (status) => {
+  if (status === "refund-after-sale") {
+    return "all";
+  }
+  return status;
+};
+
+const getDisplaySectionItems = (menuKey, items) => {
+  if (!tradeOrderStatusMenuKeys.includes(menuKey)) {
+    return items;
+  }
+  if (currentTradeOrderStatus.value === "refund-after-sale") {
+    return items.filter(isRefundAfterSaleOrder);
+  }
+  if (currentTradeOrderStatus.value === "pending-confirmation") {
+    return items.filter((item) => !isRefundAfterSaleOrder(item));
+  }
+  return items;
+};
+
+const displaySectionItems = computed(() =>
+  getDisplaySectionItems(selectedMenu.value, currentSectionItems.value)
+);
+
 const normalizeListData = (responseBody) => {
   const payload = responseBody?.data;
   if (Array.isArray(payload)) return payload;
@@ -865,6 +914,130 @@ const normalizeListData = (responseBody) => {
   if (Array.isArray(payload?.records)) return payload.records;
   if (Array.isArray(payload?.list)) return payload.list;
   return [];
+};
+
+const buildTradeReminderText = ({
+  type,
+  orderId,
+  itemTitle,
+  content,
+  actionText,
+  targetMenu,
+}) => {
+  const payload = {
+    type: String(type || "TRADE_REMINDER").trim() || "TRADE_REMINDER",
+    orderId: Number(orderId) > 0 ? Number(orderId) : null,
+    itemTitle: String(itemTitle || "").trim(),
+    content: String(content || "").trim(),
+    actionText: String(actionText || "去查看").trim() || "去查看",
+    targetMenu: String(targetMenu || "").trim(),
+  };
+  return `${TRADE_REMINDER_PREFIX}${JSON.stringify(payload)}`;
+};
+
+const sendConversationTextBySocket = async (conversationId, text) => {
+  const wsUrl = await buildMessageWebSocketUrl();
+  await new Promise((resolve, reject) => {
+    const socket = new WebSocket(wsUrl);
+    let settled = false;
+
+    const settle = (error) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.close();
+      }
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    };
+
+    const timeout = window.setTimeout(() => {
+      settle(new Error("消息提醒发送超时"));
+    }, 6000);
+
+    socket.onopen = () => {
+      try {
+        socket.send(
+          JSON.stringify({
+            action: "SEND_MESSAGE",
+            conversationId: Number(conversationId),
+            text,
+            imageUrl: "",
+          })
+        );
+        window.setTimeout(() => settle(), 120);
+      } catch (error) {
+        settle(error instanceof Error ? error : new Error("消息提醒发送失败"));
+      }
+    };
+
+    socket.onerror = () => {
+      settle(new Error("消息提醒发送失败"));
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event?.data || "{}");
+        if (String(payload?.eventType || "").toUpperCase() === "ERROR") {
+          settle(new Error(payload?.message || "消息提醒发送失败"));
+        }
+      } catch {
+        // ignore invalid payload
+      }
+    };
+
+    socket.onclose = () => {
+      if (!settled) {
+        settle();
+      }
+    };
+  });
+};
+
+const sendTradeReminderMessage = async ({
+  item,
+  fetchContactFn,
+  type,
+  content,
+  actionText,
+  targetMenu,
+}) => {
+  const orderId = getTradeOrderId(item);
+  if (!orderId) return;
+
+  const responseBody = await fetchContactFn(orderId);
+  const contact = responseBody?.data || {};
+  const peerUserId = Number(contact.peerUserId || 0);
+  const itemId = Number(contact.itemId || item?.itemId || 0);
+  if (!peerUserId || !itemId) {
+    throw new Error("交易联系人信息无效，无法发送提醒");
+  }
+
+  const conversationBody = await createOrGetDirectConversation({
+    peerUserId,
+    itemId,
+  });
+  const rawConversation = conversationBody?.data || {};
+  const conversationId = Number(
+    rawConversation.conversationId || rawConversation.id || 0
+  );
+  if (!conversationId) {
+    throw new Error("会话信息无效，无法发送提醒");
+  }
+
+  const text = buildTradeReminderText({
+    type,
+    orderId,
+    itemTitle: contact.itemTitle || item?.title || "",
+    content,
+    actionText,
+    targetMenu,
+  });
+  await sendConversationTextBySocket(conversationId, text);
 };
 
 const selectMenu = async (key) => {
@@ -1024,6 +1197,10 @@ const mapTradeItem = (item) => {
     time: item.time || "",
     photoUrl: item.photoUrl || "",
     status: item.status || "PUBLISHED",
+    buyerConfirmed: Boolean(item.buyerConfirmed),
+    sellerConfirmed: Boolean(item.sellerConfirmed),
+    refundStatus: item.refundStatus || "NONE",
+    refundType: item.refundType || "",
     categoryCode: item.categoryCode || "other",
     purchaseDate: item.purchaseDate || "",
     usageDuration: item.usageDuration || "",
@@ -1044,11 +1221,17 @@ const mapFollowUser = (item) => ({
   avatar: item.avatar || "",
 });
 
-const mapTradeOrderStatusText = (status) => {
+const mapTradeOrderStatusText = (status, item) => {
+  if (isRefundAfterSaleOrder(item)) {
+    return "退款/售后";
+  }
   if (status === "PENDING_PAYMENT") {
     return "待付款";
   }
-  if (status === "PAID") {
+  if (status === "PENDING_CONFIRMATION") {
+    return "待确认";
+  }
+  if (status === "COMPLETED") {
     return "已完成";
   }
   if (status === "CANCELLED") {
@@ -1366,21 +1549,6 @@ const loadIdleData = async () => {
   loadedMenus.idle = true;
 };
 
-const loadPendingTrades = async () => {
-  const pendingRes = await fetchPendingPaymentTrades();
-  pendingTrades.value = (pendingRes?.data || []).map((item) => ({
-    id: item.id,
-    orderId: item.orderId,
-    itemId: item.itemId,
-    title: item.title || "未命名物品",
-    partner: item.partner || "校园用户",
-    location: item.location || "未填写",
-    time: item.time || "",
-    statusText: item.statusText || "待付款",
-  }));
-  loadedMenus["pending-trade"] = true;
-};
-
 const loadMenuData = async (menuKey, force = false) => {
   if (
     !force &&
@@ -1395,11 +1563,6 @@ const loadMenuData = async (menuKey, force = false) => {
     return;
   }
 
-  if (menuKey === "pending-trade") {
-    await loadPendingTrades();
-    return;
-  }
-
   if (menuKey === "trade-published") {
     await reloadMyPublishedItems();
     return;
@@ -1407,7 +1570,7 @@ const loadMenuData = async (menuKey, force = false) => {
 
   if (menuKey === "trade-sold") {
     const soldRes = await fetchSoldItems(
-      activeTradeOrderStatusMap["trade-sold"]
+      getTradeOrderApiStatus(activeTradeOrderStatusMap["trade-sold"])
     );
     sectionItemMap["trade-sold"] = normalizeListData(soldRes).map(mapTradeItem);
     loadedMenus["trade-sold"] = true;
@@ -1416,7 +1579,7 @@ const loadMenuData = async (menuKey, force = false) => {
 
   if (menuKey === "trade-bought") {
     const boughtRes = await fetchBoughtItems(
-      activeTradeOrderStatusMap["trade-bought"]
+      getTradeOrderApiStatus(activeTradeOrderStatusMap["trade-bought"])
     );
     sectionItemMap["trade-bought"] =
       normalizeListData(boughtRes).map(mapTradeItem);
@@ -1477,7 +1640,6 @@ const handleTradeOrderCancel = async (item) => {
       }
     );
     await cancelTradeOrder(orderId);
-    await loadPendingTrades();
     if (tradeOrderStatusMenuKeys.includes(selectedMenu.value)) {
       await loadMenuData(selectedMenu.value, true);
     }
@@ -1487,6 +1649,116 @@ const handleTradeOrderCancel = async (item) => {
       return;
     }
     ElMessage.error(error.message || "取消订单失败");
+  }
+};
+
+const handleSellerConfirmDelivered = async (item) => {
+  const orderId = getTradeOrderId(item);
+  if (!orderId) {
+    ElMessage.warning("订单信息无效");
+    return;
+  }
+  try {
+    await confirmSellerDelivered(orderId);
+    await loadMenuData("trade-sold", true);
+    await sendTradeReminderMessage({
+      item,
+      fetchContactFn: fetchSoldOrderContact,
+      type: "SELLER_CONFIRMED_DELIVERED",
+      content: "卖家已确认交付物品，请及时确认是否收到。",
+      actionText: "确认已收到物品",
+      targetMenu: "trade-bought",
+    }).catch((error) => {
+      ElMessage.warning(error.message || "交付已确认，但聊天提醒发送失败");
+    });
+    ElMessage.success("已确认交付");
+  } catch (error) {
+    ElMessage.error(error.message || "确认交付失败");
+  }
+};
+
+const handleBuyerConfirmReceived = async (item) => {
+  const orderId = getTradeOrderId(item);
+  if (!orderId) {
+    ElMessage.warning("订单信息无效");
+    return;
+  }
+  try {
+    await confirmBuyerReceived(orderId);
+    await loadMenuData("trade-bought", true);
+    await sendTradeReminderMessage({
+      item,
+      fetchContactFn: fetchBoughtOrderContact,
+      type: "BUYER_CONFIRMED_RECEIVED",
+      content: "买家已确认收到物品，订单状态已更新。",
+      actionText: "查看订单状态",
+      targetMenu: "trade-sold",
+    }).catch((error) => {
+      ElMessage.warning(error.message || "收货已确认，但聊天提醒发送失败");
+    });
+    ElMessage.success("已确认收货");
+  } catch (error) {
+    ElMessage.error(error.message || "确认收货失败");
+  }
+};
+
+const handleApplyRefund = async (item, refundType) => {
+  const orderId = getTradeOrderId(item);
+  if (!orderId) {
+    ElMessage.warning("订单信息无效");
+    return;
+  }
+  try {
+    await applyTradeOrderRefund(orderId, refundType);
+    await loadMenuData("trade-bought", true);
+    const isNoReceipt = refundType === "NO_RECEIPT";
+    await sendTradeReminderMessage({
+      item,
+      fetchContactFn: fetchBoughtOrderContact,
+      type: isNoReceipt
+        ? "REFUND_APPLIED_NO_RECEIPT"
+        : "REFUND_APPLIED_RETURN_AFTER_RECEIPT",
+      content: isNoReceipt
+        ? "买家申请退款（未收到货），请确认是否同意退款。"
+        : "买家申请退款（已收到货），请确认是否同意并协商退货。",
+      actionText: "处理退款申请",
+      targetMenu: "trade-sold",
+    }).catch((error) => {
+      ElMessage.warning(error.message || "退款申请已提交，但聊天提醒发送失败");
+    });
+    ElMessage.success("退款申请已提交");
+  } catch (error) {
+    ElMessage.error(error.message || "退款申请失败");
+  }
+};
+
+const handleApproveRefund = async (item) => {
+  const orderId = getTradeOrderId(item);
+  if (!orderId) {
+    ElMessage.warning("订单信息无效");
+    return;
+  }
+  try {
+    await approveTradeOrderRefund(orderId);
+    await loadMenuData("trade-sold", true);
+    const isNoReceipt = item?.refundType === "NO_RECEIPT";
+    await sendTradeReminderMessage({
+      item,
+      fetchContactFn: fetchSoldOrderContact,
+      type: isNoReceipt
+        ? "REFUND_APPROVED_NO_RECEIPT"
+        : "REFUND_APPROVED_RETURN_AFTER_RECEIPT",
+      content: isNoReceipt
+        ? "卖家已同意退款，系统将直接退款。"
+        : "卖家已同意退款申请，请按约定交付退回物品并确认。",
+      actionText: isNoReceipt ? "查看退款结果" : "确认已交付物品",
+      targetMenu: "trade-bought",
+    }).catch((error) => {
+      ElMessage.warning(error.message || "退款已处理，但聊天提醒发送失败");
+    });
+    ElMessage.success("已完成退款");
+  } catch (error) {
+    ElMessage.error(error.message || "退款处理失败");
   }
 };
 

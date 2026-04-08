@@ -168,15 +168,28 @@
             </div>
           </header>
 
-          <div ref="messageContainerRef" class="message-list">
+          <div
+            ref="messageContainerRef"
+            :class="[
+              'message-list',
+              isNotificationPanel ? 'message-list--notification' : '',
+            ]"
+          >
             <article
               v-for="message in activePanelMessages"
               :key="message.id"
               :class="[
                 'message-item',
                 message.from === 'self' ? 'message-item--self' : '',
+                isNotificationPanel ? 'message-item--notification' : '',
               ]"
             >
+              <time
+                v-if="isNotificationPanel"
+                class="message-time message-time--notification-top"
+              >
+                {{ formatNotificationDateTime(message.time) }}
+              </time>
               <div class="message-bubble">
                 <img
                   v-if="message.imageUrl"
@@ -197,7 +210,19 @@
                     {{ getReviewInviteButtonText(message) }}
                   </button>
                 </div>
-                <time class="message-time">{{ message.time }}</time>
+                <div v-if="isTradeReminder(message)" class="review-invite-row">
+                  <button
+                    class="review-invite-btn"
+                    type="button"
+                    :disabled="!canClickTradeReminder(message)"
+                    @click="goToTradeReminderTarget(message)"
+                  >
+                    {{ getTradeReminderButtonText(message) }}
+                  </button>
+                </div>
+                <time v-if="!isNotificationPanel" class="message-time">{{
+                  message.time
+                }}</time>
               </div>
             </article>
           </div>
@@ -346,6 +371,8 @@ const isManualClose = ref(false);
 const isLoadingConversations = ref(false);
 const isLoadingMessages = ref(false);
 const NOTIFICATION_CONVERSATION_ID = "notification-system";
+const PROFILE_SELECTED_MENU_KEY = "profile:selectedMenu";
+const TRADE_REMINDER_PREFIX = "[TRADE_REMINDER]";
 const SUPPORTED_NOTIFICATION_TYPES = new Set([
   "ITEM_FAVORITED",
   "FAVORITE_PRICE_DROP",
@@ -356,6 +383,60 @@ const notificationMessages = ref([]);
 const notificationUnread = ref(0);
 const notificationLastTime = ref("");
 const notificationLastMessage = ref("暂无通知");
+
+const parseTradeReminderPayload = (text) => {
+  const rawText = typeof text === "string" ? text.trim() : "";
+  if (!rawText.startsWith(TRADE_REMINDER_PREFIX)) {
+    return null;
+  }
+
+  const jsonPart = rawText.slice(TRADE_REMINDER_PREFIX.length).trim();
+  if (!jsonPart) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(jsonPart);
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+    return {
+      type:
+        typeof parsed.type === "string" && parsed.type.trim()
+          ? parsed.type.trim()
+          : "TRADE_REMINDER",
+      orderId:
+        Number.isInteger(parsed.orderId) && parsed.orderId > 0
+          ? parsed.orderId
+          : null,
+      itemTitle:
+        typeof parsed.itemTitle === "string" ? parsed.itemTitle.trim() : "",
+      content:
+        typeof parsed.content === "string" && parsed.content.trim()
+          ? parsed.content.trim()
+          : "交易状态已更新，请及时处理。",
+      actionText:
+        typeof parsed.actionText === "string" && parsed.actionText.trim()
+          ? parsed.actionText.trim()
+          : "去处理",
+      targetMenu:
+        typeof parsed.targetMenu === "string" ? parsed.targetMenu.trim() : "",
+    };
+  } catch {
+    return null;
+  }
+};
+
+const formatConversationLastMessage = (value) => {
+  if (typeof value !== "string" || !value.trim()) {
+    return "暂无消息";
+  }
+  const tradeReminder = parseTradeReminderPayload(value);
+  if (tradeReminder) {
+    return tradeReminder.content;
+  }
+  return value;
+};
 
 const normalizeConversation = (raw) => ({
   id: String(raw?.conversationId ?? ""),
@@ -377,10 +458,7 @@ const normalizeConversation = (raw) => ({
       ? raw.itemImage.trim()
       : "",
   unread: Number.isInteger(raw?.unread) ? Math.max(raw.unread, 0) : 0,
-  lastMessage:
-    typeof raw?.lastMessage === "string" && raw.lastMessage.trim()
-      ? raw.lastMessage
-      : "暂无消息",
+  lastMessage: formatConversationLastMessage(raw?.lastMessage),
   lastTime:
     typeof raw?.lastTime === "string" && raw.lastTime.trim()
       ? raw.lastTime.trim()
@@ -390,9 +468,19 @@ const normalizeConversation = (raw) => ({
 });
 
 const normalizeMessage = (item) => ({
+  ...(parseTradeReminderPayload(item?.text)
+    ? { tradeReminder: parseTradeReminderPayload(item?.text) }
+    : { tradeReminder: null }),
   id: item?.id ?? Date.now(),
   from: item?.from === "self" ? "self" : "other",
-  text: typeof item?.text === "string" ? item.text : "",
+  text: (() => {
+    const rawText = typeof item?.text === "string" ? item.text : "";
+    const tradeReminder = parseTradeReminderPayload(rawText);
+    if (tradeReminder) {
+      return tradeReminder.content;
+    }
+    return rawText;
+  })(),
   imageUrl: typeof item?.imageUrl === "string" ? item.imageUrl : "",
   time: typeof item?.time === "string" ? item.time : "",
   messageType:
@@ -540,6 +628,11 @@ const loadNotifications = async ({ markRead = false } = {}) => {
   if (markRead && unreadCount > 0) {
     await markAllMessageNotificationsRead();
     notificationUnread.value = 0;
+    try {
+      localStorage.setItem("cep-message-unread-sync", String(Date.now()));
+    } catch {
+      // ignore localStorage errors
+    }
   }
 };
 
@@ -548,6 +641,32 @@ const getNowTime = () => {
   const hour = String(date.getHours()).padStart(2, "0");
   const minute = String(date.getMinutes()).padStart(2, "0");
   return `${hour}:${minute}`;
+};
+
+const formatNotificationDateTime = (value) => {
+  if (typeof value !== "string" || !value.trim()) {
+    return "";
+  }
+
+  const text = value.trim();
+  const match = text.match(
+    /(\d{4})[-/](\d{1,2})[-/](\d{1,2})[^\d]*(\d{1,2}):(\d{2})/
+  );
+  if (match) {
+    const month = String(Number(match[2])).padStart(2, "0");
+    const day = String(Number(match[3])).padStart(2, "0");
+    const hour = String(Number(match[4])).padStart(2, "0");
+    return `${month}-${day} ${hour}:${match[5]}`;
+  }
+
+  const noYearMatch = text.match(/(\d{1,2})[-/](\d{1,2})[^\d]*(\d{1,2}:\d{2})/);
+  if (noYearMatch) {
+    const month = String(Number(noYearMatch[1])).padStart(2, "0");
+    const day = String(Number(noYearMatch[2])).padStart(2, "0");
+    return `${month}-${day} ${noYearMatch[3]}`;
+  }
+
+  return text;
 };
 
 const scrollToBottom = async () => {
@@ -586,6 +705,11 @@ const selectConversation = (conversationId) => {
     current.unread = 0;
   }
   markConversationRead(conversationId).catch(() => {});
+  try {
+    localStorage.setItem("cep-message-unread-sync", String(Date.now()));
+  } catch {
+    // ignore localStorage errors
+  }
 };
 
 const loadConversations = async () => {
@@ -656,6 +780,39 @@ const getReviewInviteButtonText = (message) => {
     return "暂不可评";
   }
   return "去评价";
+};
+
+const isTradeReminder = (message) => Boolean(message?.tradeReminder);
+
+const canClickTradeReminder = (message) => {
+  if (!isTradeReminder(message)) {
+    return false;
+  }
+  const target = String(message.tradeReminder?.targetMenu || "").trim();
+  return Boolean(target);
+};
+
+const getTradeReminderButtonText = (message) => {
+  const text = String(message?.tradeReminder?.actionText || "").trim();
+  return text || "去处理";
+};
+
+const goToTradeReminderTarget = (message) => {
+  if (!isTradeReminder(message)) {
+    return;
+  }
+  const targetMenu = String(message.tradeReminder?.targetMenu || "").trim();
+  if (!targetMenu) {
+    ElMessage.warning("提醒跳转参数无效");
+    return;
+  }
+
+  try {
+    localStorage.setItem(PROFILE_SELECTED_MENU_KEY, targetMenu);
+  } catch {
+    // ignore localStorage errors
+  }
+  router.push("/profile");
 };
 
 const goToReview = (orderId) => {
@@ -881,6 +1038,11 @@ const handleWsMessageCreated = async (payload) => {
   if (selectedConversationId.value === conversationId) {
     conversation.unread = 0;
     await markConversationRead(conversationId).catch(() => {});
+    try {
+      localStorage.setItem("cep-message-unread-sync", String(Date.now()));
+    } catch {
+      // ignore localStorage errors
+    }
     scrollToBottom();
   }
 };
@@ -1160,10 +1322,11 @@ onBeforeUnmount(() => {
   height: 20px;
   border-radius: 999px;
   padding: 0 6px;
-  background: linear-gradient(150deg, #ff9fb8, #ff8fb2);
-  color: #ffffff;
+  background: #ff4d4f;
+  color: #ffffff !important;
   font-size: 11px;
   font-weight: 700;
+  line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1302,9 +1465,20 @@ onBeforeUnmount(() => {
   background: #ffffff;
 }
 
+.message-list--notification {
+  padding: 26px 22px;
+}
+
 .message-item {
   display: flex;
   margin-bottom: 10px;
+}
+
+.message-item--notification {
+  justify-content: center;
+  margin-bottom: 36px;
+  flex-direction: column;
+  align-items: center;
 }
 
 .message-item--self {
@@ -1317,6 +1491,13 @@ onBeforeUnmount(() => {
   padding: 10px 12px;
   background: #eee8ff;
   color: #332f52;
+}
+
+.message-item--notification .message-bubble {
+  width: min(74%, 560px);
+  min-height: 66px;
+  border-radius: 14px;
+  padding: 10px 14px;
 }
 
 .message-item--self .message-bubble {
@@ -1338,11 +1519,30 @@ onBeforeUnmount(() => {
   white-space: pre-wrap;
 }
 
+.message-item--notification .message-text {
+  font-size: 16px;
+  line-height: 1.5;
+}
+
 .message-time {
   margin-top: 6px;
   display: block;
   font-size: 11px;
   opacity: 0.76;
+}
+
+.message-item--notification .message-time {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.message-time--notification-top {
+  margin: 0 0 10px;
+  display: block;
+  font-size: 13px;
+  color: #9a8ea9;
+  text-align: center;
+  opacity: 1;
 }
 
 .review-invite-row {
