@@ -51,7 +51,7 @@
             <span>收货地址</span>
             <textarea
               v-model="receiver.address"
-              rows="3"
+              rows="2"
               placeholder="请输入详细收货地址"
             />
           </label>
@@ -82,6 +82,7 @@ import { ElMessage } from "element-plus";
 import { useRoute, useRouter } from "vue-router";
 import { fetchItemDetail } from "../service/item-detail/itemDetailApiService";
 import { createTradeOrder } from "../service/payment/paymentApiService";
+import { fetchProfileOverview } from "../service/profile/profileApiService";
 
 const route = useRoute();
 const router = useRouter();
@@ -102,6 +103,7 @@ const receiver = ref({
 const isLoading = ref(false);
 const loadError = ref("");
 const isSubmitting = ref(false);
+const isProfilePrefilled = ref(false);
 
 const toNumber = (value, fallback = 0) => {
   const converted = Number(value);
@@ -154,6 +156,25 @@ const loadItem = async () => {
   }
 };
 
+const loadReceiverProfile = async () => {
+  try {
+    const responseBody = await fetchProfileOverview();
+    const overview = responseBody?.data || {};
+    receiver.value = {
+      name:
+        (typeof overview.name === "string" && overview.name.trim()) ||
+        (typeof overview.username === "string" && overview.username.trim()) ||
+        "",
+      phone: typeof overview.phone === "string" ? overview.phone.trim() : "",
+      address:
+        typeof overview.address === "string" ? overview.address.trim() : "",
+    };
+    isProfilePrefilled.value = true;
+  } catch {
+    isProfilePrefilled.value = false;
+  }
+};
+
 const submitOrder = async () => {
   if (!item.value.id) {
     ElMessage.warning("商品信息无效");
@@ -203,6 +224,7 @@ watch(
   () => route.query.itemId,
   () => {
     loadItem();
+    loadReceiverProfile();
   },
   { immediate: true }
 );
@@ -211,12 +233,12 @@ watch(
 <style scoped>
 .confirm-page {
   min-height: 100vh;
-  background: #f5f7fb;
-  padding: 20px 14px 28px;
+  background: #f7f8fc;
+  padding: 14px 14px 12px;
 }
 
 .confirm-main {
-  max-width: 760px;
+  max-width: 780px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -226,14 +248,16 @@ watch(
 .page-title {
   margin: 0;
   font-size: 24px;
+  line-height: 1.1;
+  color: #40376d;
 }
 
 .card,
 .state-card {
-  border-radius: 14px;
+  border-radius: 16px;
   background: #ffffff;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
-  padding: 16px;
+  box-shadow: 0 8px 20px rgba(134, 123, 199, 0.1);
+  padding: 14px;
 }
 
 .state-card--error {
@@ -241,8 +265,9 @@ watch(
 }
 
 h2 {
-  margin: 0 0 12px;
-  font-size: 18px;
+  margin: 0 0 8px;
+  font-size: 20px;
+  color: #3f3868;
 }
 
 .item-row {
@@ -251,11 +276,11 @@ h2 {
 }
 
 .item-cover {
-  width: 96px;
-  height: 96px;
-  border-radius: 10px;
+  width: 82px;
+  height: 82px;
+  border-radius: 12px;
   object-fit: cover;
-  background: #eef2ff;
+  background: #ede9ff;
 }
 
 .item-cover--empty {
@@ -270,55 +295,69 @@ h2 {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 8px;
+  gap: 4px;
 }
 
 .item-title {
   margin: 0;
   font-weight: 600;
+  font-size: 22px;
+  color: #3f3868;
 }
 
 .item-price {
   margin: 0;
-  color: #f97316;
-  font-size: 22px;
+  color: #7764de;
+  font-size: 28px;
   font-weight: 700;
 }
 
 .address-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+}
+
+.address-card::before {
+  content: "";
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #c7b9ff, #ecd0ff);
+  margin-bottom: 2px;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .field span {
-  font-size: 14px;
-  color: #4b5563;
+  font-size: 16px;
+  color: #5d537f;
 }
 
 .field input,
 .field textarea {
-  border: 1px solid #d1d5db;
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 14px;
+  border: none;
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-size: 16px;
+  line-height: 1.35;
   outline: none;
+  background: #faf9ff;
+  box-shadow: inset 0 0 0 1px #ddd4ff;
 }
 
 .field textarea {
   resize: vertical;
+  min-height: 54px;
 }
 
 .field input:focus,
 .field textarea:focus {
-  border-color: #60a5fa;
-  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+  box-shadow: inset 0 0 0 2px #bfb1f7;
 }
 
 .submit-card {
@@ -331,13 +370,14 @@ h2 {
 .total-row {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  color: #374151;
+  gap: 6px;
+  color: #574b7c;
+  font-size: 18px;
 }
 
 .total-row strong {
-  color: #f97316;
-  font-size: 24px;
+  color: #f26f3d;
+  font-size: 28px;
 }
 
 .primary-btn,
@@ -349,9 +389,10 @@ h2 {
 }
 
 .primary-btn {
-  padding: 10px 28px;
+  padding: 8px 20px;
   color: #ffffff;
-  background: linear-gradient(135deg, #16a34a, #22c55e);
+  background: #26ba5f;
+  font-size: 18px;
 }
 
 .primary-btn:disabled {
@@ -361,9 +402,9 @@ h2 {
 
 .secondary-btn {
   padding: 8px 18px;
-  color: #1d4ed8;
-  border: 1px solid #bfdbfe;
-  background: #eff6ff;
+  color: #61538b;
+  border: 1px solid #dcd4ff;
+  background: #f6f3ff;
 }
 
 @media (max-width: 640px) {

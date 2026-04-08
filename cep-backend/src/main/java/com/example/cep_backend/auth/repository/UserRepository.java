@@ -17,14 +17,15 @@ public class UserRepository {
             rs.getLong("id"),
             rs.getString("email"),
             rs.getString("username"),
-            rs.getString("password_hash"));
+            rs.getString("password_hash"),
+            rs.getString("status"));
 
     public UserRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 
     public Optional<UserRecord> findByEmail(String email) {
-        String sql = "SELECT id, email, username, password_hash FROM users WHERE email = ?";
+        String sql = "SELECT id, email, username, password_hash, status FROM users WHERE email = ?";
         List<UserRecord> result = jdbcTemplate.query(sql, userRowMapper, email);
         if (result.isEmpty()) {
             return Optional.empty();
@@ -33,7 +34,7 @@ public class UserRepository {
     }
 
     public Optional<UserRecord> findById(Long userId) {
-        String sql = "SELECT id, email, username, password_hash FROM users WHERE id = ?";
+        String sql = "SELECT id, email, username, password_hash, status FROM users WHERE id = ?";
         List<UserRecord> result = jdbcTemplate.query(sql, userRowMapper, userId);
         if (result.isEmpty()) {
             return Optional.empty();
@@ -66,13 +67,8 @@ public class UserRepository {
         jdbcTemplate.update(sql, passwordHash, now, email);
     }
 
-    public void updateBasicInfo(Long userId, String username, String passwordHash, LocalDateTime now) {
-        if (passwordHash == null) {
-            String sql = "UPDATE users SET username = ?, updated_at = ? WHERE id = ?";
-            jdbcTemplate.update(sql, username, now, userId);
-            return;
-        }
-        String sql = "UPDATE users SET username = ?, password_hash = ?, updated_at = ? WHERE id = ?";
-        jdbcTemplate.update(sql, username, passwordHash, now, userId);
+    public void updateBasicInfo(Long userId, String username, LocalDateTime now) {
+        String sql = "UPDATE users SET username = ?, updated_at = ? WHERE id = ?";
+        jdbcTemplate.update(sql, username, now, userId);
     }
 }

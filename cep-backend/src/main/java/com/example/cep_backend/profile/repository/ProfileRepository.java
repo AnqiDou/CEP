@@ -1,6 +1,7 @@
 package com.example.cep_backend.profile.repository;
 
 import com.example.cep_backend.profile.dto.ProfilePendingTradeDto;
+import com.example.cep_backend.profile.dto.ProfileFollowUserDto;
 import com.example.cep_backend.profile.dto.OtherProfileItemDto;
 import com.example.cep_backend.profile.dto.ProfileReviewItemDto;
 import com.example.cep_backend.profile.dto.ProfileTradeItemDto;
@@ -58,6 +59,16 @@ public class ProfileRepository {
                 createdAt.format(DateTimeFormatter.ISO_LOCAL_DATE));
     };
 
+    private final RowMapper<ProfileFollowUserDto> followUserRowMapper = (rs, rowNum) -> {
+        Timestamp timestamp = rs.getTimestamp("followed_at");
+        LocalDateTime followedAt = timestamp == null ? LocalDateTime.now() : timestamp.toLocalDateTime();
+        return new ProfileFollowUserDto(
+                rs.getLong("user_id"),
+                rs.getString("username"),
+                rs.getString("avatar_url"),
+                followedAt.format(DATE_TIME_FORMATTER));
+    };
+
     public ProfileRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
@@ -67,6 +78,9 @@ public class ProfileRepository {
                 SELECT
                     COALESCE(NULLIF(u.username, ''), '校园用户') AS username,
                     up.avatar_url,
+                    COALESCE(up.name, '') AS name,
+                    COALESCE(up.phone, '') AS phone,
+                    COALESCE(up.address, '') AS address,
                     (SELECT COUNT(1) FROM user_follows uf WHERE uf.target_user_id = u.id) AS fans,
                     (SELECT COUNT(1) FROM user_follows uf WHERE uf.user_id = u.id) AS following
                 FROM users u
@@ -76,6 +90,9 @@ public class ProfileRepository {
         List<ProfileBaseInfo> list = jdbcTemplate.query(sql, (rs, rowNum) -> new ProfileBaseInfo(
                 rs.getString("username"),
                 rs.getString("avatar_url"),
+                rs.getString("name"),
+                rs.getString("phone"),
+                rs.getString("address"),
                 rs.getLong("fans"),
                 rs.getLong("following")), userId);
         return list.isEmpty() ? null : list.getFirst();
@@ -281,6 +298,18 @@ public class ProfileRepository {
         jdbcTemplate.update(sql, avatar, Timestamp.valueOf(now), userId);
     }
 
+    public void updateContactInfo(Long userId, String name, String phone, String address, LocalDateTime now) {
+        String sql = """
+                UPDATE user_profiles
+                SET name = ?,
+                    phone = ?,
+                    address = ?,
+                    updated_at = ?
+                WHERE user_id = ?
+                """;
+        jdbcTemplate.update(sql, name, phone, address, Timestamp.valueOf(now), userId);
+    }
+
     public Long findUserIdByUsername(String username) {
         String sql = "SELECT id FROM users WHERE username = ? LIMIT 1";
         List<Long> list = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getLong("id"), username);
@@ -417,6 +446,38 @@ public class ProfileRepository {
         jdbcTemplate.update(sql, userId, targetUserId);
     }
 
+    public List<ProfileFollowUserDto> findFollowingUsers(Long userId) {
+        String sql = """
+                SELECT
+                    uf.target_user_id AS user_id,
+                    COALESCE(NULLIF(u.username, ''), '校园用户') AS username,
+                    up.avatar_url,
+                    uf.created_at AS followed_at
+                FROM user_follows uf
+                INNER JOIN users u ON u.id = uf.target_user_id
+                LEFT JOIN user_profiles up ON up.user_id = uf.target_user_id
+                WHERE uf.user_id = ?
+                ORDER BY uf.created_at DESC, uf.id DESC
+                """;
+        return jdbcTemplate.query(sql, followUserRowMapper, userId);
+    }
+
+    public List<ProfileFollowUserDto> findFansUsers(Long userId) {
+        String sql = """
+                SELECT
+                    uf.user_id,
+                    COALESCE(NULLIF(u.username, ''), '校园用户') AS username,
+                    up.avatar_url,
+                    uf.created_at AS followed_at
+                FROM user_follows uf
+                INNER JOIN users u ON u.id = uf.user_id
+                LEFT JOIN user_profiles up ON up.user_id = uf.user_id
+                WHERE uf.target_user_id = ?
+                ORDER BY uf.created_at DESC, uf.id DESC
+                """;
+        return jdbcTemplate.query(sql, followUserRowMapper, userId);
+    }
+
     public TradeContactRecord findSoldOrderBuyerContact(Long userId, Long orderId) {
         String sql = """
                 SELECT
@@ -489,7 +550,8 @@ public class ProfileRepository {
                 createdAt.format(DATE_TIME_FORMATTER));
     }
 
-    public record ProfileBaseInfo(String username, String avatar, long fans, long following) {
+    public record ProfileBaseInfo(String username, String avatar, String name, String phone, String address, long fans,
+            long following) {
     }
 
     public record OtherProfileBaseInfo(String username, String avatar, long fans,

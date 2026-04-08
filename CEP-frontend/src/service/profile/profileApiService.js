@@ -67,6 +67,16 @@ export const fetchFavoriteItems = async () =>
     headers: await withAuthHeaders(),
   });
 
+export const fetchFollowingUsers = async () =>
+  requestJson(`${PROFILE_API_BASE}/following`, {
+    headers: await withAuthHeaders(),
+  });
+
+export const fetchFansUsers = async () =>
+  requestJson(`${PROFILE_API_BASE}/fans`, {
+    headers: await withAuthHeaders(),
+  });
+
 export const fetchPendingPaymentTrades = async () =>
   requestJson(`${PROFILE_API_BASE}/trades/pending-payment`, {
     headers: await withAuthHeaders(),

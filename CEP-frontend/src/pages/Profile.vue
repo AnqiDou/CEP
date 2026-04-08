@@ -67,6 +67,20 @@
           <el-icon><Star /></el-icon>
           <span>我的收藏</span>
         </button>
+
+        <button
+          v-for="item in followMenus"
+          :key="item.key"
+          :class="[
+            'menu-item',
+            selectedMenu === item.key ? 'menu-item--active' : '',
+          ]"
+          type="button"
+          @click="selectMenu(item.key)"
+        >
+          <el-icon><User /></el-icon>
+          <span>{{ item.label }}</span>
+        </button>
       </aside>
 
       <main class="profile-main">
@@ -409,7 +423,16 @@
               </div>
             </article>
 
-            <div v-if="!currentSectionItems.length" class="pending-empty">
+            <div
+              v-if="
+                !currentSectionItems.length &&
+                (selectedMenu === 'following' || selectedMenu === 'fans')
+              "
+              class="pending-empty"
+            >
+              暂无用户
+            </div>
+            <div v-else-if="!currentSectionItems.length" class="pending-empty">
               当前暂无物品
             </div>
           </div>
@@ -418,80 +441,124 @@
             v-else-if="detailMenuKeys.includes(selectedMenu)"
             class="section-list"
           >
-            <article
-              v-for="item in currentSectionItems"
-              :key="item.id"
-              class="section-item"
+            <template
+              v-if="selectedMenu === 'following' || selectedMenu === 'fans'"
             >
-              <div>
-                <h4 class="section-item__title">{{ item.title }}</h4>
-                <p class="section-item__meta">
-                  {{ item.price }} · {{ item.time }}
-                  <template
-                    v-if="tradeOrderStatusMenuKeys.includes(selectedMenu)"
+              <article
+                v-for="item in currentSectionItems"
+                :key="`${selectedMenu}-${item.userId}`"
+                class="follow-user-item"
+              >
+                <div class="follow-user-item__main">
+                  <el-avatar
+                    :size="44"
+                    :src="item.avatar"
+                    class="follow-user-item__avatar"
                   >
-                    · {{ mapTradeOrderStatusText(item.status) }}
-                  </template>
-                </p>
-              </div>
-              <div class="section-item__actions">
+                    <el-icon><UserFilled /></el-icon>
+                  </el-avatar>
+                  <div>
+                    <p class="follow-user-item__name">{{ item.title }}</p>
+                    <p class="follow-user-item__meta">
+                      关注时间：{{ item.time || "-" }}
+                    </p>
+                  </div>
+                </div>
                 <button
-                  v-if="
-                    selectedMenu === 'trade-bought' &&
-                    item.status === 'PENDING_PAYMENT'
-                  "
-                  class="section-item__btn section-item__btn--edit"
-                  type="button"
-                  @click="goPay(item.orderId || item.id)"
-                >
-                  去付款
-                </button>
-                <button
-                  v-if="
-                    tradeOrderStatusMenuKeys.includes(selectedMenu) &&
-                    item.status === 'PENDING_PAYMENT'
-                  "
-                  class="section-item__btn section-item__btn--danger"
-                  type="button"
-                  @click="handleTradeOrderCancel(item)"
-                >
-                  取消订单
-                </button>
-                <button
-                  v-if="selectedMenu === 'trade-sold'"
                   class="section-item__btn section-item__btn--contact"
                   type="button"
-                  @click="handleContactBuyer(item)"
+                  @click="goToOtherProfile(item)"
                 >
-                  联系买家
+                  查看主页
                 </button>
-                <button
-                  v-if="selectedMenu === 'trade-bought'"
-                  class="section-item__btn section-item__btn--contact"
-                  type="button"
-                  @click="handleContactSeller(item)"
-                >
-                  联系卖家
-                </button>
-                <button
-                  v-if="selectedMenu === 'trade-bought'"
-                  class="section-item__btn section-item__btn--rebuy"
-                  type="button"
-                  @click="handleRebuy(item)"
-                >
-                  再次购买
-                </button>
-                <button
-                  class="section-item__btn"
-                  type="button"
-                  @click="goToItemDetail(item.itemId)"
-                >
-                  查看详情
-                </button>
-              </div>
-            </article>
+              </article>
+            </template>
 
-            <div v-if="!currentSectionItems.length" class="pending-empty">
+            <template v-else>
+              <article
+                v-for="item in currentSectionItems"
+                :key="item.id"
+                class="section-item"
+              >
+                <div>
+                  <h4 class="section-item__title">{{ item.title }}</h4>
+                  <p class="section-item__meta">
+                    {{ item.price }} · {{ item.time }}
+                    <template
+                      v-if="tradeOrderStatusMenuKeys.includes(selectedMenu)"
+                    >
+                      · {{ mapTradeOrderStatusText(item.status) }}
+                    </template>
+                  </p>
+                </div>
+                <div class="section-item__actions">
+                  <button
+                    v-if="
+                      selectedMenu === 'trade-bought' &&
+                      item.status === 'PENDING_PAYMENT'
+                    "
+                    class="section-item__btn section-item__btn--edit"
+                    type="button"
+                    @click="goPay(item.orderId || item.id)"
+                  >
+                    去付款
+                  </button>
+                  <button
+                    v-if="
+                      tradeOrderStatusMenuKeys.includes(selectedMenu) &&
+                      item.status === 'PENDING_PAYMENT'
+                    "
+                    class="section-item__btn section-item__btn--danger"
+                    type="button"
+                    @click="handleTradeOrderCancel(item)"
+                  >
+                    取消订单
+                  </button>
+                  <button
+                    v-if="selectedMenu === 'trade-sold'"
+                    class="section-item__btn section-item__btn--contact"
+                    type="button"
+                    @click="handleContactBuyer(item)"
+                  >
+                    联系买家
+                  </button>
+                  <button
+                    v-if="selectedMenu === 'trade-bought'"
+                    class="section-item__btn section-item__btn--contact"
+                    type="button"
+                    @click="handleContactSeller(item)"
+                  >
+                    联系卖家
+                  </button>
+                  <button
+                    v-if="selectedMenu === 'trade-bought'"
+                    class="section-item__btn section-item__btn--rebuy"
+                    type="button"
+                    @click="handleRebuy(item)"
+                  >
+                    再次购买
+                  </button>
+                  <button
+                    class="section-item__btn"
+                    type="button"
+                    @click="goToItemDetail(item.itemId)"
+                  >
+                    查看详情
+                  </button>
+                </div>
+              </article>
+            </template>
+
+            <div
+              v-if="
+                !currentSectionItems.length &&
+                (selectedMenu === 'following' || selectedMenu === 'fans')
+              "
+              class="pending-empty"
+            >
+              暂无用户
+            </div>
+            <div v-else-if="!currentSectionItems.length" class="pending-empty">
               当前暂无物品
             </div>
           </div>
@@ -504,6 +571,7 @@
       title="编辑资料"
       width="420px"
       destroy-on-close
+      class="profile-edit-dialog"
     >
       <div class="edit-avatar-row">
         <el-avatar :size="64" :src="editForm.avatar || userInfo.avatar"
@@ -520,16 +588,30 @@
           >更换头像</el-button
         >
       </div>
-      <el-form label-width="86px">
+      <el-form label-width="86px" class="edit-form-grid">
         <el-form-item label="用户名"
           ><el-input v-model="editForm.username" maxlength="20" show-word-limit
         /></el-form-item>
-        <el-form-item label="新密码"
+        <el-form-item label="姓名"
           ><el-input
-            v-model="editForm.password"
-            type="password"
-            show-password
-            placeholder="不修改可留空"
+            v-model="editForm.name"
+            maxlength="30"
+            placeholder="请输入姓名"
+        /></el-form-item>
+        <el-form-item label="联系电话"
+          ><el-input
+            v-model="editForm.phone"
+            maxlength="30"
+            placeholder="请输入联系电话"
+        /></el-form-item>
+        <el-form-item label="收货地址"
+          ><el-input
+            v-model="editForm.address"
+            type="textarea"
+            :rows="3"
+            maxlength="200"
+            show-word-limit
+            placeholder="请输入收货地址"
         /></el-form-item>
       </el-form>
       <p v-if="editError" class="edit-error">{{ editError }}</p>
@@ -615,6 +697,8 @@ import {
   fetchBoughtOrderContact,
   fetchBoughtItems,
   fetchFavoriteItems,
+  fetchFansUsers,
+  fetchFollowingUsers,
   fetchPendingPaymentTrades,
   fetchProfileOverview,
   fetchProfileReviews,
@@ -638,6 +722,9 @@ const PROFILE_SELECTED_MENU_KEY = "profile:selectedMenu";
 const userInfo = reactive({
   avatar: "",
   username: "校园用户",
+  name: "",
+  phone: "",
+  address: "",
   fans: 0,
   following: 0,
   sellerCredit: "良好",
@@ -648,6 +735,11 @@ const tradeMenus = [
   { key: "trade-published", label: "我发布的" },
   { key: "trade-sold", label: "我卖出的" },
   { key: "trade-bought", label: "我买到的" },
+];
+
+const followMenus = [
+  { key: "following", label: "我的关注" },
+  { key: "fans", label: "我的粉丝" },
 ];
 
 const tradeOpen = ref(true);
@@ -662,7 +754,13 @@ const selectedPublishedItemIds = ref([]);
 const activePublishedActionMenuId = ref(null);
 const batchActionMode = ref("");
 const activeReviewTab = ref("all");
-const editForm = reactive({ avatar: "", username: "", password: "" });
+const editForm = reactive({
+  avatar: "",
+  username: "",
+  name: "",
+  phone: "",
+  address: "",
+});
 const itemEditForm = reactive({
   id: null,
   itemId: null,
@@ -684,12 +782,16 @@ const sectionMap = {
   "trade-sold": { title: "我卖出的" },
   "trade-bought": { title: "我买到的" },
   favorite: { title: "我的收藏" },
+  following: { title: "我的关注" },
+  fans: { title: "我的粉丝" },
 };
 const detailMenuKeys = [
   "trade-published",
   "trade-sold",
   "trade-bought",
   "favorite",
+  "following",
+  "fans",
 ];
 const tradeOrderStatusMenuKeys = ["trade-sold", "trade-bought"];
 const tradeOrderStatusTabs = [
@@ -707,6 +809,8 @@ const sectionItemMap = reactive({
   "trade-sold": [],
   "trade-bought": [],
   favorite: [],
+  following: [],
+  fans: [],
 });
 const loadedMenus = reactive({
   idle: false,
@@ -715,6 +819,8 @@ const loadedMenus = reactive({
   "trade-sold": false,
   "trade-bought": false,
   favorite: false,
+  following: false,
+  fans: false,
 });
 
 const pendingTrades = ref([]);
@@ -786,13 +892,29 @@ const goToItemDetail = (id) => {
   const resolved = router.resolve(`/item/${id}`);
   window.open(resolved.href, "_blank");
 };
+
+const goToOtherProfile = (item) => {
+  const userId = Number(item?.userId || 0);
+  if (!Number.isInteger(userId) || userId <= 0) {
+    ElMessage.warning("用户信息无效");
+    return;
+  }
+  const username = String(item?.title || "校园用户").trim() || "校园用户";
+  router.push({
+    name: "other-profile",
+    params: { name: username },
+    query: { userId: String(userId) },
+  });
+};
 const goHome = () => {
   router.push("/");
 };
 const openEditDialog = () => {
   editForm.avatar = userInfo.avatar;
   editForm.username = userInfo.username;
-  editForm.password = "";
+  editForm.name = userInfo.name;
+  editForm.phone = userInfo.phone;
+  editForm.address = userInfo.address;
   selectedAvatarFile.value = null;
   editError.value = "";
   editDialogVisible.value = true;
@@ -813,12 +935,23 @@ const handleAvatarChange = (event) => {
 };
 const saveProfile = async () => {
   const username = editForm.username.trim();
+  const name = editForm.name.trim();
+  const phone = editForm.phone.trim();
+  const address = editForm.address.trim();
   if (!username) {
     editError.value = "用户名不能为空";
     return;
   }
-  if (editForm.password && editForm.password.length < 6) {
-    editError.value = "新密码至少 6 位";
+  if (!name) {
+    editError.value = "姓名不能为空";
+    return;
+  }
+  if (!phone) {
+    editError.value = "联系电话不能为空";
+    return;
+  }
+  if (!address) {
+    editError.value = "收货地址不能为空";
     return;
   }
   editError.value = "";
@@ -830,11 +963,16 @@ const saveProfile = async () => {
     }
     const responseBody = await updateProfileBasic({
       username,
-      password: editForm.password,
+      name,
+      phone,
+      address,
       avatar: avatarUrl,
     });
     const overview = responseBody?.data || {};
     userInfo.username = overview.username || username;
+    userInfo.name = overview.name || name;
+    userInfo.phone = overview.phone || phone;
+    userInfo.address = overview.address || address;
     userInfo.avatar = overview.avatar || userInfo.avatar;
     userInfo.sellerCredit = overview.sellerCredit || userInfo.sellerCredit;
     userInfo.buyerCredit = overview.buyerCredit || userInfo.buyerCredit;
@@ -842,9 +980,6 @@ const saveProfile = async () => {
     userInfo.following = Number(overview.following || 0);
     if (authState.user) {
       authState.user.username = userInfo.username;
-    }
-    if (editForm.password) {
-      userInfo.passwordUpdatedAt = new Date().toISOString().slice(0, 10);
     }
     editDialogVisible.value = false;
     ElMessage.success("资料已更新");
@@ -873,6 +1008,14 @@ const mapTradeItem = (item) => ({
   usageDuration: item.usageDuration || "",
   description: item.description || "",
   photoUrls: Array.isArray(item.photoUrls) ? item.photoUrls : [],
+});
+
+const mapFollowUser = (item) => ({
+  id: item.userId,
+  userId: item.userId,
+  title: item.username || "校园用户",
+  time: item.followedAt || "",
+  avatar: item.avatar || "",
 });
 
 const mapTradeOrderStatusText = (status) => {
@@ -1145,6 +1288,9 @@ const applyOverview = (overviewRes) => {
   userInfo.avatar = overview.avatar || "";
   userInfo.username =
     overview.username || authState.user?.username || "校园用户";
+  userInfo.name = overview.name || "";
+  userInfo.phone = overview.phone || "";
+  userInfo.address = overview.address || "";
   userInfo.fans = Number(overview.fans || 0);
   userInfo.following = Number(overview.following || 0);
   userInfo.sellerCredit = overview.sellerCredit || "良好";
@@ -1240,6 +1386,21 @@ const loadMenuData = async (menuKey, force = false) => {
     const favoritesRes = await fetchFavoriteItems();
     sectionItemMap.favorite = normalizeListData(favoritesRes).map(mapTradeItem);
     loadedMenus.favorite = true;
+    return;
+  }
+
+  if (menuKey === "following") {
+    const followingRes = await fetchFollowingUsers();
+    sectionItemMap.following =
+      normalizeListData(followingRes).map(mapFollowUser);
+    loadedMenus.following = true;
+    return;
+  }
+
+  if (menuKey === "fans") {
+    const fansRes = await fetchFansUsers();
+    sectionItemMap.fans = normalizeListData(fansRes).map(mapFollowUser);
+    loadedMenus.fans = true;
   }
 };
 
@@ -2126,6 +2287,40 @@ onMounted(async () => {
   border: 1px solid #ece8fb;
 }
 
+.follow-user-item {
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #ffffff;
+  border: 1px solid #ece8fb;
+}
+
+.follow-user-item__main {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.follow-user-item__avatar {
+  background: #c9bdfc;
+  color: #4f3f93;
+}
+
+.follow-user-item__name {
+  margin: 0;
+  font-size: 15px;
+  color: #2f2f3f;
+}
+
+.follow-user-item__meta {
+  margin: 6px 0 0;
+  color: #8e88aa;
+  font-size: 12px;
+}
+
 .section-item__title {
   margin: 0;
   font-size: 15px;
@@ -2182,6 +2377,9 @@ onMounted(async () => {
   align-items: center;
   gap: 12px;
   margin-bottom: 16px;
+  padding: 14px;
+  border-radius: 16px;
+  background: #f7f4ff;
 }
 
 .avatar-input {
@@ -2192,6 +2390,11 @@ onMounted(async () => {
   margin: 0;
   color: #d14557;
   font-size: 13px;
+}
+
+.edit-form-grid {
+  margin-top: 14px;
+  padding: 8px 2px;
 }
 
 @media (max-width: 980px) {

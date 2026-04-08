@@ -186,7 +186,7 @@ public class AdminController {
     @GetMapping("/support/me/messages")
     public ApiResponse<List<AdminSupportMessageDto>> mySupportMessages(
             @RequestHeader("Authorization") String authorization) {
-        AuthUserDto currentUser = authService.currentUser(authorization);
+        AuthUserDto currentUser = authService.currentUser(authorization, true);
         return ApiResponse.ok("获取成功", adminService.listUserSupportMessages(currentUser.userId()));
     }
 
@@ -194,7 +194,7 @@ public class AdminController {
     public ApiResponse<Void> sendMySupportMessage(
             @RequestHeader("Authorization") String authorization,
             @RequestBody AdminSupportReplyRequest request) {
-        AuthUserDto currentUser = authService.currentUser(authorization);
+        AuthUserDto currentUser = authService.currentUser(authorization, true);
         adminService.appendUserSupportMessage(currentUser.userId(), request == null ? null : request.content());
         return ApiResponse.ok("发送成功");
     }

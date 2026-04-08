@@ -443,6 +443,36 @@
               </label>
 
               <label class="login-form__field">
+                <span class="login-form__label">姓名</span>
+                <input
+                  v-model="registerForm.name"
+                  class="login-form__input"
+                  type="text"
+                  placeholder="请输入姓名"
+                />
+              </label>
+
+              <label class="login-form__field">
+                <span class="login-form__label">联系电话</span>
+                <input
+                  v-model="registerForm.phone"
+                  class="login-form__input"
+                  type="tel"
+                  placeholder="请输入联系电话"
+                />
+              </label>
+
+              <label class="login-form__field">
+                <span class="login-form__label">收货地址</span>
+                <textarea
+                  v-model="registerForm.address"
+                  class="login-form__input login-form__textarea"
+                  rows="3"
+                  placeholder="请输入收货地址"
+                />
+              </label>
+
+              <label class="login-form__field">
                 <span class="login-form__label">密码</span>
                 <input
                   v-model="registerForm.password"
@@ -709,6 +739,9 @@ const registerForm = ref({
   username: "",
   password: "",
   confirmPassword: "",
+  name: "",
+  phone: "",
+  address: "",
 });
 const registerAgree = ref(false);
 const loginError = ref("");
@@ -1619,6 +1652,16 @@ const openRegisterModal = () => {
   registerError.value = "";
   registerSuccess.value = "";
   registerAgree.value = false;
+  registerForm.value = {
+    email: "",
+    code: "",
+    username: "",
+    password: "",
+    confirmPassword: "",
+    name: "",
+    phone: "",
+    address: "",
+  };
 };
 
 const closeAuthModal = () => {
@@ -1920,8 +1963,16 @@ const submitResetPassword = async () => {
 const submitRegister = async () => {
   registerError.value = "";
   registerSuccess.value = "";
-  const { email, code, username, password, confirmPassword } =
-    registerForm.value;
+  const {
+    email,
+    code,
+    username,
+    password,
+    confirmPassword,
+    name,
+    phone,
+    address,
+  } = registerForm.value;
 
   if (!emailPattern.test(email.trim())) {
     registerError.value = "邮箱格式不正确";
@@ -1935,6 +1986,21 @@ const submitRegister = async () => {
 
   if (!passwordPattern.test(password)) {
     registerError.value = "密码需为8-20位，且同时包含字母和数字";
+    return;
+  }
+
+  if (!name.trim()) {
+    registerError.value = "请填写姓名";
+    return;
+  }
+
+  if (!phone.trim()) {
+    registerError.value = "请填写联系电话";
+    return;
+  }
+
+  if (!address.trim()) {
+    registerError.value = "请填写收货地址";
     return;
   }
 
@@ -1954,6 +2020,9 @@ const submitRegister = async () => {
       code: code.trim(),
       username: username.trim(),
       password,
+      name: name.trim(),
+      phone: phone.trim(),
+      address: address.trim(),
     });
 
     const loginResponse = await loginUser(email.trim(), password);
@@ -2994,6 +3063,14 @@ watch(
   color: #413b5f;
   outline: none;
   box-shadow: inset 0 0 0 1px rgba(193, 183, 236, 0.52);
+}
+
+.login-form__textarea {
+  height: auto;
+  min-height: 96px;
+  padding: 10px 14px;
+  line-height: 1.6;
+  resize: vertical;
 }
 
 .login-form__input:focus {

@@ -119,7 +119,53 @@
 
 ---
 
-## 7. 获取待处理交易（付款未完成）
+## 7. 获取我的关注用户列表
+
+- **URL**: `GET /api/profile/following`
+
+### 成功响应示例
+
+```json
+{
+  "success": true,
+  "message": "获取成功",
+  "data": [
+    {
+      "userId": 12,
+      "username": "王同学",
+      "avatar": "https://xxx/avatar.jpg",
+      "followedAt": "2026-04-06 18:20"
+    }
+  ]
+}
+```
+
+---
+
+## 8. 获取我的粉丝用户列表
+
+- **URL**: `GET /api/profile/fans`
+
+### 成功响应示例
+
+```json
+{
+  "success": true,
+  "message": "获取成功",
+  "data": [
+    {
+      "userId": 9,
+      "username": "李同学",
+      "avatar": "https://xxx/avatar2.jpg",
+      "followedAt": "2026-04-06 17:05"
+    }
+  ]
+}
+```
+
+---
+
+## 9. 获取待处理交易（付款未完成）
 
 - **URL**: `GET /api/profile/trades/pending-payment`
 
@@ -147,7 +193,7 @@
 
 ---
 
-## 8. 获取我卖出的订单联系买家信息
+## 10. 获取我卖出的订单联系买家信息
 
 - **URL**: `GET /api/profile/trades/sold/{orderId}/contact`
 
@@ -175,7 +221,7 @@
 
 ---
 
-## 9. 获取我买到的订单联系卖家信息
+## 11. 获取我买到的订单联系卖家信息
 
 - **URL**: `GET /api/profile/trades/bought/{orderId}/contact`
 
@@ -203,7 +249,7 @@
 
 ---
 
-## 10. 我买到的再次购买校验接口
+## 12. 我买到的再次购买校验接口
 
 - **URL**: `POST /api/profile/trades/bought/{orderId}/rebuy`
 
@@ -239,7 +285,7 @@
 
 ---
 
-## 11. 编辑资料
+## 13. 编辑资料
 
 - **URL**: `PUT /api/profile/basic`
 - **Content-Type**: `application/json`
@@ -264,7 +310,7 @@
 
 ---
 
-## 12. 上传头像（腾讯云 COS）
+## 14. 上传头像（腾讯云 COS）
 
 - **URL**: `POST /api/profile/avatar`
 - **Content-Type**: `multipart/form-data`
@@ -289,7 +335,7 @@
 
 ---
 
-## 13. 已调整接口（支付下单）
+## 15. 已调整接口（支付下单）
 
 - **URL**: `POST /api/payment/orders`
 - **变更点**: 现在需要登录态（`Authorization: Bearer {accessToken}`），后端会自动记录买家/卖家用户 ID，用于“我买到的 / 我卖出的 / 待付款”列表。

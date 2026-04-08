@@ -12,12 +12,23 @@ export const sendResetPasswordCode = (email) =>
 export const verifyResetPasswordCode = (email, code) =>
   postAuthJson("/verify-reset-password-code", { email, code });
 
-export const registerUser = ({ email, code, username, password }) =>
+export const registerUser = ({
+  email,
+  code,
+  username,
+  password,
+  name,
+  phone,
+  address,
+}) =>
   postAuthJson("/register", {
     email,
     code,
     username,
     password,
+    name,
+    phone,
+    address,
   });
 
 export const loginUser = (email, password) =>

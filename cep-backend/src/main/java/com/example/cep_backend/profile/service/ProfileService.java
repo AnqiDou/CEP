@@ -5,6 +5,7 @@ import com.example.cep_backend.auth.repository.UserRepository;
 import com.example.cep_backend.message.service.MessageNotificationService;
 import com.example.cep_backend.profile.dto.ProfileOverviewDto;
 import com.example.cep_backend.profile.dto.ProfileAvatarUploadDto;
+import com.example.cep_backend.profile.dto.ProfileFollowUserDto;
 import com.example.cep_backend.profile.dto.OtherProfileItemDto;
 import com.example.cep_backend.profile.dto.OtherProfileOverviewDto;
 import com.example.cep_backend.profile.dto.OtherProfileReviewItemDto;
@@ -16,7 +17,6 @@ import com.example.cep_backend.profile.dto.ProfileTradeContactDto;
 import com.example.cep_backend.profile.dto.ProfileTradeItemDto;
 import com.example.cep_backend.profile.dto.ProfileUpdateRequest;
 import com.example.cep_backend.profile.repository.ProfileRepository;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -34,7 +34,6 @@ public class ProfileService {
     private final UserRepository userRepository;
     private final ProfileImageService profileImageService;
     private final MessageNotificationService messageNotificationService;
-    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public ProfileService(ProfileRepository profileRepository,
             UserRepository userRepository,
@@ -57,6 +56,9 @@ public class ProfileService {
         return new ProfileOverviewDto(
                 baseInfo.avatar(),
                 baseInfo.username(),
+                baseInfo.name(),
+                baseInfo.phone(),
+                baseInfo.address(),
                 baseInfo.fans(),
                 baseInfo.following(),
                 sellerCreditScore,
@@ -99,6 +101,14 @@ public class ProfileService {
 
     public List<ProfileTradeItemDto> getFavoriteItems(Long userId) {
         return profileRepository.findFavoriteItems(userId);
+    }
+
+    public List<ProfileFollowUserDto> getFollowingUsers(Long userId) {
+        return profileRepository.findFollowingUsers(userId);
+    }
+
+    public List<ProfileFollowUserDto> getFansUsers(Long userId) {
+        return profileRepository.findFansUsers(userId);
     }
 
     public List<ProfilePendingTradeDto> getPendingPaymentTrades(Long userId) {
@@ -238,23 +248,27 @@ public class ProfileService {
         if (username.length() > 20) {
             throw new BusinessException("用户名最多 20 个字符");
         }
-
-        String password = normalizeText(request.password());
-        String passwordHash = null;
-        if (!password.isEmpty()) {
-            if (password.length() < 6) {
-                throw new BusinessException("新密码至少 6 位");
-            }
-            passwordHash = passwordEncoder.encode(password);
+        String name = normalizeText(request.name());
+        String phone = normalizeText(request.phone());
+        String address = normalizeText(request.address());
+        if (name.isEmpty()) {
+            throw new BusinessException("姓名不能为空");
+        }
+        if (phone.isEmpty()) {
+            throw new BusinessException("联系电话不能为空");
+        }
+        if (address.isEmpty()) {
+            throw new BusinessException("收货地址不能为空");
         }
 
         userRepository.findById(userId).orElseThrow(() -> new BusinessException("用户不存在"));
         LocalDateTime now = LocalDateTime.now();
-        userRepository.updateBasicInfo(userId, username, passwordHash, now);
+        userRepository.updateBasicInfo(userId, username, now);
+        profileRepository.ensureUserProfile(userId);
+        profileRepository.updateContactInfo(userId, name, phone, address, now);
 
         String avatar = normalizeText(request.avatar());
         if (!avatar.isEmpty()) {
-            profileRepository.ensureUserProfile(userId);
             profileRepository.updateAvatar(userId, avatar, now);
         }
         return getOverview(userId);

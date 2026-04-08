@@ -63,6 +63,9 @@ public class ProfileSchemaInitializer {
                     id BIGINT AUTO_INCREMENT PRIMARY KEY,
                     user_id BIGINT NOT NULL UNIQUE,
                     college VARCHAR(80) NULL,
+                    name VARCHAR(50) NULL,
+                    phone VARCHAR(30) NULL,
+                    address VARCHAR(200) NULL,
                     seller_credit_score DECIMAL(10, 1) NOT NULL DEFAULT 100.0,
                     buyer_credit_score DECIMAL(10, 1) NOT NULL DEFAULT 100.0,
                     avatar_url VARCHAR(500) NULL,
@@ -84,6 +87,12 @@ public class ProfileSchemaInitializer {
         }
         if (!columnExists(TABLE_USER_PROFILES, "phone")) {
             jdbcTemplate.execute("ALTER TABLE user_profiles ADD COLUMN phone VARCHAR(30) NULL");
+        }
+        if (!columnExists(TABLE_USER_PROFILES, "name")) {
+            jdbcTemplate.execute("ALTER TABLE user_profiles ADD COLUMN name VARCHAR(50) NULL");
+        }
+        if (!columnExists(TABLE_USER_PROFILES, "address")) {
+            jdbcTemplate.execute("ALTER TABLE user_profiles ADD COLUMN address VARCHAR(200) NULL");
         }
     }
 

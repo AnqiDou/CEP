@@ -7,6 +7,7 @@ import com.example.cep_backend.profile.dto.ProfileAvatarUploadDto;
 import com.example.cep_backend.profile.dto.OtherProfileItemDto;
 import com.example.cep_backend.profile.dto.OtherProfileOverviewDto;
 import com.example.cep_backend.profile.dto.OtherProfileReviewSummaryDto;
+import com.example.cep_backend.profile.dto.ProfileFollowUserDto;
 import com.example.cep_backend.profile.dto.ProfileOverviewDto;
 import com.example.cep_backend.profile.dto.ProfilePendingTradeDto;
 import com.example.cep_backend.profile.dto.ProfileReviewSummaryDto;
@@ -81,6 +82,18 @@ public class ProfileController {
     public ApiResponse<List<ProfileTradeItemDto>> getFavorites(@RequestHeader("Authorization") String authorization) {
         AuthUserDto user = authService.currentUser(authorization);
         return ApiResponse.ok("获取成功", profileService.getFavoriteItems(user.userId()));
+    }
+
+    @GetMapping("/following")
+    public ApiResponse<List<ProfileFollowUserDto>> getFollowing(@RequestHeader("Authorization") String authorization) {
+        AuthUserDto user = authService.currentUser(authorization);
+        return ApiResponse.ok("获取成功", profileService.getFollowingUsers(user.userId()));
+    }
+
+    @GetMapping("/fans")
+    public ApiResponse<List<ProfileFollowUserDto>> getFans(@RequestHeader("Authorization") String authorization) {
+        AuthUserDto user = authService.currentUser(authorization);
+        return ApiResponse.ok("获取成功", profileService.getFansUsers(user.userId()));
     }
 
     @GetMapping("/trades/pending-payment")

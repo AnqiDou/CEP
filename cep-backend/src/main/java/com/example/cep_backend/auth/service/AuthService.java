@@ -16,6 +16,7 @@ import com.example.cep_backend.auth.model.VerificationCodeRecord;
 import com.example.cep_backend.auth.repository.AuthSessionRepository;
 import com.example.cep_backend.auth.repository.UserRepository;
 import com.example.cep_backend.auth.repository.VerificationCodeRepository;
+import com.example.cep_backend.profile.repository.ProfileRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -38,11 +39,13 @@ public class AuthService {
     private static final Pattern CODE_PATTERN = Pattern.compile("^\\d{6}$");
     private static final Pattern PASSWORD_PATTERN = Pattern.compile("^(?=.*[A-Za-z])(?=.*\\d).{8,20}$");
     private static final String TOKEN_TYPE = "Bearer";
+    private static final String USER_STATUS_DISABLED = "DISABLED";
 
     private final UserRepository userRepository;
     private final VerificationCodeRepository verificationCodeRepository;
     private final AuthSessionRepository authSessionRepository;
     private final EmailService emailService;
+    private final ProfileRepository profileRepository;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
     private final SecureRandom secureRandom = new SecureRandom();
     private final int expireMinutes;
@@ -53,6 +56,7 @@ public class AuthService {
     public AuthService(UserRepository userRepository,
             VerificationCodeRepository verificationCodeRepository,
             AuthSessionRepository authSessionRepository,
+            ProfileRepository profileRepository,
             EmailService emailService,
             @Value("${app.auth.code.expire-minutes}") int expireMinutes,
             @Value("${app.auth.code.resend-seconds}") int resendSeconds,
@@ -61,6 +65,7 @@ public class AuthService {
         this.userRepository = userRepository;
         this.verificationCodeRepository = verificationCodeRepository;
         this.authSessionRepository = authSessionRepository;
+        this.profileRepository = profileRepository;
         this.emailService = emailService;
         this.expireMinutes = expireMinutes;
         this.resendSeconds = resendSeconds;
@@ -135,11 +140,23 @@ public class AuthService {
         String email = normalizeEmail(request.email());
         String username = normalize(request.username());
         String code = normalize(request.code());
+        String name = normalize(request.name());
+        String phone = normalize(request.phone());
+        String address = normalize(request.address());
         String password = request.password();
 
         validateEmail(email);
         validateCode(code);
         validatePassword(password);
+        if (name.isEmpty()) {
+            throw new BusinessException("姓名不能为空");
+        }
+        if (phone.isEmpty()) {
+            throw new BusinessException("联系电话不能为空");
+        }
+        if (address.isEmpty()) {
+            throw new BusinessException("收货地址不能为空");
+        }
         ensureEmailNotRegistered(email);
 
         VerificationCodeRecord record = findLatestRegisterCode(email);
@@ -150,6 +167,8 @@ public class AuthService {
         String passwordHash = passwordEncoder.encode(password);
         LocalDateTime now = LocalDateTime.now();
         long userId = userRepository.createUser(email, username, passwordHash, now);
+        profileRepository.ensureUserProfile(userId);
+        profileRepository.updateContactInfo(userId, name, phone, address, now);
         verificationCodeRepository.markUsed(record.id());
 
         return new AuthUserDto(userId, email, username);
@@ -235,6 +254,10 @@ public class AuthService {
     }
 
     public AuthUserDto currentUser(String authorizationHeader) {
+        return currentUser(authorizationHeader, false);
+    }
+
+    public AuthUserDto currentUser(String authorizationHeader, boolean allowDisabled) {
         String accessToken = parseBearerToken(authorizationHeader);
         String accessTokenHash = hashToken(accessToken);
         AuthSessionRecord session = authSessionRepository.findByAccessTokenHash(accessTokenHash)
@@ -245,7 +268,13 @@ public class AuthService {
             throw new UnauthorizedException("登录状态已失效，请重新登录");
         }
 
-        return new AuthUserDto(session.userId(), session.email(), session.username());
+        UserRecord user = userRepository.findById(session.userId())
+                .orElseThrow(() -> new UnauthorizedException("用户不存在或已失效"));
+        if (!allowDisabled && USER_STATUS_DISABLED.equalsIgnoreCase(normalize(user.status()))) {
+            throw new UnauthorizedException("账号已被禁用");
+        }
+
+        return new AuthUserDto(user.id(), user.email(), user.username());
     }
 
     public void logout(RefreshTokenRequest request) {
