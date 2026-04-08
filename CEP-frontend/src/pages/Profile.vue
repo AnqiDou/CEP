@@ -15,18 +15,6 @@
           <span>我的评价</span>
         </button>
 
-        <button
-          :class="[
-            'menu-item',
-            selectedMenu === 'pending-trade' ? 'menu-item--active' : '',
-          ]"
-          type="button"
-          @click="selectMenu('pending-trade')"
-        >
-          <el-icon><Tickets /></el-icon>
-          <span>待处理交易</span>
-        </button>
-
         <div class="menu-group">
           <button
             class="menu-title"
@@ -285,53 +273,6 @@
           </div>
 
           <div
-            v-else-if="selectedMenu === 'pending-trade'"
-            class="pending-list"
-          >
-            <article
-              v-for="item in pendingTrades"
-              :key="item.id"
-              class="pending-item"
-            >
-              <div class="pending-item__head">
-                <button
-                  type="button"
-                  class="pending-item__title pending-item__title--link"
-                  @click="goToItemDetail(item.itemId)"
-                >
-                  {{ item.title }}
-                </button>
-                <span class="pending-item__status">{{ item.statusText }}</span>
-              </div>
-              <div class="pending-item__meta">
-                <span>交易对象：{{ item.partner }}</span>
-                <span>约定地点：{{ item.location }}</span>
-                <span>约定时间：{{ item.time }}</span>
-              </div>
-              <div class="pending-item__actions">
-                <button
-                  type="button"
-                  class="pending-btn pending-btn--confirm"
-                  @click="goPay(item.orderId)"
-                >
-                  去付款
-                </button>
-                <button
-                  type="button"
-                  class="pending-btn pending-btn--cancel"
-                  @click="goToItemDetail(item.itemId)"
-                >
-                  查看商品
-                </button>
-              </div>
-            </article>
-
-            <div v-if="!pendingTrades.length" class="pending-empty">
-              当前没有待处理交易
-            </div>
-          </div>
-
-          <div
             v-else-if="selectedMenu === 'trade-published'"
             class="published-grid"
             @click.self="cancelBatchMode"
@@ -518,6 +459,70 @@
                     取消订单
                   </button>
                   <button
+                    v-if="
+                      selectedMenu === 'trade-sold' &&
+                      item.status === 'PENDING_CONFIRMATION' &&
+                      !item.sellerConfirmed
+                    "
+                    class="section-item__btn section-item__btn--edit"
+                    type="button"
+                    @click="handleSellerConfirmDelivered(item)"
+                  >
+                    确认已交付物品
+                  </button>
+                  <button
+                    v-if="
+                      selectedMenu === 'trade-bought' &&
+                      item.status === 'PENDING_CONFIRMATION' &&
+                      !item.buyerConfirmed
+                    "
+                    class="section-item__btn section-item__btn--edit"
+                    type="button"
+                    @click="handleBuyerConfirmReceived(item)"
+                  >
+                    确认已收到物品
+                  </button>
+                  <button
+                    v-if="
+                      selectedMenu === 'trade-bought' &&
+                      item.status === 'PENDING_CONFIRMATION' &&
+                      item.refundStatus !== 'APPLIED'
+                    "
+                    class="section-item__btn section-item__btn--danger"
+                    type="button"
+                    @click="handleApplyRefund(item, 'NO_RECEIPT')"
+                  >
+                    申请退款（未收到货）
+                  </button>
+                  <button
+                    v-if="
+                      selectedMenu === 'trade-bought' &&
+                      item.status === 'PENDING_CONFIRMATION' &&
+                      item.refundStatus !== 'APPLIED'
+                    "
+                    class="section-item__btn section-item__btn--danger"
+                    type="button"
+                    @click="handleApplyRefund(item, 'RETURN_AFTER_RECEIPT')"
+                  >
+                    申请退款（已收到货）
+                  </button>
+                  <button
+                    v-if="
+                      selectedMenu === 'trade-sold' &&
+                      item.status === 'PENDING_CONFIRMATION' &&
+                      item.refundStatus === 'APPLIED'
+                    "
+                    class="section-item__btn section-item__btn--danger"
+                    type="button"
+                    @click="handleApproveRefund(item)"
+                  >
+                    {{
+                      item.refundType === "RETURN_AFTER_RECEIPT"
+                        ? "确认收到退货并退款"
+                        : "同意退款"
+                    }}
+                  </button>
+                  <button
                     v-if="selectedMenu === 'trade-sold'"
                     class="section-item__btn section-item__btn--contact"
                     type="button"
@@ -687,7 +692,6 @@ import {
   ArrowRight,
   Goods,
   Star,
-  Tickets,
   User,
   UserFilled,
 } from "@element-plus/icons-vue";
@@ -702,7 +706,6 @@ import {
   fetchFavoriteItems,
   fetchFansUsers,
   fetchFollowingUsers,
-  fetchPendingPaymentTrades,
   fetchProfileOverview,
   fetchProfileReviews,
   fetchSoldOrderContact,
@@ -711,7 +714,13 @@ import {
   updateProfileBasic,
   uploadProfileAvatar,
 } from "../service/profile/profileApiService";
-import { cancelTradeOrder } from "../service/payment/paymentApiService";
+import {
+  applyTradeOrderRefund,
+  approveTradeOrderRefund,
+  cancelTradeOrder,
+  confirmBuyerReceived,
+  confirmSellerDelivered,
+} from "../service/payment/paymentApiService";
 import {
   deleteMyPublishItem,
   fetchMyPublishItems,
@@ -780,7 +789,6 @@ const reviewList = ref([]);
 
 const sectionMap = {
   idle: { title: "我的评价" },
-  "pending-trade": { title: "待处理交易" },
   "trade-published": { title: "我发布的" },
   "trade-sold": { title: "我卖出的" },
   "trade-bought": { title: "我买到的" },
@@ -800,6 +808,7 @@ const tradeOrderStatusMenuKeys = ["trade-sold", "trade-bought"];
 const tradeOrderStatusTabs = [
   { key: "all", label: "全部" },
   { key: "pending-payment", label: "待付款" },
+  { key: "pending-confirmation", label: "待确认" },
   { key: "completed", label: "已完成" },
   { key: "cancelled", label: "已取消" },
 ];
@@ -817,7 +826,6 @@ const sectionItemMap = reactive({
 });
 const loadedMenus = reactive({
   idle: false,
-  "pending-trade": false,
   "trade-published": false,
   "trade-sold": false,
   "trade-bought": false,
@@ -825,8 +833,6 @@ const loadedMenus = reactive({
   following: false,
   fans: false,
 });
-
-const pendingTrades = ref([]);
 
 const reviewTotal = computed(() => reviewStats.total);
 const reviewTabs = computed(() => [
@@ -1024,6 +1030,10 @@ const mapTradeItem = (item) => {
     time: item.time || "",
     photoUrl: item.photoUrl || "",
     status: item.status || "PUBLISHED",
+    buyerConfirmed: Boolean(item.buyerConfirmed),
+    sellerConfirmed: Boolean(item.sellerConfirmed),
+    refundStatus: item.refundStatus || "NONE",
+    refundType: item.refundType || "",
     categoryCode: item.categoryCode || "other",
     purchaseDate: item.purchaseDate || "",
     usageDuration: item.usageDuration || "",
@@ -1048,7 +1058,10 @@ const mapTradeOrderStatusText = (status) => {
   if (status === "PENDING_PAYMENT") {
     return "待付款";
   }
-  if (status === "PAID") {
+  if (status === "PENDING_CONFIRMATION") {
+    return "待确认";
+  }
+  if (status === "COMPLETED") {
     return "已完成";
   }
   if (status === "CANCELLED") {
@@ -1366,21 +1379,6 @@ const loadIdleData = async () => {
   loadedMenus.idle = true;
 };
 
-const loadPendingTrades = async () => {
-  const pendingRes = await fetchPendingPaymentTrades();
-  pendingTrades.value = (pendingRes?.data || []).map((item) => ({
-    id: item.id,
-    orderId: item.orderId,
-    itemId: item.itemId,
-    title: item.title || "未命名物品",
-    partner: item.partner || "校园用户",
-    location: item.location || "未填写",
-    time: item.time || "",
-    statusText: item.statusText || "待付款",
-  }));
-  loadedMenus["pending-trade"] = true;
-};
-
 const loadMenuData = async (menuKey, force = false) => {
   if (
     !force &&
@@ -1392,11 +1390,6 @@ const loadMenuData = async (menuKey, force = false) => {
 
   if (menuKey === "idle") {
     await loadIdleData();
-    return;
-  }
-
-  if (menuKey === "pending-trade") {
-    await loadPendingTrades();
     return;
   }
 
@@ -1477,7 +1470,6 @@ const handleTradeOrderCancel = async (item) => {
       }
     );
     await cancelTradeOrder(orderId);
-    await loadPendingTrades();
     if (tradeOrderStatusMenuKeys.includes(selectedMenu.value)) {
       await loadMenuData(selectedMenu.value, true);
     }
@@ -1487,6 +1479,66 @@ const handleTradeOrderCancel = async (item) => {
       return;
     }
     ElMessage.error(error.message || "取消订单失败");
+  }
+};
+
+const handleSellerConfirmDelivered = async (item) => {
+  const orderId = getTradeOrderId(item);
+  if (!orderId) {
+    ElMessage.warning("订单信息无效");
+    return;
+  }
+  try {
+    await confirmSellerDelivered(orderId);
+    await loadMenuData("trade-sold", true);
+    ElMessage.success("已确认交付");
+  } catch (error) {
+    ElMessage.error(error.message || "确认交付失败");
+  }
+};
+
+const handleBuyerConfirmReceived = async (item) => {
+  const orderId = getTradeOrderId(item);
+  if (!orderId) {
+    ElMessage.warning("订单信息无效");
+    return;
+  }
+  try {
+    await confirmBuyerReceived(orderId);
+    await loadMenuData("trade-bought", true);
+    ElMessage.success("已确认收货");
+  } catch (error) {
+    ElMessage.error(error.message || "确认收货失败");
+  }
+};
+
+const handleApplyRefund = async (item, refundType) => {
+  const orderId = getTradeOrderId(item);
+  if (!orderId) {
+    ElMessage.warning("订单信息无效");
+    return;
+  }
+  try {
+    await applyTradeOrderRefund(orderId, refundType);
+    await loadMenuData("trade-bought", true);
+    ElMessage.success("退款申请已提交");
+  } catch (error) {
+    ElMessage.error(error.message || "退款申请失败");
+  }
+};
+
+const handleApproveRefund = async (item) => {
+  const orderId = getTradeOrderId(item);
+  if (!orderId) {
+    ElMessage.warning("订单信息无效");
+    return;
+  }
+  try {
+    await approveTradeOrderRefund(orderId);
+    await loadMenuData("trade-sold", true);
+    ElMessage.success("已完成退款");
+  } catch (error) {
+    ElMessage.error(error.message || "退款处理失败");
   }
 };
 

@@ -49,3 +49,48 @@ export const cancelTradeOrder = async (orderId) => {
     },
   });
 };
+
+export const confirmSellerDelivered = async (orderId) => {
+  const accessToken = await ensureValidAccessToken();
+  return requestJson(
+    `${PAYMENT_API_BASE}/${orderId}/seller-confirm-delivered`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  );
+};
+
+export const confirmBuyerReceived = async (orderId) => {
+  const accessToken = await ensureValidAccessToken();
+  return requestJson(`${PAYMENT_API_BASE}/${orderId}/buyer-confirm-received`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+};
+
+export const applyTradeOrderRefund = async (orderId, refundType) => {
+  const accessToken = await ensureValidAccessToken();
+  return requestJson(`${PAYMENT_API_BASE}/${orderId}/refund/apply`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ refundType }),
+  });
+};
+
+export const approveTradeOrderRefund = async (orderId) => {
+  const accessToken = await ensureValidAccessToken();
+  return requestJson(`${PAYMENT_API_BASE}/${orderId}/refund/approve`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+};

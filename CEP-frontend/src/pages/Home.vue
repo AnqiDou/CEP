@@ -730,6 +730,7 @@ const router = useRouter();
 const route = useRoute();
 const ADMIN_EMAIL = "3299166215@qq.com";
 const HOME_NOTICE_CLOSED_ID_KEY = "home.notice.closed.id";
+const MESSAGE_BADGE_SYNC_KEY = "cep-message-unread-sync";
 const keyword = ref("");
 const searchedKeyword = ref("");
 const authModalType = ref("");
@@ -979,6 +980,13 @@ const loadUnreadMessageCount = async () => {
   } catch {
     unreadMessageCount.value = 0;
   }
+};
+
+const handleUnreadBadgeSync = (event) => {
+  if (event?.key !== MESSAGE_BADGE_SYNC_KEY) {
+    return;
+  }
+  loadUnreadMessageCount();
 };
 
 const sortOptions = [
@@ -2238,6 +2246,7 @@ const submitRegister = async () => {
 };
 
 onMounted(async () => {
+  window.addEventListener("storage", handleUnreadBadgeSync);
   restoreClosedHomeNoticeId();
   await initAuthSession();
   await consumeLoginRequiredQuery();
@@ -2261,6 +2270,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener("storage", handleUnreadBadgeSync);
   stopOpsPreviewAutoRefresh();
   if (codeCountdownTimer) {
     clearInterval(codeCountdownTimer);

@@ -168,15 +168,28 @@
             </div>
           </header>
 
-          <div ref="messageContainerRef" class="message-list">
+          <div
+            ref="messageContainerRef"
+            :class="[
+              'message-list',
+              isNotificationPanel ? 'message-list--notification' : '',
+            ]"
+          >
             <article
               v-for="message in activePanelMessages"
               :key="message.id"
               :class="[
                 'message-item',
                 message.from === 'self' ? 'message-item--self' : '',
+                isNotificationPanel ? 'message-item--notification' : '',
               ]"
             >
+              <time
+                v-if="isNotificationPanel"
+                class="message-time message-time--notification-top"
+              >
+                {{ formatNotificationDateTime(message.time) }}
+              </time>
               <div class="message-bubble">
                 <img
                   v-if="message.imageUrl"
@@ -197,7 +210,9 @@
                     {{ getReviewInviteButtonText(message) }}
                   </button>
                 </div>
-                <time class="message-time">{{ message.time }}</time>
+                <time v-if="!isNotificationPanel" class="message-time">{{
+                  message.time
+                }}</time>
               </div>
             </article>
           </div>
@@ -540,6 +555,11 @@ const loadNotifications = async ({ markRead = false } = {}) => {
   if (markRead && unreadCount > 0) {
     await markAllMessageNotificationsRead();
     notificationUnread.value = 0;
+    try {
+      localStorage.setItem("cep-message-unread-sync", String(Date.now()));
+    } catch {
+      // ignore localStorage errors
+    }
   }
 };
 
@@ -548,6 +568,32 @@ const getNowTime = () => {
   const hour = String(date.getHours()).padStart(2, "0");
   const minute = String(date.getMinutes()).padStart(2, "0");
   return `${hour}:${minute}`;
+};
+
+const formatNotificationDateTime = (value) => {
+  if (typeof value !== "string" || !value.trim()) {
+    return "";
+  }
+
+  const text = value.trim();
+  const match = text.match(
+    /(\d{4})[-/](\d{1,2})[-/](\d{1,2})[^\d]*(\d{1,2}):(\d{2})/
+  );
+  if (match) {
+    const month = String(Number(match[2])).padStart(2, "0");
+    const day = String(Number(match[3])).padStart(2, "0");
+    const hour = String(Number(match[4])).padStart(2, "0");
+    return `${month}-${day} ${hour}:${match[5]}`;
+  }
+
+  const noYearMatch = text.match(/(\d{1,2})[-/](\d{1,2})[^\d]*(\d{1,2}:\d{2})/);
+  if (noYearMatch) {
+    const month = String(Number(noYearMatch[1])).padStart(2, "0");
+    const day = String(Number(noYearMatch[2])).padStart(2, "0");
+    return `${month}-${day} ${noYearMatch[3]}`;
+  }
+
+  return text;
 };
 
 const scrollToBottom = async () => {
@@ -586,6 +632,11 @@ const selectConversation = (conversationId) => {
     current.unread = 0;
   }
   markConversationRead(conversationId).catch(() => {});
+  try {
+    localStorage.setItem("cep-message-unread-sync", String(Date.now()));
+  } catch {
+    // ignore localStorage errors
+  }
 };
 
 const loadConversations = async () => {
@@ -881,6 +932,11 @@ const handleWsMessageCreated = async (payload) => {
   if (selectedConversationId.value === conversationId) {
     conversation.unread = 0;
     await markConversationRead(conversationId).catch(() => {});
+    try {
+      localStorage.setItem("cep-message-unread-sync", String(Date.now()));
+    } catch {
+      // ignore localStorage errors
+    }
     scrollToBottom();
   }
 };
@@ -1160,10 +1216,11 @@ onBeforeUnmount(() => {
   height: 20px;
   border-radius: 999px;
   padding: 0 6px;
-  background: linear-gradient(150deg, #ff9fb8, #ff8fb2);
-  color: #ffffff;
+  background: #ff4d4f;
+  color: #ffffff !important;
   font-size: 11px;
   font-weight: 700;
+  line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1302,9 +1359,20 @@ onBeforeUnmount(() => {
   background: #ffffff;
 }
 
+.message-list--notification {
+  padding: 26px 22px;
+}
+
 .message-item {
   display: flex;
   margin-bottom: 10px;
+}
+
+.message-item--notification {
+  justify-content: center;
+  margin-bottom: 36px;
+  flex-direction: column;
+  align-items: center;
 }
 
 .message-item--self {
@@ -1317,6 +1385,13 @@ onBeforeUnmount(() => {
   padding: 10px 12px;
   background: #eee8ff;
   color: #332f52;
+}
+
+.message-item--notification .message-bubble {
+  width: min(74%, 560px);
+  min-height: 66px;
+  border-radius: 14px;
+  padding: 10px 14px;
 }
 
 .message-item--self .message-bubble {
@@ -1338,11 +1413,30 @@ onBeforeUnmount(() => {
   white-space: pre-wrap;
 }
 
+.message-item--notification .message-text {
+  font-size: 16px;
+  line-height: 1.5;
+}
+
 .message-time {
   margin-top: 6px;
   display: block;
   font-size: 11px;
   opacity: 0.76;
+}
+
+.message-item--notification .message-time {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.message-time--notification-top {
+  margin: 0 0 10px;
+  display: block;
+  font-size: 13px;
+  color: #9a8ea9;
+  text-align: center;
+  opacity: 1;
 }
 
 .review-invite-row {

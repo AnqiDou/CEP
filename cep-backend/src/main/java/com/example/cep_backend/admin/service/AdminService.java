@@ -64,12 +64,14 @@ public class AdminService {
 
         Map<String, Integer> rawStats = adminRepository.countOrderStates();
         int pendingPayCount = rawStats.getOrDefault("PENDING_PAYMENT", 0);
-        int completedCount = rawStats.getOrDefault("PAID", 0);
+        int pendingConfirmCount = rawStats.getOrDefault("PENDING_CONFIRMATION", 0);
+        int completedCount = rawStats.getOrDefault("COMPLETED", 0);
         int cancelledCount = rawStats.getOrDefault("CANCELLED", 0);
-        int total = Math.max(pendingPayCount + completedCount + cancelledCount, 1);
+        int total = Math.max(pendingPayCount + pendingConfirmCount + completedCount + cancelledCount, 1);
 
         List<AdminOrderStateStatDto> stats = List.of(
                 new AdminOrderStateStatDto("待付款", pendingPayCount, pendingPayCount * 100 / total),
+                new AdminOrderStateStatDto("待确认", pendingConfirmCount, pendingConfirmCount * 100 / total),
                 new AdminOrderStateStatDto("已完成", completedCount, completedCount * 100 / total),
                 new AdminOrderStateStatDto("已取消", cancelledCount, cancelledCount * 100 / total));
 
@@ -442,7 +444,10 @@ public class AdminService {
         if ("PENDING_PAYMENT".equals(status)) {
             return "pending-pay";
         }
-        if ("PAID".equals(status)) {
+        if ("PENDING_CONFIRMATION".equals(status)) {
+            return "pending-confirm";
+        }
+        if ("COMPLETED".equals(status)) {
             return "completed";
         }
         if ("CANCELLED".equals(status)) {

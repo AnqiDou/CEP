@@ -165,7 +165,11 @@ public class ProfileService {
                 null,
                 "",
                 "",
-                "PUBLISHED");
+                "PUBLISHED",
+                null,
+                null,
+                null,
+                null);
     }
 
     public OtherProfileOverviewDto getOtherOverview(Long viewerUserId, Long userId, String username) {
@@ -348,6 +352,7 @@ public class ProfileService {
         }
         if (!"all".equals(normalized)
                 && !"pending-payment".equals(normalized)
+                && !"pending-confirmation".equals(normalized)
                 && !"completed".equals(normalized)
                 && !"cancelled".equals(normalized)) {
             throw new BusinessException("交易状态筛选参数无效");
