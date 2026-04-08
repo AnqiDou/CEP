@@ -366,7 +366,7 @@
                   暂无图片
                 </div>
                 <span class="published-card__status">{{
-                  mapStatusText(item.status)
+                  mapStatusText(item)
                 }}</span>
               </div>
               <div class="published-card__body">
@@ -412,6 +412,9 @@
                 </div>
                 <p class="published-card__meta">
                   {{ item.price }} · {{ item.time }}
+                </p>
+                <p class="published-card__meta published-card__meta--quantity">
+                  {{ buildPublishedQuantityText(item) }}
                 </p>
                 <p
                   v-if="item.description"
@@ -994,21 +997,44 @@ const toPrice = (value) => {
   return fixed.endsWith(".00") ? `￥${fixed.slice(0, -3)}` : `￥${fixed}`;
 };
 
-const mapTradeItem = (item) => ({
-  id: item.id,
-  orderId: item.orderId || item.id,
-  itemId: item.itemId || item.id,
-  title: item.title || item.name || "未命名物品",
-  price: toPrice(item.price),
-  time: item.time || "",
-  photoUrl: item.photoUrl || "",
-  status: item.status || "PUBLISHED",
-  categoryCode: item.categoryCode || "other",
-  purchaseDate: item.purchaseDate || "",
-  usageDuration: item.usageDuration || "",
-  description: item.description || "",
-  photoUrls: Array.isArray(item.photoUrls) ? item.photoUrls : [],
-});
+const mapTradeItem = (item) => {
+  const quantityMode = item?.quantityMode || "SINGLE";
+  const soldQuantity = Number(item?.soldQuantity ?? 0);
+  const totalQuantityRaw = item?.totalQuantity;
+  const totalQuantity =
+    totalQuantityRaw === null || totalQuantityRaw === undefined
+      ? quantityMode === "UNLIMITED"
+        ? null
+        : 1
+      : Number(totalQuantityRaw);
+  const remainingQuantityRaw = item?.remainingQuantity;
+  const remainingQuantity =
+    remainingQuantityRaw === null || remainingQuantityRaw === undefined
+      ? quantityMode === "UNLIMITED"
+        ? null
+        : Math.max(Number(totalQuantity || 1) - soldQuantity, 0)
+      : Number(remainingQuantityRaw);
+
+  return {
+    id: item.id,
+    orderId: item.orderId || item.id,
+    itemId: item.itemId || item.id,
+    title: item.title || item.name || "未命名物品",
+    price: toPrice(item.price),
+    time: item.time || "",
+    photoUrl: item.photoUrl || "",
+    status: item.status || "PUBLISHED",
+    categoryCode: item.categoryCode || "other",
+    purchaseDate: item.purchaseDate || "",
+    usageDuration: item.usageDuration || "",
+    description: item.description || "",
+    photoUrls: Array.isArray(item.photoUrls) ? item.photoUrls : [],
+    quantityMode,
+    totalQuantity,
+    soldQuantity,
+    remainingQuantity,
+  };
+};
 
 const mapFollowUser = (item) => ({
   id: item.userId,
@@ -1041,14 +1067,30 @@ const getTradeItemPhoto = (item) => {
   return "";
 };
 
-const mapStatusText = (status) => {
-  if (status === "OFF_SHELF") {
-    return "已下架";
-  }
-  if (status === "DELETED") {
+const mapStatusText = (item) => {
+  if (item?.status === "DELETED") {
     return "已删除";
   }
+  const isSoldOut =
+    item?.quantityMode !== "UNLIMITED" &&
+    Number(item?.remainingQuantity ?? 0) <= 0;
+  if (isSoldOut) {
+    return "已售出";
+  }
+  if (item?.status === "OFF_SHELF") {
+    return "已下架";
+  }
   return "已上架";
+};
+
+const buildPublishedQuantityText = (item) => {
+  if (item?.quantityMode === "UNLIMITED") {
+    return "数量：无限量";
+  }
+  const total = Number(item?.totalQuantity ?? 1);
+  const sold = Number(item?.soldQuantity ?? 0);
+  const remain = Number(item?.remainingQuantity ?? Math.max(total - sold, 0));
+  return `数量：${total}（已售 ${sold}，剩余 ${Math.max(remain, 0)}）`;
 };
 
 const reloadMyPublishedItems = async () => {
@@ -2109,6 +2151,12 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 12px;
+}
+
+.published-grid > .pending-empty {
+  grid-column: 1 / -1;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .published-card {

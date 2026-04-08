@@ -2,21 +2,15 @@
   <div class="result-page">
     <main class="result-main">
       <section v-if="isLoading" class="result-card">订单状态加载中...</section>
-      <section v-else-if="loadError" class="result-card result-card--error">
-        <p>{{ loadError }}</p>
-        <button type="button" class="secondary-btn" @click="loadOrder">
-          重试
-        </button>
-      </section>
-
       <section v-else class="result-card">
         <div class="success-icon">✓</div>
         <h1 class="title">支付成功</h1>
         <p class="amount">￥{{ displayPrice }}</p>
         <p class="order-no">订单号：{{ order.orderNo }}</p>
+        <p class="redirect-tip">{{ autoRedirectText }}</p>
 
         <button type="button" class="primary-btn" @click="finishFlow">
-          完成
+          返回首页
         </button>
       </section>
     </main>
@@ -24,7 +18,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { fetchTradeOrder } from "../service/payment/paymentApiService";
 
@@ -40,6 +34,9 @@ const order = ref({
 
 const isLoading = ref(false);
 const loadError = ref("");
+const redirectSeconds = ref(3);
+let redirectTimer = null;
+let countdownTimer = null;
 
 const orderId = computed(() => {
   const value = Number(route.query.orderId);
@@ -60,10 +57,38 @@ const formatCurrency = (value) => {
 };
 
 const displayPrice = computed(() => formatCurrency(order.value.amount));
+const autoRedirectText = computed(
+  () => `${redirectSeconds.value} 秒后自动返回首页`
+);
+
+const clearTimers = () => {
+  if (redirectTimer) {
+    window.clearTimeout(redirectTimer);
+    redirectTimer = null;
+  }
+  if (countdownTimer) {
+    window.clearInterval(countdownTimer);
+    countdownTimer = null;
+  }
+};
+
+const scheduleAutoRedirect = () => {
+  clearTimers();
+  redirectSeconds.value = 3;
+  countdownTimer = window.setInterval(() => {
+    if (redirectSeconds.value > 1) {
+      redirectSeconds.value -= 1;
+    }
+  }, 1000);
+  redirectTimer = window.setTimeout(() => {
+    clearTimers();
+    router.replace({ name: "home" });
+  }, 3000);
+};
 
 const loadOrder = async () => {
   if (!orderId.value) {
-    loadError.value = "订单信息无效";
+    router.replace({ name: "home" });
     return;
   }
 
@@ -72,23 +97,23 @@ const loadOrder = async () => {
   try {
     const responseBody = await fetchTradeOrder(orderId.value);
     order.value = responseBody.data || order.value;
+    scheduleAutoRedirect();
   } catch (error) {
-    loadError.value = error.message || "获取订单状态失败";
+    router.replace({ name: "home" });
+    return;
   } finally {
     isLoading.value = false;
   }
 };
 
 const finishFlow = () => {
-  if (order.value.itemId) {
-    router.replace({
-      name: "item-detail",
-      params: { id: String(order.value.itemId) },
-    });
-    return;
-  }
+  clearTimers();
   router.replace({ name: "home" });
 };
+
+onBeforeUnmount(() => {
+  clearTimers();
+});
 
 watch(
   () => route.query.orderId,

@@ -25,6 +25,9 @@ public class PublishRepository {
                     rs.getString("title"),
                     rs.getString("category_code"),
                     rs.getBigDecimal("price"),
+                    rs.getString("quantity_mode"),
+                    rs.getObject("total_quantity", Integer.class),
+                    rs.getObject("sold_quantity", Integer.class),
                     rs.getDate("purchase_date") == null ? null : rs.getDate("purchase_date").toLocalDate(),
                     rs.getString("usage_duration"),
                     rs.getString("description"),
@@ -45,6 +48,9 @@ public class PublishRepository {
             Long publisherUserId,
             String itemName,
             BigDecimal price,
+            String quantityMode,
+            Integer totalQuantity,
+            Integer soldQuantity,
             String description,
             LocalDateTime now) {
         String sql = """
@@ -54,11 +60,14 @@ public class PublishRepository {
                     title,
                     description,
                     price,
+                    quantity_mode,
+                    total_quantity,
+                    sold_quantity,
                     badge,
                     status,
                     created_at,
                     updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, 'PUBLISHED', ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PUBLISHED', ?, ?)
                 """;
 
         KeyHolder keyHolder = new GeneratedKeyHolder();
@@ -69,9 +78,12 @@ public class PublishRepository {
             statement.setString(3, itemName);
             statement.setString(4, description);
             statement.setBigDecimal(5, price);
-            statement.setString(6, null);
-            statement.setTimestamp(7, Timestamp.valueOf(now));
-            statement.setTimestamp(8, Timestamp.valueOf(now));
+            statement.setString(6, quantityMode);
+            statement.setObject(7, totalQuantity);
+            statement.setObject(8, soldQuantity);
+            statement.setString(9, null);
+            statement.setTimestamp(10, Timestamp.valueOf(now));
+            statement.setTimestamp(11, Timestamp.valueOf(now));
             return statement;
         }, keyHolder);
 
@@ -133,6 +145,9 @@ public class PublishRepository {
                     i.title,
                     c.code AS category_code,
                     i.price,
+                    i.quantity_mode,
+                    i.total_quantity,
+                    i.sold_quantity,
                     d.purchase_date,
                     d.usage_duration,
                     i.description,
@@ -155,6 +170,9 @@ public class PublishRepository {
                     i.title,
                     c.code AS category_code,
                     i.price,
+                    i.quantity_mode,
+                    i.total_quantity,
+                    i.sold_quantity,
                     d.purchase_date,
                     d.usage_duration,
                     i.description,
@@ -189,6 +207,8 @@ public class PublishRepository {
             Long categoryId,
             String itemName,
             BigDecimal price,
+            String quantityMode,
+            Integer totalQuantity,
             String description,
             LocalDate purchaseDate,
             String usageDuration,
@@ -200,6 +220,8 @@ public class PublishRepository {
                     title = ?,
                     description = ?,
                     price = ?,
+                    quantity_mode = ?,
+                    total_quantity = ?,
                     updated_at = ?
                 WHERE id = ?
                 """;
@@ -210,6 +232,8 @@ public class PublishRepository {
                 itemName,
                 description,
                 price,
+                quantityMode,
+                totalQuantity,
                 Timestamp.valueOf(now),
                 itemId);
 
@@ -307,10 +331,22 @@ public class PublishRepository {
             String name,
             String categoryCode,
             BigDecimal price,
+            String quantityMode,
+            Integer totalQuantity,
+            Integer soldQuantity,
             LocalDate purchaseDate,
             String usageDuration,
             String description,
             String status,
             LocalDateTime createdAt) {
+
+        public Integer remainingQuantity() {
+            if ("UNLIMITED".equals(quantityMode)) {
+                return null;
+            }
+            int total = totalQuantity == null ? 1 : totalQuantity;
+            int sold = soldQuantity == null ? 0 : soldQuantity;
+            return Math.max(total - sold, 0);
+        }
     }
 }

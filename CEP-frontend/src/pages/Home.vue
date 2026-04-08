@@ -283,7 +283,7 @@
             v-if="authModalType === 'login'"
             class="login-form"
             method="post"
-            autocomplete="on"
+            :autocomplete="loginAutofillEnabled ? 'on' : 'off'"
             @submit.prevent="submitLogin"
           >
             <section class="login-form__group">
@@ -295,7 +295,8 @@
                   name="username"
                   type="email"
                   placeholder="请输入邮箱"
-                  autocomplete="username"
+                  :autocomplete="loginAutofillEnabled ? 'username' : 'off'"
+                  @focus="enableLoginAutofill"
                 />
               </label>
 
@@ -307,7 +308,10 @@
                   name="password"
                   type="password"
                   placeholder="请输入密码"
-                  autocomplete="current-password"
+                  :autocomplete="
+                    loginAutofillEnabled ? 'current-password' : 'new-password'
+                  "
+                  @focus="enableLoginAutofill"
                 />
               </label>
             </section>
@@ -429,46 +433,20 @@
 
           <form
             v-else-if="authModalType === 'register-profile'"
-            class="login-form"
+            class="login-form login-form--register-profile"
+            autocomplete="off"
           >
-            <section class="login-form__group">
-              <label class="login-form__field">
-                <span class="login-form__label">用户名（选填）</span>
+            <section class="login-form__group login-form__group--register-top">
+              <label
+                class="login-form__field login-form__field--register-username"
+              >
+                <span class="login-form__label">用户名</span>
                 <input
                   v-model="registerForm.username"
                   class="login-form__input"
                   type="text"
-                  placeholder="请输入用户名（可留空）"
-                />
-              </label>
-
-              <label class="login-form__field">
-                <span class="login-form__label">姓名</span>
-                <input
-                  v-model="registerForm.name"
-                  class="login-form__input"
-                  type="text"
-                  placeholder="请输入姓名"
-                />
-              </label>
-
-              <label class="login-form__field">
-                <span class="login-form__label">联系电话</span>
-                <input
-                  v-model="registerForm.phone"
-                  class="login-form__input"
-                  type="tel"
-                  placeholder="请输入联系电话"
-                />
-              </label>
-
-              <label class="login-form__field">
-                <span class="login-form__label">收货地址</span>
-                <textarea
-                  v-model="registerForm.address"
-                  class="login-form__input login-form__textarea"
-                  rows="3"
-                  placeholder="请输入收货地址"
+                  placeholder="请输入用户名"
+                  autocomplete="off"
                 />
               </label>
 
@@ -479,6 +457,7 @@
                   class="login-form__input"
                   type="password"
                   placeholder="8-20位，需包含数字和字母"
+                  autocomplete="new-password"
                 />
               </label>
 
@@ -489,6 +468,44 @@
                   class="login-form__input"
                   type="password"
                   placeholder="请再次输入密码"
+                  autocomplete="new-password"
+                />
+              </label>
+            </section>
+
+            <section
+              class="login-form__group login-form__group--register-bottom"
+            >
+              <label class="login-form__field">
+                <span class="login-form__label">联系人</span>
+                <input
+                  v-model="registerForm.name"
+                  class="login-form__input"
+                  type="text"
+                  placeholder="请输入联系人"
+                  autocomplete="off"
+                />
+              </label>
+
+              <label class="login-form__field">
+                <span class="login-form__label">联系电话</span>
+                <input
+                  v-model="registerForm.phone"
+                  class="login-form__input"
+                  type="tel"
+                  placeholder="请输入联系电话"
+                  autocomplete="off"
+                />
+              </label>
+
+              <label class="login-form__field">
+                <span class="login-form__label">收货地址</span>
+                <textarea
+                  v-model="registerForm.address"
+                  class="login-form__input login-form__textarea"
+                  rows="3"
+                  placeholder="请输入收货地址"
+                  autocomplete="off"
                 />
               </label>
             </section>
@@ -750,6 +767,7 @@ const registerError = ref("");
 const registerSuccess = ref("");
 const forgotError = ref("");
 const forgotSuccess = ref("");
+const loginAutofillEnabled = ref(false);
 const isSendingCode = ref(false);
 const codeCountdown = ref(0);
 let codeCountdownTimer = null;
@@ -760,6 +778,7 @@ let forgotCodeCountdownTimer = null;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const codePattern = /^\d{6}$/;
 const passwordPattern = /^(?=.*[A-Za-z])(?=.*\d).{8,20}$/;
+const phonePattern = /^(?:\+?86)?1[3-9]\d{9}$/;
 
 const sendCodeButtonText = computed(() => {
   if (isSendingCode.value) return "发送中...";
@@ -800,6 +819,8 @@ const HOT_CATEGORY_ID = "hot";
 const HOT_BATCH_SIZE = 8;
 const LIST_PAGE_SIZE = 12;
 const OPS_BARGAIN_MAX_PRICE = 15;
+const OPS_PREVIEW_FETCH_SIZE = 48;
+const OPS_PREVIEW_REFRESH_INTERVAL_MS = 20000;
 const VIEWER_SCOPE_ALL = "all";
 const VIEWER_SCOPE_OTHERS = "others";
 const VIEWER_SCOPE_SELF = "self";
@@ -822,6 +843,8 @@ const hotKeywords = ref([]);
 const unreadMessageCount = ref(0);
 const homeNotices = ref([]);
 const closedHomeNoticeId = ref("");
+const opsPreviewItems = ref([]);
+let opsPreviewRefreshTimer = null;
 const OPS_COLUMNS = [
   {
     id: "ops-benefit",
@@ -1096,6 +1119,59 @@ const displayedItems = computed(() => {
   return sortItemsByOwnerPriority(source);
 });
 
+const doesItemMatchOpsColumn = (item, columnCode) => {
+  const normalizeText = (value) =>
+    typeof value === "string" ? value.trim().toLowerCase() : "";
+  const containsAnyKeyword = (targetItem, keywordList) => {
+    const text = [targetItem?.title, targetItem?.desc, targetItem?.badge]
+      .map(normalizeText)
+      .filter(Boolean)
+      .join(" ");
+    return keywordList.some((keyword) => text.includes(keyword.toLowerCase()));
+  };
+
+  if (columnCode === "campus-bargain") {
+    const price = Number(item?.price);
+    return Number.isFinite(price) && price < OPS_BARGAIN_MAX_PRICE;
+  }
+
+  if (columnCode === "graduate-clearance") {
+    return containsAnyKeyword(item, GRADUATE_COLUMN_KEYWORDS);
+  }
+
+  if (columnCode === "back-to-school") {
+    return containsAnyKeyword(item, CAMPUS_COLUMN_KEYWORDS);
+  }
+
+  return true;
+};
+
+const buildOpsCardPreviewMap = (items) => {
+  const byColumn = {
+    "campus-bargain": null,
+    "graduate-clearance": null,
+    "back-to-school": null,
+  };
+  const usedItemIds = new Set();
+
+  OPS_COLUMNS.forEach((column) => {
+    const matched = items.find((item) => {
+      const itemId = item?.id;
+      if (usedItemIds.has(itemId)) {
+        return false;
+      }
+      return doesItemMatchOpsColumn(item, column.columnCode);
+    });
+
+    byColumn[column.columnCode] = matched || null;
+    if (matched?.id !== null && matched?.id !== undefined) {
+      usedItemIds.add(matched.id);
+    }
+  });
+
+  return byColumn;
+};
+
 const opsCards = computed(() => ({
   benefit: {
     id: "ops-benefit",
@@ -1116,9 +1192,26 @@ const opsCards = computed(() => ({
   ],
 }));
 
+const opsCardPreviewItems = computed(() => {
+  const previewSource = sortItemsByOwnerPriority(opsPreviewItems.value || []);
+  const fallbackSource = sortItemsByOwnerPriority(hotItems.value || []);
+  const primaryMap = buildOpsCardPreviewMap(previewSource);
+  const fallbackMap = buildOpsCardPreviewMap(fallbackSource);
+
+  return {
+    benefit:
+      primaryMap["campus-bargain"] || fallbackMap["campus-bargain"] || null,
+    graduate:
+      primaryMap["graduate-clearance"] ||
+      fallbackMap["graduate-clearance"] ||
+      null,
+    campus:
+      primaryMap["back-to-school"] || fallbackMap["back-to-school"] || null,
+  };
+});
+
 const seasonPreviewItems = computed(() => {
-  const source = hotItems.value.length ? hotItems.value : displayedItems.value;
-  return [source[0], source[1]];
+  return [opsCardPreviewItems.value.graduate, opsCardPreviewItems.value.campus];
 });
 
 const heroActiveIndex = ref(0);
@@ -1178,6 +1271,50 @@ const hasMoreItems = computed(() =>
   useHotStream.value ? hotHasMore.value : listHasMore.value
 );
 
+const resolveBackendOrigin = () => {
+  const customOrigin = (import.meta.env.VITE_BACKEND_ORIGIN || "").trim();
+  if (customOrigin) {
+    return customOrigin.replace(/\/+$/, "");
+  }
+
+  if (import.meta.env.PROD) {
+    return window.location.origin;
+  }
+
+  const protocol = window.location.protocol;
+  const host = window.location.hostname;
+  const port = import.meta.env.VITE_BACKEND_PORT || "8080";
+  return `${protocol}//${host}:${port}`;
+};
+
+const BACKEND_ORIGIN = resolveBackendOrigin();
+
+const resolveMediaUrl = (value) => {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  const raw = value.trim();
+  if (!raw) {
+    return "";
+  }
+
+  const normalized = raw.replace(/\\/g, "/");
+  if (
+    /^(https?:)?\/\//i.test(normalized) ||
+    normalized.startsWith("data:") ||
+    normalized.startsWith("blob:")
+  ) {
+    return normalized;
+  }
+
+  if (normalized.startsWith("/")) {
+    return `${BACKEND_ORIGIN}${normalized}`;
+  }
+
+  return `${BACKEND_ORIGIN}/${normalized.replace(/^\.\//, "")}`;
+};
+
 const resolveSellerAvatarUrl = (item) => {
   const candidates = [
     item.sellerAvatarUrl,
@@ -1187,7 +1324,7 @@ const resolveSellerAvatarUrl = (item) => {
   const target = candidates.find(
     (value) => typeof value === "string" && value.trim()
   );
-  return typeof target === "string" ? target.trim() : "";
+  return resolveMediaUrl(typeof target === "string" ? target : "");
 };
 
 const resolveSellerName = (item) => {
@@ -1220,7 +1357,7 @@ const mapHomeItem = (item) => ({
   isSelf: Boolean(item.isSelf),
   title: item.title,
   price: item.price,
-  photoUrl: typeof item.photoUrl === "string" ? item.photoUrl.trim() : "",
+  photoUrl: resolveMediaUrl(item.photoUrl),
   desc:
     typeof item.description === "string" && item.description.trim()
       ? item.description.trim()
@@ -1297,6 +1434,54 @@ const loadHomeNotices = async () => {
   } catch {
     homeNotices.value = [];
   }
+};
+
+const loadOpsPreviewItems = async () => {
+  const responseBody = await fetchHomeItems({
+    keyword: "",
+    categoryId: undefined,
+    viewerScope: resolveInitialViewerScope(),
+    sortBy: "time",
+    sortOrder: "desc",
+    page: 1,
+    size: OPS_PREVIEW_FETCH_SIZE,
+    accessToken: homeAccessToken.value,
+  });
+  const incomingItems = (responseBody.data?.items || []).map(mapHomeItem);
+  opsPreviewItems.value = sortItemsByOwnerPriority(incomingItems);
+};
+
+const stopOpsPreviewAutoRefresh = () => {
+  if (!opsPreviewRefreshTimer) {
+    return;
+  }
+  clearInterval(opsPreviewRefreshTimer);
+  opsPreviewRefreshTimer = null;
+};
+
+const startOpsPreviewAutoRefresh = async () => {
+  stopOpsPreviewAutoRefresh();
+
+  if (isSearchListOnlyMode.value || isOpsListOnlyMode.value) {
+    return;
+  }
+
+  try {
+    await loadOpsPreviewItems();
+  } catch {
+    opsPreviewItems.value = [];
+  }
+
+  opsPreviewRefreshTimer = window.setInterval(async () => {
+    if (isSearchListOnlyMode.value || isOpsListOnlyMode.value) {
+      return;
+    }
+    try {
+      await loadOpsPreviewItems();
+    } catch {
+      // ignore: 防止轮询打断主流程
+    }
+  }, OPS_PREVIEW_REFRESH_INTERVAL_MS);
 };
 
 const closeHomeNotice = () => {
@@ -1629,6 +1814,11 @@ const openLoginModal = () => {
   authModalType.value = "login";
   loginError.value = "";
   loginSuccess.value = "";
+  loginAutofillEnabled.value = false;
+};
+
+const enableLoginAutofill = () => {
+  loginAutofillEnabled.value = true;
 };
 
 const LOGIN_MODAL_TRIGGER_COOLDOWN_MS = 1500;
@@ -1984,18 +2174,29 @@ const submitRegister = async () => {
     return;
   }
 
+  if (!username.trim()) {
+    registerError.value = "请填写用户名";
+    return;
+  }
+
   if (!passwordPattern.test(password)) {
     registerError.value = "密码需为8-20位，且同时包含字母和数字";
     return;
   }
 
   if (!name.trim()) {
-    registerError.value = "请填写姓名";
+    registerError.value = "请填写联系人";
     return;
   }
 
   if (!phone.trim()) {
     registerError.value = "请填写联系电话";
+    return;
+  }
+
+  const normalizedPhone = phone.trim().replace(/[\s-]/g, "");
+  if (!phonePattern.test(normalizedPhone)) {
+    registerError.value = "联系电话格式不正确，请输入11位手机号";
     return;
   }
 
@@ -2021,7 +2222,7 @@ const submitRegister = async () => {
       username: username.trim(),
       password,
       name: name.trim(),
-      phone: phone.trim(),
+      phone: normalizedPhone.replace(/^\+?86/, ""),
       address: address.trim(),
     });
 
@@ -2051,6 +2252,7 @@ onMounted(async () => {
     } else {
       await Promise.all([loadCategories(), loadHotItems(), loadHotKeywords()]);
     }
+    await startOpsPreviewAutoRefresh();
     await ensureScrollableContent();
   } catch (error) {
     homeError.value = error.message || "首页数据加载失败";
@@ -2059,6 +2261,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  stopOpsPreviewAutoRefresh();
   if (codeCountdownTimer) {
     clearInterval(codeCountdownTimer);
     codeCountdownTimer = null;
@@ -2085,9 +2288,11 @@ watch(
       return;
     }
     if (isOpsListOnlyMode.value) {
+      stopOpsPreviewAutoRefresh();
       await applyOpsListMode();
       return;
     }
+    await startOpsPreviewAutoRefresh();
   }
 );
 
@@ -2096,8 +2301,21 @@ watch(
   async () => {
     homeError.value = "";
     if (isSearchListOnlyMode.value) {
+      stopOpsPreviewAutoRefresh();
       await applySearchListMode();
+      return;
     }
+    await startOpsPreviewAutoRefresh();
+  }
+);
+
+watch(
+  () => isUserLoggedIn.value,
+  async () => {
+    if (isSearchListOnlyMode.value || isOpsListOnlyMode.value) {
+      return;
+    }
+    await startOpsPreviewAutoRefresh();
   }
 );
 
@@ -3047,6 +3265,20 @@ watch(
   gap: 8px;
 }
 
+.login-form__group--register-top,
+.login-form__group--register-bottom {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 10px;
+  row-gap: 10px;
+  padding: 12px;
+}
+
+.login-form__field--register-username,
+.login-form__group--register-bottom .login-form__field:last-child {
+  grid-column: 1 / -1;
+}
+
 .login-form__label {
   font-size: 14px;
   font-weight: 700;
@@ -3067,7 +3299,7 @@ watch(
 
 .login-form__textarea {
   height: auto;
-  min-height: 96px;
+  min-height: 72px;
   padding: 10px 14px;
   line-height: 1.6;
   resize: vertical;
@@ -3283,6 +3515,16 @@ watch(
 
   .login-form__group {
     padding: 12px;
+  }
+
+  .login-form__group--register-top,
+  .login-form__group--register-bottom {
+    grid-template-columns: 1fr;
+  }
+
+  .login-form__field--register-username,
+  .login-form__group--register-bottom .login-form__field:last-child {
+    grid-column: auto;
   }
 
   .login-form__code-btn {

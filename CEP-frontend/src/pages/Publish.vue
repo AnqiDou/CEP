@@ -104,6 +104,45 @@
               />
             </label>
 
+            <div class="form-field">
+              <span class="form-label">物品数量 *</span>
+              <div class="quantity-mode-group">
+                <label class="quantity-mode-option">
+                  <input
+                    v-model="form.quantityMode"
+                    type="radio"
+                    value="SINGLE"
+                  />
+                  <span>仅一件</span>
+                </label>
+                <label class="quantity-mode-option">
+                  <input
+                    v-model="form.quantityMode"
+                    type="radio"
+                    value="UNLIMITED"
+                  />
+                  <span>无限量</span>
+                </label>
+                <label class="quantity-mode-option">
+                  <input
+                    v-model="form.quantityMode"
+                    type="radio"
+                    value="MULTI"
+                  />
+                  <span>多件</span>
+                </label>
+              </div>
+              <input
+                v-if="form.quantityMode === 'MULTI'"
+                v-model="form.totalQuantity"
+                class="form-input"
+                type="number"
+                min="2"
+                step="1"
+                placeholder="请输入数量（至少 2）"
+              />
+            </div>
+
             <div class="form-grid">
               <label class="form-field">
                 <span class="form-label">购买时间</span>
@@ -248,6 +287,8 @@ const form = ref({
   name: "",
   category: "other",
   price: "",
+  quantityMode: "SINGLE",
+  totalQuantity: "",
   purchaseDate: "",
   usageDuration: "",
   description: "",
@@ -325,6 +366,11 @@ const fillFormForEdit = (item) => {
       item?.price === null || item?.price === undefined
         ? ""
         : String(item.price),
+    quantityMode: item?.quantityMode || "SINGLE",
+    totalQuantity:
+      item?.totalQuantity === null || item?.totalQuantity === undefined
+        ? ""
+        : String(item.totalQuantity),
     purchaseDate: item?.purchaseDate || "",
     usageDuration: item?.usageDuration || "",
     description: item?.description || "",
@@ -425,6 +471,21 @@ const handleSubmit = async () => {
     return;
   }
 
+  let normalizedTotalQuantity = null;
+  if (form.value.quantityMode === "MULTI") {
+    const rawTotal = `${form.value.totalQuantity ?? ""}`.trim();
+    if (!rawTotal) {
+      showSubmitMessage("多件商品请填写数量");
+      return;
+    }
+    const parsedTotal = Number(rawTotal);
+    if (!Number.isInteger(parsedTotal) || parsedTotal < 2) {
+      showSubmitMessage("多件商品数量至少为 2");
+      return;
+    }
+    normalizedTotalQuantity = parsedTotal;
+  }
+
   submitting.value = true;
   submitMessage.value = isEditMode.value
     ? "正在上传图片并保存修改..."
@@ -454,6 +515,8 @@ const handleSubmit = async () => {
       name: form.value.name.trim(),
       categoryCode: form.value.category || "other",
       price: Number(normalizedPrice.toFixed(2)),
+      quantityMode: form.value.quantityMode || "SINGLE",
+      totalQuantity: normalizedTotalQuantity,
       purchaseDate: form.value.purchaseDate || null,
       usageDuration: form.value.usageDuration.trim(),
       description: form.value.description.trim(),
@@ -478,6 +541,8 @@ const handleSubmit = async () => {
       name: "",
       category: "other",
       price: "",
+      quantityMode: "SINGLE",
+      totalQuantity: "",
       purchaseDate: "",
       usageDuration: "",
       description: "",
@@ -814,6 +879,24 @@ onBeforeUnmount(() => {
 .form-textarea {
   min-height: 120px;
   resize: vertical;
+}
+
+.quantity-mode-group {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.quantity-mode-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #f7f2ff;
+  color: #5f4fa8;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .upload-area {

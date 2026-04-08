@@ -51,6 +51,10 @@ public class TradeOrderService {
         if (snapshot == null) {
             throw new BusinessException("物品不存在或不可交易");
         }
+        Integer remainingQuantity = snapshot.remainingQuantity();
+        if (remainingQuantity != null && remainingQuantity <= 0) {
+            throw new BusinessException("该物品已售罄");
+        }
         if (tradeOrderRepository.existsPendingOrderForItem(itemId)) {
             throw new BusinessException("该物品已有待付款订单，请先完成支付或取消后再下单");
         }
@@ -147,6 +151,10 @@ public class TradeOrderService {
 
         if (!STATUS_PENDING_PAYMENT.equals(order.status())) {
             throw new BusinessException("当前订单状态不可支付");
+        }
+
+        if (!tradeOrderRepository.consumeOneStockOnPaid(order.itemId())) {
+            throw new BusinessException("该物品库存不足或已下架，无法支付");
         }
 
         tradeOrderRepository.markOrderPaid(orderId, LocalDateTime.now());

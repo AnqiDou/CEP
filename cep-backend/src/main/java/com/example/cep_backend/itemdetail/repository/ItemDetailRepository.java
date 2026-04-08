@@ -82,7 +82,15 @@ public class ItemDetailRepository {
                 LEFT JOIN item_details d ON d.item_id = i.id
                 LEFT JOIN users u ON u.id = d.publisher_user_id
                 LEFT JOIN user_profiles up ON up.user_id = u.id
-                WHERE i.id = ? AND i.status = 'PUBLISHED'
+                WHERE i.id = ?
+                  AND (
+                        i.status = 'PUBLISHED'
+                        OR (
+                            i.status = 'OFF_SHELF'
+                            AND i.quantity_mode <> 'UNLIMITED'
+                            AND COALESCE(i.sold_quantity, 0) >= COALESCE(i.total_quantity, 1)
+                        )
+                  )
                 """;
         List<ItemDetailRecord> records = jdbcTemplate.query(sql, itemDetailRowMapper, itemId);
         return records.isEmpty() ? null : records.getFirst();

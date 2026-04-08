@@ -28,6 +28,9 @@ public class PublishService {
     private static final String STATUS_PUBLISHED = "PUBLISHED";
     private static final String STATUS_OFF_SHELF = "OFF_SHELF";
     private static final String STATUS_DELETED = "DELETED";
+    private static final String QUANTITY_MODE_SINGLE = "SINGLE";
+    private static final String QUANTITY_MODE_UNLIMITED = "UNLIMITED";
+    private static final String QUANTITY_MODE_MULTI = "MULTI";
     private static final BigDecimal CAMPUS_BARGAIN_MAX_PRICE = BigDecimal.valueOf(15);
     private static final Set<String> GRADUATE_CLEARANCE_CATEGORY_CODES = Set.of("book", "daily", "clothes", "sports");
     private static final Set<String> BACK_TO_SCHOOL_CATEGORY_CODES = Set.of("stationery", "daily", "digital", "book");
@@ -63,6 +66,7 @@ public class PublishService {
         String itemName = validateText(request.name(), "物品名称", 120);
         String categoryCode = normalizeCategoryCode(request.categoryCode());
         BigDecimal price = validatePrice(request.price());
+        QuantityState quantityState = normalizeCreateQuantityState(request.quantityMode(), request.totalQuantity());
         LocalDate purchaseDate = normalizePurchaseDate(request.purchaseDate());
         String usageDuration = normalizeOptionalText(request.usageDuration(), "使用时长", 50);
         String description = normalizeOptionalText(request.description(), "物品描述", 500);
@@ -81,6 +85,9 @@ public class PublishService {
                     userId,
                     itemName,
                     price,
+                    quantityState.mode(),
+                    quantityState.totalQuantity(),
+                    quantityState.soldQuantity(),
                     description,
                     now);
             publishRepository.insertItemPhotos(itemId, photoUrls, now);
@@ -95,6 +102,10 @@ public class PublishService {
                 itemName,
                 categoryCode,
                 price,
+                quantityState.mode(),
+                quantityState.totalQuantity(),
+                quantityState.soldQuantity(),
+                quantityState.remainingQuantity(),
                 purchaseDate,
                 usageDuration,
                 description,
@@ -132,6 +143,14 @@ public class PublishService {
         String itemName = validateText(request.name(), "物品名称", 120);
         String categoryCode = normalizeCategoryCode(request.categoryCode());
         BigDecimal price = validatePrice(request.price());
+        QuantityState currentQuantityState = normalizeExistingQuantityState(
+                existing.quantityMode(),
+                existing.totalQuantity(),
+                existing.soldQuantity());
+        QuantityState nextQuantityState = normalizeUpdateQuantityState(
+                request.quantityMode(),
+                request.totalQuantity(),
+                currentQuantityState);
         LocalDate purchaseDate = normalizePurchaseDate(request.purchaseDate());
         String usageDuration = normalizeOptionalText(request.usageDuration(), "使用时长", 50);
         String description = normalizeOptionalText(request.description(), "物品描述", 500);
@@ -143,7 +162,9 @@ public class PublishService {
         }
 
         LocalDateTime now = LocalDateTime.now();
-        publishRepository.updateItemAndDetail(userId, itemId, categoryId, itemName, price, description, purchaseDate,
+        publishRepository.updateItemAndDetail(userId, itemId, categoryId, itemName, price,
+                nextQuantityState.mode(), nextQuantityState.totalQuantity(),
+                description, purchaseDate,
                 usageDuration, now);
         publishRepository.replaceItemPhotos(itemId, photoUrls, now);
         refreshItemOpsColumns(itemId, categoryId, categoryCode, itemName, price, description, usageDuration, now);
@@ -195,6 +216,16 @@ public class PublishService {
 
         PublishRepository.PublishOwnedItemBaseRecord before = publishRepository.findOwnedItem(userId, itemId)
                 .orElseThrow(() -> new BusinessException("物品不存在或无操作权限"));
+
+        if (STATUS_PUBLISHED.equals(normalized)) {
+            QuantityState quantityState = normalizeExistingQuantityState(
+                    before.quantityMode(),
+                    before.totalQuantity(),
+                    before.soldQuantity());
+            if (quantityState.remainingQuantity() != null && quantityState.remainingQuantity() <= 0) {
+                throw new BusinessException("该商品已售罄，请先调整数量后再上架");
+            }
+        }
 
         int updated = publishRepository.updateStatus(userId, itemId, normalized, LocalDateTime.now());
         if (updated <= 0) {
@@ -307,17 +338,127 @@ public class PublishService {
 
     private PublishOwnedItemDto toOwnedItemDto(PublishRepository.PublishOwnedItemBaseRecord item,
             List<String> photoUrls) {
+        QuantityState quantityState = normalizeExistingQuantityState(
+                item.quantityMode(),
+                item.totalQuantity(),
+                item.soldQuantity());
         return new PublishOwnedItemDto(
                 item.id(),
                 item.name(),
                 item.categoryCode(),
                 item.price(),
+                quantityState.mode(),
+                quantityState.totalQuantity(),
+                quantityState.soldQuantity(),
+                quantityState.remainingQuantity(),
                 item.purchaseDate(),
                 item.usageDuration(),
                 item.description(),
                 photoUrls,
                 item.status(),
                 item.createdAt());
+    }
+
+    private QuantityState normalizeCreateQuantityState(String quantityMode, Integer totalQuantity) {
+        String mode = normalizeQuantityMode(quantityMode);
+        if (QUANTITY_MODE_SINGLE.equals(mode)) {
+            return new QuantityState(mode, 1, 0);
+        }
+        if (QUANTITY_MODE_UNLIMITED.equals(mode)) {
+            return new QuantityState(mode, null, 0);
+        }
+        int normalizedTotal = validateMultiQuantity(totalQuantity);
+        return new QuantityState(mode, normalizedTotal, 0);
+    }
+
+    private QuantityState normalizeExistingQuantityState(String quantityMode, Integer totalQuantity,
+            Integer soldQuantity) {
+        String mode = normalizeQuantityMode(quantityMode);
+        int normalizedSold = soldQuantity == null || soldQuantity < 0 ? 0 : soldQuantity;
+        if (QUANTITY_MODE_SINGLE.equals(mode)) {
+            return new QuantityState(mode, 1, Math.min(normalizedSold, 1));
+        }
+        if (QUANTITY_MODE_UNLIMITED.equals(mode)) {
+            return new QuantityState(mode, null, normalizedSold);
+        }
+        int normalizedTotal = totalQuantity == null || totalQuantity < 2 ? 2 : totalQuantity;
+        if (normalizedSold > normalizedTotal) {
+            normalizedSold = normalizedTotal;
+        }
+        return new QuantityState(mode, normalizedTotal, normalizedSold);
+    }
+
+    private QuantityState normalizeUpdateQuantityState(String quantityMode, Integer totalQuantity,
+            QuantityState current) {
+        if (current == null) {
+            return normalizeCreateQuantityState(quantityMode, totalQuantity);
+        }
+        if (quantityMode == null || quantityMode.isBlank()) {
+            if (totalQuantity == null) {
+                return current;
+            }
+            if (!QUANTITY_MODE_MULTI.equals(current.mode())) {
+                throw new BusinessException("仅多件商品支持修改数量");
+            }
+            int normalizedTotal = validateMultiQuantity(totalQuantity);
+            if (current.soldQuantity() > normalizedTotal) {
+                throw new BusinessException("总数量不能小于已售数量");
+            }
+            return new QuantityState(current.mode(), normalizedTotal, current.soldQuantity());
+        }
+
+        String mode = normalizeQuantityMode(quantityMode);
+        int sold = current.soldQuantity();
+        if (QUANTITY_MODE_SINGLE.equals(mode)) {
+            if (sold > 1) {
+                throw new BusinessException("当前已售数量超过单件上限，无法改为仅一件");
+            }
+            return new QuantityState(mode, 1, sold);
+        }
+        if (QUANTITY_MODE_UNLIMITED.equals(mode)) {
+            return new QuantityState(mode, null, sold);
+        }
+        int normalizedTotal = validateMultiQuantity(totalQuantity);
+        if (sold > normalizedTotal) {
+            throw new BusinessException("总数量不能小于已售数量");
+        }
+        return new QuantityState(mode, normalizedTotal, sold);
+    }
+
+    private String normalizeQuantityMode(String quantityMode) {
+        String normalized = quantityMode == null ? "" : quantityMode.trim().toUpperCase(Locale.ROOT);
+        if (normalized.isEmpty()) {
+            return QUANTITY_MODE_SINGLE;
+        }
+        if (!QUANTITY_MODE_SINGLE.equals(normalized)
+                && !QUANTITY_MODE_UNLIMITED.equals(normalized)
+                && !QUANTITY_MODE_MULTI.equals(normalized)) {
+            throw new BusinessException("物品数量类型无效，仅支持 SINGLE / UNLIMITED / MULTI");
+        }
+        return normalized;
+    }
+
+    private int validateMultiQuantity(Integer totalQuantity) {
+        if (totalQuantity == null) {
+            throw new BusinessException("多件商品请填写数量");
+        }
+        if (totalQuantity < 2) {
+            throw new BusinessException("多件商品数量至少为 2");
+        }
+        if (totalQuantity > 999999) {
+            throw new BusinessException("商品数量超出允许范围");
+        }
+        return totalQuantity;
+    }
+
+    private record QuantityState(String mode, Integer totalQuantity, int soldQuantity) {
+        private Integer remainingQuantity() {
+            if (QUANTITY_MODE_UNLIMITED.equals(mode)) {
+                return null;
+            }
+            int total = totalQuantity == null ? 1 : totalQuantity;
+            return Math.max(total - soldQuantity, 0);
+        }
     }
 
     private String normalizeCategoryCode(String categoryCode) {

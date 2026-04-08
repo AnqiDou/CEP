@@ -364,7 +364,6 @@ body,
 .profile-page .pending-empty::before,
 .admin-page .table-wrap:empty::before,
 .result-page .success-icon {
-  content: "🧸";
   display: inline-flex;
   align-items: center;
   justify-content: center;

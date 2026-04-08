@@ -22,7 +22,11 @@ public class TradeOrderRepository {
             rs.getObject("seller_user_id", Long.class),
             rs.getString("item_title"),
             rs.getBigDecimal("price"),
-            rs.getString("cover_photo_url"));
+            rs.getString("cover_photo_url"),
+            rs.getString("quantity_mode"),
+            rs.getObject("total_quantity", Integer.class),
+            rs.getObject("sold_quantity", Integer.class),
+            rs.getObject("remaining_quantity", Integer.class));
 
     private final RowMapper<TradeOrderRecord> tradeOrderRowMapper = (rs, rowNum) -> new TradeOrderRecord(
             rs.getLong("id"),
@@ -51,6 +55,13 @@ public class TradeOrderRepository {
                     COALESCE(i.publisher_user_id, d.publisher_user_id) AS seller_user_id,
                     i.title AS item_title,
                     i.price,
+                    i.quantity_mode,
+                    i.total_quantity,
+                    i.sold_quantity,
+                    CASE
+                        WHEN i.quantity_mode = 'UNLIMITED' THEN NULL
+                        ELSE GREATEST(COALESCE(i.total_quantity, 1) - COALESCE(i.sold_quantity, 0), 0)
+                    END AS remaining_quantity,
                     (
                         SELECT p.photo_url
                         FROM item_photos p
@@ -213,5 +224,26 @@ public class TradeOrderRepository {
                   AND status = 'PENDING_PAYMENT'
                 """;
         return jdbcTemplate.update(sql, buyerUserId, itemId);
+    }
+
+    public boolean consumeOneStockOnPaid(Long itemId) {
+        String sql = """
+                UPDATE items
+                SET sold_quantity = COALESCE(sold_quantity, 0) + 1,
+                    status = CASE
+                        WHEN quantity_mode = 'UNLIMITED' THEN status
+                        WHEN (COALESCE(sold_quantity, 0) + 1) >= COALESCE(total_quantity, 1) THEN 'OFF_SHELF'
+                        ELSE status
+                    END,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                  AND status = 'PUBLISHED'
+                  AND (
+                        quantity_mode = 'UNLIMITED'
+                        OR COALESCE(sold_quantity, 0) < COALESCE(total_quantity, 1)
+                  )
+                """;
+        int updated = jdbcTemplate.update(sql, itemId);
+        return updated > 0;
     }
 }
