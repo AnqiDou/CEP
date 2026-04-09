@@ -474,8 +474,7 @@
                     v-if="
                       selectedMenu === 'trade-bought' &&
                       item.status === 'PENDING_CONFIRMATION' &&
-                      !item.buyerConfirmed &&
-                      !isRefundAfterSaleOrder(item)
+                      !item.buyerConfirmed
                     "
                     class="section-item__btn section-item__btn--edit"
                     type="button"
@@ -720,16 +719,11 @@ import {
   uploadProfileAvatar,
 } from "../service/profile/profileApiService";
 import {
-  buildMessageWebSocketUrl,
-  createOrGetDirectConversation,
-} from "../service/chat/chatApiService";
-import {
   applyTradeOrderRefund,
   approveTradeOrderRefund,
   cancelTradeOrder,
   confirmBuyerReceived,
   confirmSellerDelivered,
-  rejectTradeOrderRefund,
 } from "../service/payment/paymentApiService";
 import {
   deleteMyPublishItem,
@@ -820,7 +814,6 @@ const tradeOrderStatusTabs = [
   { key: "all", label: "全部" },
   { key: "pending-payment", label: "待付款" },
   { key: "pending-confirmation", label: "待确认" },
-  { key: "refund-after-sale", label: "退款/售后" },
   { key: "completed", label: "已完成" },
   { key: "cancelled", label: "已取消" },
 ];
@@ -1661,16 +1654,6 @@ const handleSellerConfirmDelivered = async (item) => {
   try {
     await confirmSellerDelivered(orderId);
     await loadMenuData("trade-sold", true);
-    await sendTradeReminderMessage({
-      item,
-      fetchContactFn: fetchSoldOrderContact,
-      type: "SELLER_CONFIRMED_DELIVERED",
-      content: "卖家已确认交付物品，请及时确认是否收到。",
-      actionText: "确认已收到物品",
-      targetMenu: "trade-bought",
-    }).catch((error) => {
-      ElMessage.warning(error.message || "交付已确认，但聊天提醒发送失败");
-    });
     ElMessage.success("已确认交付");
   } catch (error) {
     ElMessage.error(error.message || "确认交付失败");
@@ -1686,16 +1669,6 @@ const handleBuyerConfirmReceived = async (item) => {
   try {
     await confirmBuyerReceived(orderId);
     await loadMenuData("trade-bought", true);
-    await sendTradeReminderMessage({
-      item,
-      fetchContactFn: fetchBoughtOrderContact,
-      type: "BUYER_CONFIRMED_RECEIVED",
-      content: "买家已确认收到物品，订单状态已更新。",
-      actionText: "查看订单状态",
-      targetMenu: "trade-sold",
-    }).catch((error) => {
-      ElMessage.warning(error.message || "收货已确认，但聊天提醒发送失败");
-    });
     ElMessage.success("已确认收货");
   } catch (error) {
     ElMessage.error(error.message || "确认收货失败");
@@ -1711,21 +1684,6 @@ const handleApplyRefund = async (item, refundType) => {
   try {
     await applyTradeOrderRefund(orderId, refundType);
     await loadMenuData("trade-bought", true);
-    const isNoReceipt = refundType === "NO_RECEIPT";
-    await sendTradeReminderMessage({
-      item,
-      fetchContactFn: fetchBoughtOrderContact,
-      type: isNoReceipt
-        ? "REFUND_APPLIED_NO_RECEIPT"
-        : "REFUND_APPLIED_RETURN_AFTER_RECEIPT",
-      content: isNoReceipt
-        ? "买家申请退款（未收到货），请确认是否同意退款。"
-        : "买家申请退款（已收到货），请确认是否同意并协商退货。",
-      actionText: "处理退款申请",
-      targetMenu: "trade-sold",
-    }).catch((error) => {
-      ElMessage.warning(error.message || "退款申请已提交，但聊天提醒发送失败");
-    });
     ElMessage.success("退款申请已提交");
   } catch (error) {
     ElMessage.error(error.message || "退款申请失败");
@@ -1741,21 +1699,6 @@ const handleApproveRefund = async (item) => {
   try {
     await approveTradeOrderRefund(orderId);
     await loadMenuData("trade-sold", true);
-    const isNoReceipt = item?.refundType === "NO_RECEIPT";
-    await sendTradeReminderMessage({
-      item,
-      fetchContactFn: fetchSoldOrderContact,
-      type: isNoReceipt
-        ? "REFUND_APPROVED_NO_RECEIPT"
-        : "REFUND_APPROVED_RETURN_AFTER_RECEIPT",
-      content: isNoReceipt
-        ? "卖家已同意退款，系统将直接退款。"
-        : "卖家已同意退款申请，请按约定交付退回物品并确认。",
-      actionText: isNoReceipt ? "查看退款结果" : "确认已交付物品",
-      targetMenu: "trade-bought",
-    }).catch((error) => {
-      ElMessage.warning(error.message || "退款已处理，但聊天提醒发送失败");
-    });
     ElMessage.success("已完成退款");
   } catch (error) {
     ElMessage.error(error.message || "退款处理失败");

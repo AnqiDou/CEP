@@ -210,16 +210,6 @@
                     {{ getReviewInviteButtonText(message) }}
                   </button>
                 </div>
-                <div v-if="isTradeReminder(message)" class="review-invite-row">
-                  <button
-                    class="review-invite-btn"
-                    type="button"
-                    :disabled="!canClickTradeReminder(message)"
-                    @click="goToTradeReminderTarget(message)"
-                  >
-                    {{ getTradeReminderButtonText(message) }}
-                  </button>
-                </div>
                 <time v-if="!isNotificationPanel" class="message-time">{{
                   message.time
                 }}</time>

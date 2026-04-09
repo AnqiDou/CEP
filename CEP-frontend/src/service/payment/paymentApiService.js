@@ -94,13 +94,3 @@ export const approveTradeOrderRefund = async (orderId) => {
     },
   });
 };
-
-export const rejectTradeOrderRefund = async (orderId) => {
-  const accessToken = await ensureValidAccessToken();
-  return requestJson(`${PAYMENT_API_BASE}/${orderId}/refund/reject`, {
-    method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
-};
