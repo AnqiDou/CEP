@@ -50,7 +50,11 @@
       </div>
     </header>
 
-    <section v-if="visibleHomeNotice" class="home-notice" role="status">
+    <section
+      v-if="route.name === 'home' && visibleHomeNotice"
+      class="home-notice"
+      role="status"
+    >
       <div class="home-notice__content">
         <span class="home-notice__label">平台公告</span>
         <span class="home-notice__text">{{ visibleHomeNotice.content }}</span>
@@ -166,41 +170,37 @@
         class="category-tabs"
         aria-label="分类导航"
       >
-        <button
-          v-for="cat in categories"
-          :key="cat.id"
-          type="button"
-          :class="[
-            'category-pill',
-            activeCategoryId === cat.id ? 'category-pill--active' : '',
-          ]"
-          @click="selectCategory(cat.id)"
-        >
-          {{ cat.name }}
-        </button>
+        <div class="category-tabs__left">
+          <button
+            v-for="cat in categories"
+            :key="cat.id"
+            type="button"
+            :class="[
+              'category-pill',
+              activeCategoryId === cat.id ? 'category-pill--active' : '',
+            ]"
+            @click="selectCategory(cat.id)"
+          >
+            {{ cat.name }}
+          </button>
+        </div>
+
+        <div class="sort-actions sort-actions--inline">
+          <button
+            v-for="option in sortOptions"
+            :key="option.id"
+            class="sort-btn"
+            :class="isSortActive(option) ? 'sort-btn--active' : ''"
+            type="button"
+            @click="applySort(option)"
+          >
+            {{ option.label }}
+          </button>
+        </div>
       </nav>
 
       <section class="content">
         <section class="block block--featured">
-          <header
-            v-if="!isOpsListOnlyMode && !isSearchListOnlyMode"
-            class="block-header"
-          >
-            <h3 class="section-title">🔥 {{ blockTitle }}</h3>
-            <div class="sort-actions">
-              <button
-                v-for="option in sortOptions"
-                :key="option.id"
-                class="sort-btn"
-                :class="isSortActive(option) ? 'sort-btn--active' : ''"
-                type="button"
-                @click="applySort(option)"
-              >
-                {{ option.label }}
-              </button>
-            </div>
-          </header>
-
           <div ref="cardGridRef" class="card-grid">
             <article
               v-for="item in displayedItems"
@@ -2941,17 +2941,24 @@ watch(
 .category-tabs {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: nowrap;
+  padding: 0 0 14px;
+}
+
+.category-tabs__left {
+  display: flex;
+  align-items: center;
   gap: 9px;
   flex-wrap: wrap;
-  padding: 0 0 14px;
 }
 
 .category-pill {
   border: 1px solid rgba(163, 149, 233, 0.32);
   border-radius: 999px;
-  padding: 7px 15px;
-  font-size: 14px;
+  padding: 9px 18px;
+  font-size: 17px;
   color: #675f92;
   background: rgba(255, 255, 255, 0.62);
   cursor: pointer;
@@ -3003,6 +3010,16 @@ watch(
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.sort-actions--inline {
+  width: 240px;
+  justify-content: space-between;
+  flex: 0 0 auto;
+}
+
+.sort-actions--inline .sort-btn {
+  flex: 1;
 }
 
 .sort-btn {
@@ -3450,6 +3467,17 @@ watch(
   .home-main {
     padding-left: 16px;
     padding-right: 16px;
+  }
+
+  .category-tabs {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .sort-actions--inline {
+    width: 100%;
+    justify-content: stretch;
+    gap: 10px;
   }
 
   .card-grid {

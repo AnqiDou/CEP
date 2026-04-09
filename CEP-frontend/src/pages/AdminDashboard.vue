@@ -89,7 +89,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="user in users" :key="user.id">
+              <tr v-for="user in pagedUsers" :key="user.id">
                 <td>{{ user.name }}</td>
                 <td>{{ user.phone || "-" }}</td>
                 <td>{{ user.email || "-" }}</td>
@@ -127,6 +127,28 @@
               </tr>
             </tbody>
           </table>
+        </div>
+        <div class="pagination-bar">
+          <span class="pagination-info"
+            >第 {{ userPage }} / {{ userTotalPages }} 页 · 共
+            {{ users.length }} 条</span
+          >
+          <div class="pagination-actions">
+            <button
+              class="text-btn"
+              :disabled="userPage <= 1"
+              @click="goUserPage(userPage - 1)"
+            >
+              上一页
+            </button>
+            <button
+              class="text-btn"
+              :disabled="userPage >= userTotalPages"
+              @click="goUserPage(userPage + 1)"
+            >
+              下一页
+            </button>
+          </div>
         </div>
       </section>
 
@@ -192,7 +214,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in items" :key="item.id">
+              <tr v-for="item in pagedItems" :key="item.id">
                 <td>{{ item.title }}</td>
                 <td>{{ item.category }}</td>
                 <td>￥{{ item.price }}</td>
@@ -229,6 +251,28 @@
               </tr>
             </tbody>
           </table>
+        </div>
+        <div class="pagination-bar">
+          <span class="pagination-info"
+            >第 {{ itemPage }} / {{ itemTotalPages }} 页 · 共
+            {{ items.length }} 条</span
+          >
+          <div class="pagination-actions">
+            <button
+              class="text-btn"
+              :disabled="itemPage <= 1"
+              @click="goItemPage(itemPage - 1)"
+            >
+              上一页
+            </button>
+            <button
+              class="text-btn"
+              :disabled="itemPage >= itemTotalPages"
+              @click="goItemPage(itemPage + 1)"
+            >
+              下一页
+            </button>
+          </div>
         </div>
       </section>
 
@@ -294,7 +338,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="order in orders" :key="order.orderNo">
+              <tr v-for="order in pagedOrders" :key="order.orderNo">
                 <td>{{ order.orderNo }}</td>
                 <td>{{ order.itemTitle }}</td>
                 <td>{{ order.buyer }}</td>
@@ -330,6 +374,28 @@
               </tr>
             </tbody>
           </table>
+        </div>
+        <div class="pagination-bar">
+          <span class="pagination-info"
+            >第 {{ orderPage }} / {{ orderTotalPages }} 页 · 共
+            {{ orders.length }} 条</span
+          >
+          <div class="pagination-actions">
+            <button
+              class="text-btn"
+              :disabled="orderPage <= 1"
+              @click="goOrderPage(orderPage - 1)"
+            >
+              上一页
+            </button>
+            <button
+              class="text-btn"
+              :disabled="orderPage >= orderTotalPages"
+              @click="goOrderPage(orderPage + 1)"
+            >
+              下一页
+            </button>
+          </div>
         </div>
       </section>
 
@@ -626,6 +692,7 @@ const dashboardRaw = ref({
 const users = ref([]);
 const userKeyword = ref("");
 const userSearchTimer = ref(null);
+const userPage = ref(1);
 const creditModalVisible = ref(false);
 const creditModalSellerValue = ref("100.0");
 const creditModalBuyerValue = ref("100.0");
@@ -637,6 +704,7 @@ const itemTitleKeyword = ref("");
 const itemCategoryKeyword = ref("");
 const itemPriceKeyword = ref("");
 const itemPublisherKeyword = ref("");
+const itemPage = ref(1);
 const itemStatus = ref("all");
 const itemStatusOpen = ref(false);
 const itemStatusDropdownRef = ref(null);
@@ -658,6 +726,7 @@ const orderNoKeyword = ref("");
 const orderBuyerKeyword = ref("");
 const orderSellerKeyword = ref("");
 const orderItemKeyword = ref("");
+const orderPage = ref(1);
 const orderState = ref("all");
 const orderStateOpen = ref(false);
 const orderStateDropdownRef = ref(null);
@@ -698,6 +767,60 @@ const abnormalOrderCount = computed(
 const pendingConversationCount = computed(
   () => dashboardRaw.value.pendingConversationCount || 0
 );
+
+const PAGE_SIZE = 10;
+
+const userTotalPages = computed(() =>
+  Math.max(1, Math.ceil(users.value.length / PAGE_SIZE))
+);
+const itemTotalPages = computed(() =>
+  Math.max(1, Math.ceil(items.value.length / PAGE_SIZE))
+);
+const orderTotalPages = computed(() =>
+  Math.max(1, Math.ceil(orders.value.length / PAGE_SIZE))
+);
+
+const pagedUsers = computed(() => {
+  const start = (userPage.value - 1) * PAGE_SIZE;
+  return users.value.slice(start, start + PAGE_SIZE);
+});
+
+const pagedItems = computed(() => {
+  const start = (itemPage.value - 1) * PAGE_SIZE;
+  return items.value.slice(start, start + PAGE_SIZE);
+});
+
+const pagedOrders = computed(() => {
+  const start = (orderPage.value - 1) * PAGE_SIZE;
+  return orders.value.slice(start, start + PAGE_SIZE);
+});
+
+const goUserPage = (nextPage) => {
+  const page = Number(nextPage || 1);
+  if (!Number.isFinite(page)) return;
+  userPage.value = Math.min(
+    userTotalPages.value,
+    Math.max(1, Math.trunc(page))
+  );
+};
+
+const goItemPage = (nextPage) => {
+  const page = Number(nextPage || 1);
+  if (!Number.isFinite(page)) return;
+  itemPage.value = Math.min(
+    itemTotalPages.value,
+    Math.max(1, Math.trunc(page))
+  );
+};
+
+const goOrderPage = (nextPage) => {
+  const page = Number(nextPage || 1);
+  if (!Number.isFinite(page)) return;
+  orderPage.value = Math.min(
+    orderTotalPages.value,
+    Math.max(1, Math.trunc(page))
+  );
+};
 
 const normalizeDate = (value) => {
   if (!value) return "-";
@@ -827,6 +950,7 @@ const loadUsers = async () => {
     ...item,
     registeredAt: normalizeDate(item.registeredAt),
   }));
+  goUserPage(1);
   updateNavCount();
 };
 
@@ -839,6 +963,7 @@ const loadItems = async () => {
     status: itemStatus.value,
   });
   items.value = data || [];
+  goItemPage(1);
   updateNavCount();
 };
 
@@ -851,6 +976,7 @@ const loadOrders = async () => {
     status: orderState.value,
   });
   orders.value = data || [];
+  goOrderPage(1);
   updateNavCount();
 };
 
@@ -1403,6 +1529,7 @@ onMounted(async () => {
 });
 
 watch([userKeyword], () => {
+  goUserPage(1);
   scheduleUsersReload();
 });
 
@@ -1415,6 +1542,7 @@ watch(
     itemStatus,
   ],
   () => {
+    goItemPage(1);
     scheduleItemsReload();
   }
 );
@@ -1428,6 +1556,7 @@ watch(
     orderState,
   ],
   () => {
+    goOrderPage(1);
     scheduleOrdersReload();
   }
 );
@@ -1718,6 +1847,26 @@ onBeforeUnmount(() => {
 .table th {
   color: #64748b;
   font-weight: 600;
+}
+
+.pagination-bar {
+  margin-top: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pagination-info {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.pagination-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .pill {
