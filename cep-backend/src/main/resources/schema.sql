@@ -148,6 +148,7 @@ CREATE TABLE trade_orders (
     receiver_address NVARCHAR (200) NOT NULL,
     status NVARCHAR (30) NOT NULL DEFAULT 'PENDING_PAYMENT',
     paid_at DATETIME2 NULL,
+    completed_at DATETIME2 NULL,
     created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_trade_orders_item FOREIGN KEY (item_id) REFERENCES items (id),

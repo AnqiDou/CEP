@@ -11,6 +11,7 @@ import ConfirmOrder from "../pages/ConfirmOrder.vue";
 import PaymentMethod from "../pages/PaymentMethod.vue";
 import WechatPay from "../pages/WechatPay.vue";
 import PaymentResult from "../pages/PaymentResult.vue";
+import OrderDetail from "../pages/OrderDetail.vue";
 import TradeReview from "../pages/TradeReview.vue";
 import AdminDashboard from "../pages/AdminDashboard.vue";
 import Support from "../pages/Support.vue";
@@ -136,6 +137,14 @@ const router = createRouter({
       component: PaymentResult,
       meta: {
         title: "支付结果",
+      },
+    },
+    {
+      path: "/trade/order-detail",
+      name: "order-detail",
+      component: OrderDetail,
+      meta: {
+        title: "订单详情",
       },
     },
     {

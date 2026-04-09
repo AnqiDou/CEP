@@ -240,10 +240,13 @@ const confirmPay = async () => {
       ElMessage.warning(error.message || "支付成功，但卖家提醒发送失败");
     });
 
-    router.replace({
+    const resolved = router.resolve({
       name: "payment-result",
-      query: { orderId: String(paidOrder.id) },
+      query: {
+        orderId: String(paidOrder.id),
+      },
     });
+    window.open(resolved.href, "_blank");
   } catch (error) {
     ElMessage.error(error.message || "支付失败，请重试");
   } finally {

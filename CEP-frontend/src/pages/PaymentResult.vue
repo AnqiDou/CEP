@@ -46,6 +46,14 @@ const orderId = computed(() => {
   return value;
 });
 
+const returnTo = computed(() => {
+  const raw = String(route.query?.returnTo || "").trim();
+  if (!raw.startsWith("/")) {
+    return null;
+  }
+  return raw;
+});
+
 const toNumber = (value, fallback = 0) => {
   const converted = Number(value);
   return Number.isFinite(converted) ? converted : fallback;
@@ -82,6 +90,10 @@ const scheduleAutoRedirect = () => {
   }, 1000);
   redirectTimer = window.setTimeout(() => {
     clearTimers();
+    if (returnTo.value) {
+      window.location.replace(returnTo.value);
+      return;
+    }
     router.replace({ name: "home" });
   }, 3000);
 };
@@ -108,6 +120,10 @@ const loadOrder = async () => {
 
 const finishFlow = () => {
   clearTimers();
+  if (returnTo.value) {
+    window.location.replace(returnTo.value);
+    return;
+  }
   router.replace({ name: "home" });
 };
 

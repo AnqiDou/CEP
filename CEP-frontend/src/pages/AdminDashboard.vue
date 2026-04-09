@@ -301,14 +301,31 @@
                 <td>{{ order.seller }}</td>
                 <td>￥{{ order.amount }}</td>
                 <td>
-                  <span class="pill" :class="statusClass(order.status)">{{
-                    statusText(order.status)
+                  <span class="pill" :class="orderStatusClass(order)">{{
+                    orderStatusText(order)
                   }}</span>
                 </td>
                 <td>
-                  <button class="text-btn" @click="markAbnormalHandled(order)">
-                    处理异常
-                  </button>
+                  <div class="actions actions--wrap">
+                    <button
+                      class="text-btn"
+                      @click="updateOrderStatusByAdmin(order, 'COMPLETED')"
+                    >
+                      设为已完成
+                    </button>
+                    <button
+                      class="text-btn text-btn--danger"
+                      @click="updateOrderStatusByAdmin(order, 'CANCELLED')"
+                    >
+                      设为已取消
+                    </button>
+                    <button
+                      class="text-btn"
+                      @click="updateOrderRefundStatusByAdmin(order, 'APPROVED')"
+                    >
+                      设为退款
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -571,9 +588,9 @@ import {
   fetchAdminNotices,
   fetchAdminOrders,
   fetchAdminUsers,
-  handleAdminOrderAbnormal,
   offlineAdminItem,
   replyAdminConversation,
+  updateAdminOrder,
   updateAdminConversationStatus,
   updateAdminUserCreditScore,
   updateAdminUserStatus,
@@ -648,6 +665,7 @@ const orderSearchTimer = ref(null);
 const orderStateOptions = [
   { value: "all", label: "全部状态" },
   { value: "pending-pay", label: "待付款" },
+  { value: "pending-confirm", label: "待确认" },
   { value: "completed", label: "已完成" },
   { value: "cancelled", label: "已取消" },
 ];
@@ -985,6 +1003,7 @@ const statusText = (status) => {
     online: "上架中",
     offline: "已下架",
     "pending-pay": "待付款",
+    "pending-confirm": "待确认",
     completed: "已完成",
     cancelled: "已取消",
   };
@@ -993,9 +1012,41 @@ const statusText = (status) => {
 
 const statusClass = (status) => {
   if (status === "offline" || status === "cancelled") return "pill--danger";
-  if (status === "pending" || status === "pending-pay") return "pill--warn";
+  if (
+    status === "pending" ||
+    status === "pending-pay" ||
+    status === "pending-confirm"
+  )
+    return "pill--warn";
   if (status === "completed" || status === "online") return "pill--ok";
   return "";
+};
+
+const normalizeRefundStatus = (refundStatus) =>
+  String(refundStatus || "")
+    .trim()
+    .toLowerCase();
+
+const orderStatusText = (order) => {
+  const refundStatus = normalizeRefundStatus(order?.refundStatus);
+  if (refundStatus === "applied") {
+    return "退款";
+  }
+  if (refundStatus === "approved") {
+    return "已退款";
+  }
+  if (refundStatus === "rejected") {
+    return "退款已拒绝";
+  }
+  return statusText(order?.status);
+};
+
+const orderStatusClass = (order) => {
+  const refundStatus = normalizeRefundStatus(order?.refundStatus);
+  if (refundStatus === "applied") return "pill--warn";
+  if (refundStatus === "approved") return "pill--ok";
+  if (refundStatus === "rejected") return "pill--danger";
+  return statusClass(order?.status);
 };
 
 const supportStatusText = (status) => {
@@ -1175,13 +1226,67 @@ const deleteItem = (id) => {
     .catch((error) => ElMessage.error(error.message || "删除失败"));
 };
 
-const markAbnormalHandled = (order) => {
-  handleAdminOrderAbnormal(order.orderNo)
-    .then(async () => {
-      await Promise.all([loadOrders(), loadDashboard()]);
-      ElMessage.success("异常订单已处理");
-    })
-    .catch((error) => ElMessage.error(error.message || "处理失败"));
+const adminOrderStatusOptions = [
+  { value: "PENDING_PAYMENT", label: "待付款" },
+  { value: "PENDING_CONFIRMATION", label: "待确认" },
+  { value: "COMPLETED", label: "已完成" },
+  { value: "CANCELLED", label: "已取消" },
+];
+
+const getAdminStatusLabel = (value) =>
+  adminOrderStatusOptions.find((option) => option.value === String(value || ""))
+    ?.label || String(value || "-");
+
+const toAdminOrderStatus = (status) => {
+  const normalized = String(status || "")
+    .trim()
+    .toLowerCase();
+  if (normalized === "pending-pay") return "PENDING_PAYMENT";
+  if (normalized === "pending-confirm") return "PENDING_CONFIRMATION";
+  if (normalized === "completed") return "COMPLETED";
+  if (normalized === "cancelled") return "CANCELLED";
+  return null;
+};
+
+const toAdminRefundStatus = (status) => {
+  const normalized = String(status || "")
+    .trim()
+    .toLowerCase();
+  if (!normalized || normalized === "none") return "NONE";
+  if (normalized === "applied") return "APPLIED";
+  if (normalized === "approved") return "APPROVED";
+  if (normalized === "rejected") return "REJECTED";
+  return "NONE";
+};
+
+const updateOrderStatusByAdmin = async (order, nextStatus) => {
+  const orderNo = String(order?.orderNo || "").trim();
+  if (!orderNo || !nextStatus) return;
+  try {
+    await updateAdminOrder(orderNo, {
+      status: nextStatus,
+      refundStatus: null,
+    });
+    await Promise.all([loadOrders(), loadDashboard()]);
+    ElMessage.success(`订单状态已更新为${getAdminStatusLabel(nextStatus)}`);
+  } catch (error) {
+    ElMessage.error(error.message || "更新订单状态失败");
+  }
+};
+
+const updateOrderRefundStatusByAdmin = async (order, nextRefundStatus) => {
+  const orderNo = String(order?.orderNo || "").trim();
+  if (!orderNo || !nextRefundStatus) return;
+  try {
+    await updateAdminOrder(orderNo, {
+      status: null,
+      refundStatus: nextRefundStatus,
+    });
+    await Promise.all([loadOrders(), loadDashboard()]);
+    ElMessage.success("订单已设为退款");
+  } catch (error) {
+    ElMessage.error(error.message || "更新退款状态失败");
+  }
 };
 
 const appendReply = () => {

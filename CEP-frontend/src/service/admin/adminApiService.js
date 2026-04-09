@@ -140,6 +140,18 @@ export const handleAdminOrderAbnormal = async (orderNo) =>
     },
   );
 
+export const updateAdminOrder = async (orderNo, payload = {}) =>
+  requestJson(`${ADMIN_API_BASE}/orders/${encodeURIComponent(orderNo)}`, {
+    method: "PATCH",
+    headers: await withAuthHeaders({
+      "Content-Type": "application/json",
+    }),
+    body: JSON.stringify({
+      status: payload?.status || null,
+      refundStatus: payload?.refundStatus || null,
+    }),
+  });
+
 export const fetchAdminConversations = async () =>
   requestJson(`${ADMIN_API_BASE}/support/conversations`, {
     headers: await withAuthHeaders(),
@@ -177,13 +189,13 @@ export const fetchMySupportMessages = async () =>
     headers: await withAuthHeaders(),
   });
 
-export const sendMySupportMessage = async (content) =>
+export const sendMySupportMessage = async (content, orderId = null) =>
   requestJson(`${ADMIN_API_BASE}/support/me/messages`, {
     method: "POST",
     headers: await withAuthHeaders({
       "Content-Type": "application/json",
     }),
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, orderId }),
   });
 
 export const fetchAdminNotices = async () =>

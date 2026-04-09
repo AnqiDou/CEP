@@ -160,6 +160,7 @@ public class ProfileService {
 
         return new ProfileTradeItemDto(
                 orderId,
+                null,
                 itemId,
                 defaultItemTitle(record.itemTitle()),
                 null,

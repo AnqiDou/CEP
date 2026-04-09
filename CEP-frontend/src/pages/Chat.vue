@@ -210,6 +210,16 @@
                     {{ getReviewInviteButtonText(message) }}
                   </button>
                 </div>
+                <div v-if="isTradeReminder(message)" class="trade-reminder-row">
+                  <button
+                    class="trade-reminder-btn"
+                    type="button"
+                    :disabled="!canClickTradeReminder(message)"
+                    @click="goToTradeReminderTarget(message)"
+                  >
+                    {{ getTradeReminderButtonText(message) }}
+                  </button>
+                </div>
                 <time v-if="!isNotificationPanel" class="message-time">{{
                   message.time
                 }}</time>
@@ -1551,6 +1561,28 @@ onBeforeUnmount(() => {
 }
 
 .review-invite-btn:disabled {
+  border-color: #d1d5db;
+  color: #6b7280;
+  background: #f3f4f6;
+  cursor: default;
+}
+
+.trade-reminder-row {
+  margin-top: 8px;
+}
+
+.trade-reminder-btn {
+  border: 1px solid #cfc1fd;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #5f4eb0;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.trade-reminder-btn:disabled {
   border-color: #d1d5db;
   color: #6b7280;
   background: #f3f4f6;

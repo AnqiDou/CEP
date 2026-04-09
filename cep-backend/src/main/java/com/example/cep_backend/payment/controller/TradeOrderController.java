@@ -5,6 +5,7 @@ import com.example.cep_backend.auth.service.AuthService;
 import com.example.cep_backend.common.api.ApiResponse;
 import com.example.cep_backend.payment.dto.ApplyRefundRequest;
 import com.example.cep_backend.payment.dto.CreateTradeOrderRequest;
+import com.example.cep_backend.payment.dto.TradeOrderDetailDto;
 import com.example.cep_backend.payment.dto.TradeOrderDto;
 import com.example.cep_backend.payment.service.TradeOrderService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -74,6 +75,14 @@ public class TradeOrderController {
         return ApiResponse.ok("退款处理成功", tradeOrderService.approveRefund(user.userId(), orderId));
     }
 
+    @PatchMapping("/{orderId}/refund/reject")
+    public ApiResponse<TradeOrderDto> rejectRefund(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long orderId) {
+        AuthUserDto user = authService.currentUser(authorization);
+        return ApiResponse.ok("已拒绝退款", tradeOrderService.rejectRefund(user.userId(), orderId));
+    }
+
     @PatchMapping("/{orderId}/cancel")
     public ApiResponse<TradeOrderDto> cancelOrder(
             @RequestHeader("Authorization") String authorization,
@@ -85,5 +94,13 @@ public class TradeOrderController {
     @GetMapping("/{orderId}")
     public ApiResponse<TradeOrderDto> getOrder(@PathVariable Long orderId) {
         return ApiResponse.ok("获取成功", tradeOrderService.getOrder(orderId));
+    }
+
+    @GetMapping("/{orderId}/detail")
+    public ApiResponse<TradeOrderDetailDto> getOrderDetail(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long orderId) {
+        AuthUserDto user = authService.currentUser(authorization);
+        return ApiResponse.ok("获取成功", tradeOrderService.getOrderDetail(user.userId(), orderId));
     }
 }

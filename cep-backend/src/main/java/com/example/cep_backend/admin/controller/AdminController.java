@@ -5,6 +5,7 @@ import com.example.cep_backend.admin.dto.AdminItemDto;
 import com.example.cep_backend.admin.dto.AdminNoticeCreateRequest;
 import com.example.cep_backend.admin.dto.AdminNoticeDto;
 import com.example.cep_backend.admin.dto.AdminOrderDto;
+import com.example.cep_backend.admin.dto.AdminOrderUpdateRequest;
 import com.example.cep_backend.admin.dto.AdminSupportConversationDto;
 import com.example.cep_backend.admin.dto.AdminSupportMessageDto;
 import com.example.cep_backend.admin.dto.AdminSupportReplyRequest;
@@ -153,6 +154,19 @@ public class AdminController {
         return ApiResponse.ok("处理成功");
     }
 
+    @PatchMapping("/orders/{orderNo}")
+    public ApiResponse<Void> updateOrder(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable String orderNo,
+            @RequestBody AdminOrderUpdateRequest request) {
+        ensureAdmin(authorization);
+        adminService.updateOrder(
+                orderNo,
+                request == null ? null : request.status(),
+                request == null ? null : request.refundStatus());
+        return ApiResponse.ok("更新成功");
+    }
+
     @GetMapping("/support/conversations")
     public ApiResponse<List<AdminSupportConversationDto>> conversations(
             @RequestHeader("Authorization") String authorization) {
@@ -195,7 +209,10 @@ public class AdminController {
             @RequestHeader("Authorization") String authorization,
             @RequestBody AdminSupportReplyRequest request) {
         AuthUserDto currentUser = authService.currentUser(authorization, true);
-        adminService.appendUserSupportMessage(currentUser.userId(), request == null ? null : request.content());
+        adminService.appendUserSupportMessage(
+                currentUser.userId(),
+                request == null ? null : request.content(),
+                request == null ? null : request.orderId());
         return ApiResponse.ok("发送成功");
     }
 

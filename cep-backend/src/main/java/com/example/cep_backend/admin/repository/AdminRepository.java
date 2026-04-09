@@ -331,6 +331,9 @@ public class AdminRepository {
         String normalizedItemTitle = itemTitle == null ? "" : itemTitle.trim();
         String normalizedStatus = status == null ? "all" : status.trim().toLowerCase();
         String orderStatus = mapOrderStatus(normalizedStatus);
+        String refundStatusSelect = hasTradeOrdersColumn("refund_status")
+                ? "COALESCE(o.refund_status, 'NONE') AS refund_status"
+                : "'NONE' AS refund_status";
         String sql = """
                 SELECT
                     o.order_no,
@@ -338,7 +341,8 @@ public class AdminRepository {
                     COALESCE(NULLIF(b.username, ''), b.email, '未知买家') AS buyer_name,
                     COALESCE(NULLIF(s.username, ''), s.email, '未知卖家') AS seller_name,
                     o.amount,
-                    o.status
+                    o.status,
+                    %s
                 FROM trade_orders o
                 LEFT JOIN users b ON b.id = o.buyer_user_id
                 LEFT JOIN users s ON s.id = o.seller_user_id
@@ -351,7 +355,7 @@ public class AdminRepository {
                   AND (? = '' OR o.item_title LIKE ?)
                   AND (? = 'ALL' OR o.status = ?)
                 ORDER BY o.created_at DESC, o.id DESC
-                """;
+                """.formatted(refundStatusSelect);
         String like = "%" + normalizedKeyword + "%";
         String likeOrderNo = "%" + normalizedOrderNo + "%";
         String likeBuyer = "%" + normalizedBuyer + "%";
@@ -363,7 +367,8 @@ public class AdminRepository {
                 rs.getString("buyer_name"),
                 rs.getString("seller_name"),
                 rs.getBigDecimal("amount"),
-                rs.getString("status")),
+                rs.getString("status"),
+                rs.getString("refund_status")),
                 normalizedKeyword,
                 like,
                 like,
@@ -385,6 +390,18 @@ public class AdminRepository {
                 orderStatus);
     }
 
+    private boolean hasTradeOrdersColumn(String columnName) {
+        String sql = """
+                SELECT COUNT(1)
+                FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND table_name = 'trade_orders'
+                  AND column_name = ?
+                """;
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, columnName);
+        return count != null && count > 0;
+    }
+
     public int markOrderHandled(String orderNo, LocalDateTime now) {
         String sql = """
                 UPDATE trade_orders
@@ -395,6 +412,63 @@ public class AdminRepository {
                 """;
         Timestamp timestamp = Timestamp.valueOf(now);
         return jdbcTemplate.update(sql, timestamp, timestamp, orderNo);
+    }
+
+    public int updateOrderStatusByOrderNo(String orderNo, String status, LocalDateTime now) {
+        String sql = """
+                UPDATE trade_orders
+                SET status = ?,
+                    completed_at = CASE WHEN ? = 'COMPLETED' THEN COALESCE(completed_at, ?) ELSE NULL END,
+                    updated_at = ?
+                WHERE order_no = ?
+                """;
+        Timestamp timestamp = Timestamp.valueOf(now);
+        return jdbcTemplate.update(sql, status, status, timestamp, timestamp, orderNo);
+    }
+
+    public int updateOrderRefundStatusByOrderNo(String orderNo, String refundStatus, LocalDateTime now) {
+        String sql = """
+                UPDATE trade_orders
+                SET refund_status = ?,
+                    refund_type = CASE WHEN ? = 'APPLIED' THEN refund_type ELSE NULL END,
+                    updated_at = ?
+                WHERE order_no = ?
+                """;
+        Timestamp timestamp = Timestamp.valueOf(now);
+        return jdbcTemplate.update(sql, refundStatus, refundStatus, timestamp, orderNo);
+    }
+
+    public TradeOrderNotifyRecord findTradeOrderNotifyRecordByOrderNo(String orderNo) {
+        if (orderNo == null || orderNo.trim().isEmpty()) {
+            return null;
+        }
+        String refundStatusSelect = hasTradeOrdersColumn("refund_status")
+                ? "COALESCE(o.refund_status, 'NONE') AS refund_status"
+                : "'NONE' AS refund_status";
+        String sql = """
+                SELECT
+                    o.id,
+                    o.order_no,
+                    o.item_id,
+                    o.item_title,
+                    o.buyer_user_id,
+                    o.seller_user_id,
+                    o.status,
+                    %s
+                FROM trade_orders o
+                WHERE o.order_no = ?
+                LIMIT 1
+                """.formatted(refundStatusSelect);
+        List<TradeOrderNotifyRecord> list = jdbcTemplate.query(sql, (rs, rowNum) -> new TradeOrderNotifyRecord(
+                rs.getLong("id"),
+                rs.getString("order_no"),
+                rs.getObject("item_id", Long.class),
+                rs.getString("item_title"),
+                rs.getObject("buyer_user_id", Long.class),
+                rs.getObject("seller_user_id", Long.class),
+                rs.getString("status"),
+                rs.getString("refund_status")), orderNo.trim());
+        return list.isEmpty() ? null : list.getFirst();
     }
 
     public List<AdminSupportConversationDto> listSupportConversations() {
@@ -537,6 +611,21 @@ public class AdminRepository {
         return list.isEmpty() ? null : list.getFirst();
     }
 
+    public String findOrderNoByOrderIdAndUserId(Long orderId, Long userId) {
+        if (orderId == null || orderId <= 0 || userId == null || userId <= 0) {
+            return null;
+        }
+        String sql = """
+                SELECT o.order_no
+                FROM trade_orders o
+                WHERE o.id = ?
+                  AND (o.buyer_user_id = ? OR o.seller_user_id = ?)
+                LIMIT 1
+                """;
+        List<String> list = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getString("order_no"), orderId, userId, userId);
+        return list.isEmpty() ? null : list.getFirst();
+    }
+
     public Long findActiveConversationIdByReporter(Long reporterUserId) {
         String sql = """
                 SELECT id
@@ -662,6 +751,17 @@ public class AdminRepository {
             String status,
             String preview,
             List<AdminSupportMessageDto> messages) {
+    }
+
+    public record TradeOrderNotifyRecord(
+            Long orderId,
+            String orderNo,
+            Long itemId,
+            String itemTitle,
+            Long buyerUserId,
+            Long sellerUserId,
+            String status,
+            String refundStatus) {
     }
 
     private String resolveReporterName(Object username, Object email) {

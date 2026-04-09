@@ -2,6 +2,7 @@ package com.example.cep_backend.payment.service;
 
 import com.example.cep_backend.auth.BusinessException;
 import com.example.cep_backend.payment.dto.CreateTradeOrderRequest;
+import com.example.cep_backend.payment.dto.TradeOrderDetailDto;
 import com.example.cep_backend.payment.dto.TradeOrderDto;
 import com.example.cep_backend.payment.model.TradeOrderItemSnapshot;
 import com.example.cep_backend.payment.model.TradeOrderRecord;
@@ -12,19 +13,20 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 public class TradeOrderService {
+    private static final String ORDER_NO_PREFIX = "CEP";
     private static final String STATUS_PENDING_PAYMENT = "PENDING_PAYMENT";
     private static final String STATUS_PENDING_CONFIRMATION = "PENDING_CONFIRMATION";
     private static final String STATUS_COMPLETED = "COMPLETED";
     private static final String STATUS_CANCELLED = "CANCELLED";
     private static final String REFUND_STATUS_NONE = "NONE";
     private static final String REFUND_STATUS_APPLIED = "APPLIED";
+    private static final String REFUND_STATUS_REJECTED = "REJECTED";
     private static final String REFUND_TYPE_NO_RECEIPT = "NO_RECEIPT";
     private static final String REFUND_TYPE_RETURN_AFTER_RECEIPT = "RETURN_AFTER_RECEIPT";
-    private static final DateTimeFormatter ORDER_NO_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+    private static final DateTimeFormatter ORDER_NO_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     private final TradeOrderRepository tradeOrderRepository;
     private final ReviewService reviewService;
@@ -98,6 +100,43 @@ public class TradeOrderService {
             throw new BusinessException("订单不存在");
         }
         return toDto(order);
+    }
+
+    public TradeOrderDetailDto getOrderDetail(Long actorUserId, Long orderId) {
+        if (actorUserId == null || actorUserId <= 0) {
+            throw new BusinessException("登录状态已失效，请重新登录");
+        }
+        if (orderId == null || orderId <= 0) {
+            throw new BusinessException("订单信息无效");
+        }
+
+        TradeOrderRepository.TradeOrderDetailRecord record = tradeOrderRepository.findOrderDetailByIdForUser(orderId,
+                actorUserId);
+        if (record == null) {
+            throw new BusinessException("订单不存在或无权限查看");
+        }
+
+        return new TradeOrderDetailDto(
+                record.orderId(),
+                record.orderNo(),
+                record.status(),
+                mapOrderDetailStatusText(record.status(), record.refundStatus()),
+                record.createdAt(),
+                record.paidAt(),
+                record.completedAt(),
+                record.itemId(),
+                record.itemTitle(),
+                record.itemDescription(),
+                record.itemImage(),
+                record.amount(),
+                record.buyerUserId(),
+                record.buyerName(),
+                record.buyerAvatar(),
+                record.buyerPhone(),
+                record.sellerUserId(),
+                record.sellerName(),
+                record.sellerAvatar(),
+                record.sellerPhone());
     }
 
     @Transactional
@@ -270,6 +309,28 @@ public class TradeOrderService {
         return toDto(updated);
     }
 
+    @Transactional
+    public TradeOrderDto rejectRefund(Long actorUserId, Long orderId) {
+        TradeOrderRecord order = requireOrderActorAndPendingConfirmation(actorUserId, orderId);
+        if (!actorUserId.equals(order.sellerUserId())) {
+            throw new BusinessException("仅卖家可处理退款");
+        }
+        if (!REFUND_STATUS_APPLIED.equals(order.refundStatus())) {
+            throw new BusinessException("当前订单未处于退款申请状态");
+        }
+
+        int updatedRows = tradeOrderRepository.rejectRefund(orderId);
+        if (updatedRows <= 0) {
+            throw new BusinessException("退款处理失败，请稍后重试");
+        }
+
+        TradeOrderRecord updated = tradeOrderRepository.findOrderById(orderId);
+        if (updated == null) {
+            throw new BusinessException("退款处理失败，请稍后重试");
+        }
+        return toDto(updated);
+    }
+
     private TradeOrderDto toDto(TradeOrderRecord record) {
         return new TradeOrderDto(
                 record.id(),
@@ -329,8 +390,44 @@ public class TradeOrderService {
     }
 
     private String generateOrderNo() {
-        String timePart = LocalDateTime.now().format(ORDER_NO_TIME_FORMATTER);
-        int randomPart = ThreadLocalRandom.current().nextInt(100000, 1000000);
-        return "CEP" + timePart + randomPart;
+        String datePart = LocalDateTime.now().format(ORDER_NO_DATE_FORMATTER);
+        String prefix = ORDER_NO_PREFIX + datePart;
+        String latestOrderNo = tradeOrderRepository.findLatestOrderNoByDatePrefix(prefix);
+
+        int nextSequence = 1;
+        if (latestOrderNo != null && latestOrderNo.length() >= prefix.length() + 6) {
+            String tail = latestOrderNo.substring(prefix.length());
+            try {
+                nextSequence = Integer.parseInt(tail) + 1;
+            } catch (NumberFormatException ignored) {
+                nextSequence = 1;
+            }
+        }
+        if (nextSequence > 999999) {
+            throw new BusinessException("当日订单量已达上限，请稍后重试");
+        }
+        return prefix + String.format("%06d", nextSequence);
+    }
+
+    private String mapOrderDetailStatusText(String status, String refundStatus) {
+        if (REFUND_STATUS_REJECTED.equalsIgnoreCase(String.valueOf(refundStatus))) {
+            return "待确认";
+        }
+        if (REFUND_STATUS_APPLIED.equalsIgnoreCase(String.valueOf(refundStatus))) {
+            return "售后中";
+        }
+        if (STATUS_PENDING_PAYMENT.equals(status)) {
+            return "待付款";
+        }
+        if (STATUS_PENDING_CONFIRMATION.equals(status)) {
+            return "待确认";
+        }
+        if (STATUS_COMPLETED.equals(status)) {
+            return "已完成";
+        }
+        if (STATUS_CANCELLED.equals(status)) {
+            return "已取消";
+        }
+        return "进行中";
     }
 }

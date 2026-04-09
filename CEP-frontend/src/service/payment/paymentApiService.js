@@ -35,6 +35,15 @@ export const createTradeOrder = async (payload) => {
 export const fetchTradeOrder = (orderId) =>
   requestJson(`${PAYMENT_API_BASE}/${orderId}`);
 
+export const fetchTradeOrderDetail = async (orderId) => {
+  const accessToken = await ensureValidAccessToken();
+  return requestJson(`${PAYMENT_API_BASE}/${orderId}/detail`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+};
+
 export const markTradeOrderPaid = (orderId) =>
   requestJson(`${PAYMENT_API_BASE}/${orderId}/pay-success`, {
     method: "POST",
@@ -88,6 +97,16 @@ export const applyTradeOrderRefund = async (orderId, refundType) => {
 export const approveTradeOrderRefund = async (orderId) => {
   const accessToken = await ensureValidAccessToken();
   return requestJson(`${PAYMENT_API_BASE}/${orderId}/refund/approve`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+};
+
+export const rejectTradeOrderRefund = async (orderId) => {
+  const accessToken = await ensureValidAccessToken();
+  return requestJson(`${PAYMENT_API_BASE}/${orderId}/refund/reject`, {
     method: "PATCH",
     headers: {
       Authorization: `Bearer ${accessToken}`,

@@ -44,6 +44,7 @@ public class PaymentSchemaInitializer {
             ensureColumnExists("refund_status",
                     "ALTER TABLE trade_orders ADD COLUMN refund_status VARCHAR(30) NOT NULL DEFAULT 'NONE'");
             ensureColumnExists("refund_type", "ALTER TABLE trade_orders ADD COLUMN refund_type VARCHAR(40) NULL");
+            ensureColumnExists("completed_at", "ALTER TABLE trade_orders ADD COLUMN completed_at DATETIME(6) NULL");
         } catch (SQLException ex) {
             throw new IllegalStateException("初始化支付表结构失败", ex);
         }
@@ -69,6 +70,7 @@ public class PaymentSchemaInitializer {
                     seller_confirmed TINYINT(1) NOT NULL DEFAULT 0,
                     refund_status VARCHAR(30) NOT NULL DEFAULT 'NONE',
                     refund_type VARCHAR(40) NULL,
+                    completed_at DATETIME(6) NULL,
                     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     CONSTRAINT fk_trade_orders_item FOREIGN KEY (item_id) REFERENCES items (id),

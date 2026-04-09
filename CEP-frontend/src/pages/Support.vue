@@ -47,6 +47,14 @@
           >
             上传图片
           </button>
+          <button
+            type="button"
+            class="order-picker-btn"
+            :disabled="sending"
+            @click="openOrderPicker"
+          >
+            +
+          </button>
           <input
             ref="imageInputRef"
             class="image-input"
@@ -68,6 +76,27 @@
               移除图片
             </button>
           </div>
+
+          <div v-if="selectedOrderId" class="selected-order-chip">
+            <span>
+              订单号：{{ selectedOrderDisplayNo }}
+              <template v-if="selectedOrder">
+                · {{ selectedOrder.sourceLabel }} · {{ selectedOrder.title }}
+                <template v-if="selectedOrder.time">
+                  · {{ formatTime(selectedOrder.time) }}
+                </template>
+              </template>
+            </span>
+            <button
+              type="button"
+              class="selected-order-clear"
+              :disabled="sending"
+              @click="clearSelectedOrder"
+            >
+              清除
+            </button>
+          </div>
+          <p v-else class="order-picker-placeholder">未关联订单（可选）</p>
         </div>
 
         <div class="composer-row">
@@ -87,21 +116,68 @@
             {{ sending ? "发送中" : "发送" }}
           </button>
         </div>
-        <p class="composer-tip">支持发送文字与图片，图片将自动上传后发送</p>
+        <p class="composer-tip">
+          支持发送文字与图片；点击“+”可选择买到/卖出的订单并关联给客服。
+        </p>
       </footer>
+
+      <el-dialog
+        v-model="orderPickerVisible"
+        title="选择关联订单"
+        width="680px"
+        destroy-on-close
+      >
+        <p class="order-picker-tip">
+          展示我买到和卖出的全部订单，按时间最新排序。
+        </p>
+        <div class="order-picker-list">
+          <p v-if="orderListLoading" class="state-text">订单加载中...</p>
+          <p v-else-if="orderSelectionItems.length === 0" class="state-text">
+            暂无可关联订单
+          </p>
+          <button
+            v-for="item in orderSelectionItems"
+            v-else
+            :key="item.key"
+            type="button"
+            class="order-picker-item"
+            @click="selectOrder(item)"
+          >
+            <div class="order-picker-item__main">
+              <p class="order-picker-item__title">
+                订单号：{{ getOrderDisplayNo(item) }} · {{ item.sourceLabel }}
+              </p>
+              <p class="order-picker-item__desc">{{ item.title }}</p>
+            </div>
+            <time class="order-picker-item__time">{{
+              formatTime(item.time)
+            }}</time>
+          </button>
+        </div>
+        <template #footer>
+          <el-button @click="closeOrderPicker">关闭</el-button>
+        </template>
+      </el-dialog>
     </main>
   </div>
 </template>
 
 <script setup>
-import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { ElMessage } from "element-plus";
+import { useRoute } from "vue-router";
 import {
   fetchMySupportMessages,
   sendMySupportMessage,
 } from "../service/admin/adminApiService";
 import { buildMessageWebSocketUrl } from "../service/chat/chatApiService";
+import {
+  fetchBoughtItems,
+  fetchSoldItems,
+} from "../service/profile/profileApiService";
 import { uploadPublishImage } from "../service/publish/publishApiService";
+
+const route = useRoute();
 
 const loading = ref(false);
 const draft = ref("");
@@ -114,8 +190,141 @@ const imageInputRef = ref(null);
 const pendingImageFile = ref(null);
 const pendingImagePreviewUrl = ref("");
 const sending = ref(false);
+const orderPickerVisible = ref(false);
+const orderListLoading = ref(false);
+const orderSelectionItems = ref([]);
+const selectedOrderId = ref(null);
 
 const IMAGE_PREFIX = "【图片】";
+
+const selectedOrder = computed(() => {
+  const selected = Number(selectedOrderId.value || 0);
+  if (!selected) return null;
+  return (
+    orderSelectionItems.value.find(
+      (item) => Number(item.orderId || 0) === selected
+    ) || null
+  );
+});
+
+const getOrderDisplayNo = (item) => {
+  const orderNo = String(item?.orderNo || "").trim();
+  if (orderNo) return orderNo;
+  const orderId = Number(item?.orderId || 0);
+  return orderId > 0 ? String(orderId) : "";
+};
+
+const selectedOrderDisplayNo = computed(() => {
+  if (selectedOrder.value) {
+    return getOrderDisplayNo(selectedOrder.value);
+  }
+  const orderId = Number(selectedOrderId.value || 0);
+  return orderId > 0 ? String(orderId) : "";
+});
+
+const normalizeListData = (responseBody) => {
+  const payload = responseBody?.data;
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.records)) return payload.records;
+  if (Array.isArray(payload?.list)) return payload.list;
+  return [];
+};
+
+const toSortTimestamp = (value) => {
+  if (!value) return 0;
+  const text = String(value).trim();
+  if (!text) return 0;
+  const normalized = text.includes("T") ? text : text.replace(" ", "T");
+  const ts = Date.parse(normalized);
+  return Number.isNaN(ts) ? 0 : ts;
+};
+
+const mapSupportOrderItem = (item, source) => {
+  const orderId = Number(item?.orderId ?? item?.id ?? 0);
+  if (!Number.isInteger(orderId) || orderId <= 0) {
+    return null;
+  }
+  const time = String(item?.time || "").trim();
+  return {
+    key: `${source}-${orderId}`,
+    orderId,
+    orderNo: String(item?.orderNo || "").trim(),
+    source,
+    sourceLabel: source === "bought" ? "买到" : "卖出",
+    title:
+      String(item?.title || item?.name || "未命名物品").trim() || "未命名物品",
+    status: String(item?.status || "").trim(),
+    time,
+    sortTime: toSortTimestamp(time),
+  };
+};
+
+const loadOrderSelectionItems = async () => {
+  orderListLoading.value = true;
+  try {
+    const statusList = [
+      "all",
+      "pending-payment",
+      "pending-confirmation",
+      "completed",
+      "cancelled",
+    ];
+    const tasks = statusList.flatMap((status) => [
+      fetchBoughtItems(status),
+      fetchSoldItems(status),
+    ]);
+    const responses = await Promise.allSettled(tasks);
+
+    const mergedMap = new Map();
+    responses.forEach((result, index) => {
+      if (result.status !== "fulfilled") return;
+      const source = index % 2 === 0 ? "bought" : "sold";
+      const mapped = normalizeListData(result.value)
+        .map((item) => mapSupportOrderItem(item, source))
+        .filter(Boolean);
+      mapped.forEach((item) => {
+        if (!mergedMap.has(item.key)) {
+          mergedMap.set(item.key, item);
+        }
+      });
+    });
+
+    orderSelectionItems.value = Array.from(mergedMap.values()).sort((a, b) => {
+      if (b.sortTime !== a.sortTime) {
+        return b.sortTime - a.sortTime;
+      }
+      return b.orderId - a.orderId;
+    });
+  } catch (error) {
+    ElMessage.error(error.message || "加载订单列表失败");
+  } finally {
+    orderListLoading.value = false;
+  }
+};
+
+const openOrderPicker = async () => {
+  orderPickerVisible.value = true;
+  await loadOrderSelectionItems();
+};
+
+const closeOrderPicker = () => {
+  orderPickerVisible.value = false;
+};
+
+const selectOrder = (item) => {
+  const orderId = Number(item?.orderId || 0);
+  if (!Number.isInteger(orderId) || orderId <= 0) {
+    ElMessage.warning("订单信息无效");
+    return;
+  }
+  selectedOrderId.value = orderId;
+  closeOrderPicker();
+};
+
+const clearSelectedOrder = () => {
+  selectedOrderId.value = null;
+};
 
 const formatTime = (value) => {
   if (!value) return "";
@@ -294,6 +503,10 @@ const sendMessage = async () => {
 
   const text = String(draft.value || "").trim();
   const imageFile = pendingImageFile.value;
+  const orderId = Number.isInteger(Number(selectedOrderId.value || 0))
+    ? Number(selectedOrderId.value || 0)
+    : 0;
+
   if (!text && !imageFile) {
     ElMessage.warning("请输入问题内容或上传图片");
     return;
@@ -322,12 +535,13 @@ const sendMessage = async () => {
         JSON.stringify({
           action: "SEND_SUPPORT_MESSAGE",
           text: finalContent,
+          orderId: orderId > 0 ? orderId : null,
         })
       );
       return;
     }
 
-    await sendMySupportMessage(finalContent);
+    await sendMySupportMessage(finalContent, orderId > 0 ? orderId : null);
     pushMessage("self", finalContent, new Date().toISOString());
     await scrollToBottom();
   } catch (error) {
@@ -338,6 +552,10 @@ const sendMessage = async () => {
 };
 
 onMounted(async () => {
+  const routeOrderId = String(route.query?.orderId || "").trim();
+  if (/^\d+$/.test(routeOrderId) && Number(routeOrderId) > 0) {
+    selectedOrderId.value = Number(routeOrderId);
+  }
   await loadMessages();
   connectWebSocket();
 });
@@ -521,6 +739,117 @@ onBeforeUnmount(() => {
   gap: 10px;
 }
 
+.composer-row--meta {
+  align-items: center;
+}
+
+.order-picker-btn {
+  width: 40px;
+  height: 40px;
+  border: 1px solid #cfc3ff;
+  background: #efe9ff;
+  color: #5a4e92;
+  border-radius: 999px;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.selected-order-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #d9cfff;
+  background: #ffffff;
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: #3f3565;
+  font-size: 13px;
+  max-width: min(100%, 860px);
+}
+
+.selected-order-chip > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.selected-order-clear {
+  border: 1px solid #edd8d8;
+  background: #fff2f2;
+  color: #995a5a;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.order-picker-placeholder {
+  margin: 0;
+  color: #8d86af;
+  font-size: 13px;
+}
+
+.order-picker-tip {
+  margin: 0 0 12px;
+  color: #6d6595;
+  font-size: 13px;
+}
+
+.order-picker-list {
+  max-height: 420px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.order-picker-item {
+  border: 1px solid #e6ddff;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.order-picker-item:hover {
+  border-color: #cdbdff;
+  background: #faf8ff;
+}
+
+.order-picker-item__main {
+  min-width: 0;
+}
+
+.order-picker-item__title,
+.order-picker-item__desc {
+  margin: 0;
+}
+
+.order-picker-item__title {
+  color: #3a3163;
+  font-weight: 600;
+}
+
+.order-picker-item__desc {
+  margin-top: 4px;
+  color: #6d6595;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.order-picker-item__time {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #837bab;
+}
+
 .composer-input {
   flex: 1;
   border: 1px solid #d9cfff;
@@ -529,6 +858,11 @@ onBeforeUnmount(() => {
   font-size: 14px;
   color: #3f3565;
   background: #ffffff;
+}
+
+.composer-input--order {
+  flex: 0 0 260px;
+  max-width: 100%;
 }
 
 .composer-input:focus {
@@ -549,7 +883,9 @@ onBeforeUnmount(() => {
 }
 
 .upload-btn:disabled,
-.send-btn:disabled {
+.send-btn:disabled,
+.order-picker-btn:disabled,
+.selected-order-clear:disabled {
   opacity: 0.62;
   cursor: not-allowed;
 }

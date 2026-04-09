@@ -25,6 +25,7 @@ public class ProfileRepository {
         LocalDateTime createdAt = timestamp == null ? LocalDateTime.now() : timestamp.toLocalDateTime();
         return new ProfileTradeItemDto(
                 rs.getLong("id"),
+                rs.getString("order_no"),
                 rs.getLong("item_id"),
                 rs.getString("title"),
                 rs.getBigDecimal("price"),
@@ -176,6 +177,7 @@ public class ProfileRepository {
         String sql = """
                 SELECT
                     i.id,
+                    NULL AS order_no,
                     i.id AS item_id,
                     i.title,
                     i.price,
@@ -205,6 +207,7 @@ public class ProfileRepository {
         String sql = """
                 SELECT
                     o.id,
+                    o.order_no,
                     o.item_id,
                     o.item_title AS title,
                     o.amount AS price,
@@ -238,6 +241,7 @@ public class ProfileRepository {
         String sql = """
                 SELECT
                     o.id,
+                    o.order_no,
                     o.item_id,
                     o.item_title AS title,
                     o.amount AS price,
@@ -270,6 +274,7 @@ public class ProfileRepository {
         String sql = """
                 SELECT
                     i.id,
+                    NULL AS order_no,
                     i.id AS item_id,
                     i.title,
                     i.price,

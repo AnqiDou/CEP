@@ -40,18 +40,32 @@
               hasMultiplePhotos ? '' : 'gallery-wrap--single',
             ]"
           >
-            <div v-if="hasMultiplePhotos" class="gallery-list soft-panel">
-              <button
-                v-for="(photo, index) in item.photos"
-                :key="photo"
-                :class="[
-                  'gallery-thumb',
-                  activePhoto === photo ? 'gallery-thumb--active' : '',
-                ]"
-                type="button"
-                @click="activePhoto = photo"
+            <div v-if="hasMultiplePhotos" class="gallery-side">
+              <div
+                ref="galleryListRef"
+                class="gallery-list soft-panel"
+                @scroll="handleGalleryListScroll"
               >
-                <img :src="photo" :alt="`${item.title}-图片${index + 1}`" />
+                <button
+                  v-for="(photo, index) in item.photos"
+                  :key="`${photo}-${index}`"
+                  :class="[
+                    'gallery-thumb',
+                    activePhoto === photo ? 'gallery-thumb--active' : '',
+                  ]"
+                  type="button"
+                  @click="activePhoto = photo"
+                >
+                  <img :src="photo" :alt="`${item.title}-图片${index + 1}`" />
+                </button>
+              </div>
+              <button
+                v-if="galleryCanScroll"
+                class="gallery-scroll-btn"
+                type="button"
+                @click="scrollGalleryList"
+              >
+                {{ galleryAtBottom ? "回到顶部" : "向下查看更多" }}
               </button>
             </div>
 
@@ -178,7 +192,14 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import { ElMessage } from "element-plus";
 import { useRoute, useRouter } from "vue-router";
 import { Star } from "@element-plus/icons-vue";
@@ -380,6 +401,43 @@ const isFavorite = ref(false);
 const showReportDialog = ref(false);
 const reportType = ref("PROHIBITED_CONTACT");
 const reportContent = ref("");
+const galleryListRef = ref(null);
+const galleryCanScroll = ref(false);
+const galleryAtBottom = ref(false);
+
+const updateGalleryScrollState = () => {
+  const container = galleryListRef.value;
+  if (!container) {
+    galleryCanScroll.value = false;
+    galleryAtBottom.value = false;
+    return;
+  }
+  const maxScrollTop = Math.max(
+    0,
+    container.scrollHeight - container.clientHeight
+  );
+  galleryCanScroll.value = maxScrollTop > 4;
+  galleryAtBottom.value =
+    maxScrollTop <= 4 || container.scrollTop >= maxScrollTop - 2;
+};
+
+const handleGalleryListScroll = () => {
+  updateGalleryScrollState();
+};
+
+const scrollGalleryList = () => {
+  const container = galleryListRef.value;
+  if (!container) return;
+  const step = Math.max(150, Math.floor(container.clientHeight * 0.75));
+  const maxScrollTop = Math.max(
+    0,
+    container.scrollHeight - container.clientHeight
+  );
+  const nextTop = galleryAtBottom.value
+    ? 0
+    : Math.min(container.scrollTop + step, maxScrollTop);
+  container.scrollTo({ top: nextTop, behavior: "smooth" });
+};
 
 const loadFavoriteStatus = async () => {
   const itemId = Number(route.params.id);
@@ -404,6 +462,23 @@ watch(
   },
   { immediate: true }
 );
+
+watch(
+  () => [hasMultiplePhotos.value, item.value.photos.length],
+  async () => {
+    await nextTick();
+    updateGalleryScrollState();
+  },
+  { immediate: true }
+);
+
+onMounted(() => {
+  window.addEventListener("resize", updateGalleryScrollState);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", updateGalleryScrollState);
+});
 
 const applyTrade = () => {
   if (!item.value.id) {
@@ -633,12 +708,23 @@ const submitReport = async () => {
   gap: 18px;
   align-items: stretch;
   min-height: clamp(420px, calc(100vh - 300px), 560px);
+  height: clamp(420px, calc(100vh - 300px), 560px);
 }
 
 .gallery-wrap {
   display: grid;
   grid-template-columns: 132px minmax(0, 1fr);
   gap: 14px;
+  min-height: 0;
+  height: 100%;
+}
+
+.gallery-side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  max-height: clamp(360px, calc(100vh - 360px), 520px);
 }
 
 .gallery-wrap--single {
@@ -649,6 +735,7 @@ const submitReport = async () => {
   border-radius: 22px;
   overflow: hidden;
   padding: 10px;
+  min-height: 0;
 }
 
 .gallery-main {
@@ -675,6 +762,37 @@ const submitReport = async () => {
   flex-direction: column;
   gap: 10px;
   padding: 10px;
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #c6b8f6 transparent;
+}
+
+.gallery-list::-webkit-scrollbar {
+  width: 7px;
+}
+
+.gallery-list::-webkit-scrollbar-thumb {
+  background: #c6b8f6;
+  border-radius: 999px;
+}
+
+.gallery-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.gallery-scroll-btn {
+  border: none;
+  border-radius: 999px;
+  background: #efeaff;
+  color: #5f4ca2;
+  font-size: 12px;
+  font-weight: 600;
+  height: 30px;
+  cursor: pointer;
 }
 
 .gallery-thumb {
@@ -1015,6 +1133,7 @@ const submitReport = async () => {
   .detail-top {
     grid-template-columns: minmax(0, 1fr);
     min-height: auto;
+    height: auto;
   }
 
   .summary-title {
@@ -1039,6 +1158,16 @@ const submitReport = async () => {
     order: 2;
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
+    max-height: none;
+    overflow: visible;
+  }
+
+  .gallery-side {
+    max-height: none;
+  }
+
+  .gallery-scroll-btn {
+    display: none;
   }
 
   .summary-actions {

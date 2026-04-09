@@ -462,31 +462,41 @@
                     v-if="
                       selectedMenu === 'trade-sold' &&
                       item.status === 'PENDING_CONFIRMATION' &&
-                      !item.sellerConfirmed
+                      !item.sellerConfirmed &&
+                      !isRefundAfterSaleOrder(item)
                     "
                     class="section-item__btn section-item__btn--edit"
                     type="button"
                     @click="handleSellerConfirmDelivered(item)"
                   >
-                    确认已交付物品
+                    {{
+                      isReturnAfterReceiptApproved(item)
+                        ? "确认已收到物品"
+                        : "确认已交付物品"
+                    }}
                   </button>
                   <button
                     v-if="
                       selectedMenu === 'trade-bought' &&
                       item.status === 'PENDING_CONFIRMATION' &&
-                      !item.buyerConfirmed
+                      !item.buyerConfirmed &&
+                      !isRefundAfterSaleOrder(item)
                     "
                     class="section-item__btn section-item__btn--edit"
                     type="button"
                     @click="handleBuyerConfirmReceived(item)"
                   >
-                    确认已收到物品
+                    {{
+                      isReturnAfterReceiptApproved(item)
+                        ? "确认已交付物品"
+                        : "确认已收到物品"
+                    }}
                   </button>
                   <button
                     v-if="
                       selectedMenu === 'trade-bought' &&
                       item.status === 'PENDING_CONFIRMATION' &&
-                      item.refundStatus !== 'APPLIED'
+                      !isRefundAfterSaleOrder(item)
                     "
                     class="section-item__btn section-item__btn--danger"
                     type="button"
@@ -498,7 +508,7 @@
                     v-if="
                       selectedMenu === 'trade-bought' &&
                       item.status === 'PENDING_CONFIRMATION' &&
-                      item.refundStatus !== 'APPLIED'
+                      !isRefundAfterSaleOrder(item)
                     "
                     class="section-item__btn section-item__btn--danger"
                     type="button"
@@ -523,6 +533,18 @@
                     }}
                   </button>
                   <button
+                    v-if="
+                      selectedMenu === 'trade-sold' &&
+                      item.status === 'PENDING_CONFIRMATION' &&
+                      item.refundStatus === 'APPLIED'
+                    "
+                    class="section-item__btn section-item__btn--danger"
+                    type="button"
+                    @click="handleRejectRefund(item)"
+                  >
+                    不同意退款
+                  </button>
+                  <button
                     v-if="selectedMenu === 'trade-sold'"
                     class="section-item__btn section-item__btn--contact"
                     type="button"
@@ -539,21 +561,21 @@
                     联系卖家
                   </button>
                   <button
-                    v-if="
-                      selectedMenu === 'trade-bought' &&
-                      item.status !== 'PENDING_CONFIRMATION' &&
-                      !isRefundAfterSaleOrder(item)
-                    "
-                    class="section-item__btn section-item__btn--rebuy"
-                    type="button"
-                    @click="handleRebuy(item)"
-                  >
-                    再次购买
-                  </button>
-                  <button
+                    v-if="tradeOrderStatusMenuKeys.includes(selectedMenu)"
                     class="section-item__btn"
                     type="button"
-                    @click="goToItemDetail(item.itemId)"
+                    @click="goSupportWithOrder(item)"
+                  >
+                    联系客服
+                  </button>
+                  <button
+                    v-if="
+                      !tradeOrderStatusMenuKeys.includes(selectedMenu) ||
+                      item.status !== 'PENDING_PAYMENT'
+                    "
+                    class="section-item__btn"
+                    type="button"
+                    @click="handleViewOrderOrItemDetail(item)"
                   >
                     查看详情
                   </button>
@@ -713,17 +735,21 @@ import {
   fetchProfileOverview,
   fetchProfileReviews,
   fetchSoldOrderContact,
-  rebuyBoughtOrder,
   fetchSoldItems,
   updateProfileBasic,
   uploadProfileAvatar,
 } from "../service/profile/profileApiService";
+import {
+  buildMessageWebSocketUrl,
+  createOrGetDirectConversation,
+} from "../service/chat/chatApiService";
 import {
   applyTradeOrderRefund,
   approveTradeOrderRefund,
   cancelTradeOrder,
   confirmBuyerReceived,
   confirmSellerDelivered,
+  rejectTradeOrderRefund,
 } from "../service/payment/paymentApiService";
 import {
   deleteMyPublishItem,
@@ -814,6 +840,7 @@ const tradeOrderStatusTabs = [
   { key: "all", label: "全部" },
   { key: "pending-payment", label: "待付款" },
   { key: "pending-confirmation", label: "待确认" },
+  { key: "refund-after-sale", label: "退款" },
   { key: "completed", label: "已完成" },
   { key: "cancelled", label: "已取消" },
 ];
@@ -873,7 +900,17 @@ const isRefundAfterSaleOrder = (item) => {
   const refundStatus = String(item?.refundStatus || "")
     .trim()
     .toUpperCase();
-  return refundStatus === "APPLIED" || refundStatus === "APPROVED";
+  return refundStatus === "APPLIED";
+};
+
+const isReturnAfterReceiptApproved = (item) => {
+  const refundStatus = String(item?.refundStatus || "")
+    .trim()
+    .toUpperCase();
+  const refundType = String(item?.refundType || "")
+    .trim()
+    .toUpperCase();
+  return refundStatus === "APPROVED" && refundType === "RETURN_AFTER_RECEIPT";
 };
 
 const getTradeOrderApiStatus = (status) => {
@@ -887,13 +924,13 @@ const getDisplaySectionItems = (menuKey, items) => {
   if (!tradeOrderStatusMenuKeys.includes(menuKey)) {
     return items;
   }
+  if (currentTradeOrderStatus.value === "all") {
+    return items;
+  }
   if (currentTradeOrderStatus.value === "refund-after-sale") {
     return items.filter(isRefundAfterSaleOrder);
   }
-  if (currentTradeOrderStatus.value === "pending-confirmation") {
-    return items.filter((item) => !isRefundAfterSaleOrder(item));
-  }
-  return items;
+  return items.filter((item) => !isRefundAfterSaleOrder(item));
 };
 
 const displaySectionItems = computed(() =>
@@ -1062,6 +1099,42 @@ const goToItemDetail = (id) => {
   window.open(resolved.href, "_blank");
 };
 
+const goToOrderDetail = (orderId) => {
+  if (!orderId) {
+    ElMessage.warning("订单信息无效");
+    return;
+  }
+  const resolved = router.resolve({
+    name: "order-detail",
+    query: { orderId: String(orderId) },
+  });
+  window.open(resolved.href, "_blank");
+};
+
+const goSupportWithOrder = (item) => {
+  const orderId = getTradeOrderId(item);
+  if (!orderId) {
+    ElMessage.warning("订单信息无效");
+    return;
+  }
+  const resolved = router.resolve({
+    name: "support",
+    query: { orderId: String(orderId) },
+  });
+  window.open(resolved.href, "_blank");
+};
+
+const handleViewOrderOrItemDetail = (item) => {
+  if (tradeOrderStatusMenuKeys.includes(selectedMenu.value)) {
+    if (item?.status === "PENDING_PAYMENT") {
+      return;
+    }
+    goToOrderDetail(getTradeOrderId(item));
+    return;
+  }
+  goToItemDetail(item?.itemId);
+};
+
 const goToOtherProfile = (item) => {
   const userId = Number(item?.userId || 0);
   if (!Number.isInteger(userId) || userId <= 0) {
@@ -1216,7 +1289,7 @@ const mapFollowUser = (item) => ({
 
 const mapTradeOrderStatusText = (status, item) => {
   if (isRefundAfterSaleOrder(item)) {
-    return "退款/售后";
+    return "退款";
   }
   if (status === "PENDING_PAYMENT") {
     return "待付款";
@@ -1654,7 +1727,24 @@ const handleSellerConfirmDelivered = async (item) => {
   try {
     await confirmSellerDelivered(orderId);
     await loadMenuData("trade-sold", true);
-    ElMessage.success("已确认交付");
+    const isReturnFlow = isReturnAfterReceiptApproved(item);
+    ElMessage.success(isReturnFlow ? "已确认收到物品" : "已确认交付");
+    try {
+      await sendTradeReminderMessage({
+        item,
+        fetchContactFn: fetchSoldOrderContact,
+        type: isReturnFlow
+          ? "RETURN_RECEIVED_CONFIRMED"
+          : "SELLER_DELIVERED_CONFIRMED",
+        content: isReturnFlow
+          ? "卖家已确认收到退货物品，退款已完成。"
+          : "卖家已确认交付物品，请尽快确认收货。",
+        actionText: isReturnFlow ? "查看退款" : "去确认收货",
+        targetMenu: "trade-bought",
+      });
+    } catch {
+      ElMessage.warning("订单状态已更新，但聊天提醒发送失败");
+    }
   } catch (error) {
     ElMessage.error(error.message || "确认交付失败");
   }
@@ -1669,7 +1759,24 @@ const handleBuyerConfirmReceived = async (item) => {
   try {
     await confirmBuyerReceived(orderId);
     await loadMenuData("trade-bought", true);
-    ElMessage.success("已确认收货");
+    const isReturnFlow = isReturnAfterReceiptApproved(item);
+    ElMessage.success(isReturnFlow ? "已确认交付物品" : "已确认收货");
+    try {
+      await sendTradeReminderMessage({
+        item,
+        fetchContactFn: fetchBoughtOrderContact,
+        type: isReturnFlow
+          ? "BUYER_RETURN_DELIVERED_CONFIRMED"
+          : "BUYER_RECEIVED_CONFIRMED",
+        content: isReturnFlow
+          ? "买家已确认交付退货物品，请确认是否已收到。"
+          : "买家已确认收到物品，订单已完成。",
+        actionText: isReturnFlow ? "去确认是否收到" : "查看订单",
+        targetMenu: "trade-sold",
+      });
+    } catch {
+      ElMessage.warning("订单状态已更新，但聊天提醒发送失败");
+    }
   } catch (error) {
     ElMessage.error(error.message || "确认收货失败");
   }
@@ -1685,6 +1792,23 @@ const handleApplyRefund = async (item, refundType) => {
     await applyTradeOrderRefund(orderId, refundType);
     await loadMenuData("trade-bought", true);
     ElMessage.success("退款申请已提交");
+    try {
+      const isNoReceipt = refundType === "NO_RECEIPT";
+      await sendTradeReminderMessage({
+        item,
+        fetchContactFn: fetchBoughtOrderContact,
+        type: isNoReceipt
+          ? "REFUND_APPLIED_NO_RECEIPT"
+          : "REFUND_APPLIED_RETURN",
+        content: isNoReceipt
+          ? "买家申请退款（未收到货），请确认是否同意退款。"
+          : "买家申请退款（已收到货），请在线下完成退货后再确认已收到退货并退款。",
+        actionText: "去处理退款",
+        targetMenu: "trade-sold",
+      });
+    } catch {
+      ElMessage.warning("退款状态已更新，但聊天提醒发送失败");
+    }
   } catch (error) {
     ElMessage.error(error.message || "退款申请失败");
   }
@@ -1699,7 +1823,62 @@ const handleApproveRefund = async (item) => {
   try {
     await approveTradeOrderRefund(orderId);
     await loadMenuData("trade-sold", true);
-    ElMessage.success("已完成退款");
+    const isReturnFlow =
+      String(item?.refundType || "")
+        .trim()
+        .toUpperCase() === "RETURN_AFTER_RECEIPT";
+    ElMessage.success(isReturnFlow ? "已确认收到退货并完成退款" : "已完成退款");
+    try {
+      await sendTradeReminderMessage({
+        item,
+        fetchContactFn: fetchSoldOrderContact,
+        type: isReturnFlow
+          ? "REFUND_APPROVED_RETURN"
+          : "REFUND_APPROVED_NO_RECEIPT",
+        content: isReturnFlow
+          ? "卖家已确认收到退货物品，退款已完成，订单已完成。"
+          : "卖家已同意退款，退款已完成。",
+        actionText: "查看订单",
+        targetMenu: "trade-bought",
+      });
+    } catch {
+      ElMessage.warning("退款状态已更新，但聊天提醒发送失败");
+    }
+  } catch (error) {
+    ElMessage.error(error.message || "退款处理失败");
+  }
+};
+
+const handleRejectRefund = async (item) => {
+  const orderId = getTradeOrderId(item);
+  if (!orderId) {
+    ElMessage.warning("订单信息无效");
+    return;
+  }
+  try {
+    await rejectTradeOrderRefund(orderId);
+    await loadMenuData("trade-sold", true);
+    const isReturnFlow =
+      String(item?.refundType || "")
+        .trim()
+        .toUpperCase() === "RETURN_AFTER_RECEIPT";
+    ElMessage.success("已拒绝退款申请");
+    try {
+      await sendTradeReminderMessage({
+        item,
+        fetchContactFn: fetchSoldOrderContact,
+        type: isReturnFlow
+          ? "REFUND_REJECTED_RETURN"
+          : "REFUND_REJECTED_NO_RECEIPT",
+        content: isReturnFlow
+          ? "卖家不同意退款（已收到货）。如有异议，请联系客服协助处理。"
+          : "卖家不同意退款（未收到货）。如有异议，请联系客服协助处理。",
+        actionText: "查看订单",
+        targetMenu: "trade-bought",
+      });
+    } catch {
+      ElMessage.warning("退款状态已更新，但聊天提醒发送失败");
+    }
   } catch (error) {
     ElMessage.error(error.message || "退款处理失败");
   }
@@ -1746,28 +1925,6 @@ const handleContactSeller = async (item) => {
     await openContactChat(item, fetchBoughtOrderContact);
   } catch (error) {
     ElMessage.error(error.message || "打开会话失败");
-  }
-};
-
-const handleRebuy = async (item) => {
-  const orderId = getTradeOrderId(item);
-  if (!orderId) {
-    ElMessage.warning("订单信息无效");
-    return;
-  }
-
-  try {
-    const responseBody = await rebuyBoughtOrder(orderId);
-    const itemId = Number(responseBody?.data?.itemId || item?.itemId || 0);
-    if (!itemId) {
-      throw new Error("商品信息无效，暂无法再次购买");
-    }
-    await router.push({
-      name: "confirm-order",
-      query: { itemId: String(itemId) },
-    });
-  } catch (error) {
-    ElMessage.error(error.message || "再次购买失败");
   }
 };
 
@@ -2629,10 +2786,6 @@ onMounted(async () => {
 
 .section-item__btn--contact {
   background: #7f72e8;
-}
-
-.section-item__btn--rebuy {
-  background: #5ca7ee;
 }
 
 .edit-avatar-row {

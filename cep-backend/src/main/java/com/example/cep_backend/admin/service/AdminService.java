@@ -13,7 +13,11 @@ import com.example.cep_backend.auth.BusinessException;
 import com.example.cep_backend.auth.dto.AuthUserDto;
 import com.example.cep_backend.message.dto.MessageConversationDto;
 import com.example.cep_backend.message.dto.MessageItemDto;
+import com.example.cep_backend.message.dto.MessageSendRequest;
+import com.example.cep_backend.message.repository.MessageRepository;
+import com.example.cep_backend.message.service.MessageService;
 import com.example.cep_backend.message.ws.MessageWebSocketNotifier;
+import org.springframework.dao.DataAccessException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,13 +34,19 @@ public class AdminService {
     public static final BigDecimal PUBLISH_CREDIT_THRESHOLD = new BigDecimal("85.0");
 
     private final AdminRepository adminRepository;
+    private final MessageRepository messageRepository;
+    private final MessageService messageService;
     private final String adminEmail;
     private final MessageWebSocketNotifier messageWebSocketNotifier;
 
     public AdminService(AdminRepository adminRepository,
+            MessageRepository messageRepository,
+            MessageService messageService,
             MessageWebSocketNotifier messageWebSocketNotifier,
             @Value("${app.admin.email:3299166215@qq.com}") String adminEmail) {
         this.adminRepository = adminRepository;
+        this.messageRepository = messageRepository;
+        this.messageService = messageService;
         this.messageWebSocketNotifier = messageWebSocketNotifier;
         this.adminEmail = adminEmail == null ? "" : adminEmail.trim().toLowerCase();
     }
@@ -201,7 +211,8 @@ public class AdminService {
                         order.buyer(),
                         order.seller(),
                         order.amount(),
-                        toOrderStatus(order.status())))
+                        toOrderStatus(order.status()),
+                        order.refundStatus() == null ? "none" : order.refundStatus().trim().toLowerCase()))
                 .toList();
     }
 
@@ -214,6 +225,50 @@ public class AdminService {
         if (updated <= 0) {
             throw new BusinessException("订单不存在");
         }
+    }
+
+    @Transactional
+    public void updateOrder(String orderNo, String status, String refundStatus) {
+        if (orderNo == null || orderNo.trim().isEmpty()) {
+            throw new BusinessException("订单号不能为空");
+        }
+        String normalizedOrderNo = orderNo.trim();
+        LocalDateTime now = LocalDateTime.now();
+        AdminRepository.TradeOrderNotifyRecord before = adminRepository
+                .findTradeOrderNotifyRecordByOrderNo(normalizedOrderNo);
+
+        String normalizedStatus = status == null ? "" : status.trim().toUpperCase();
+        if (!normalizedStatus.isEmpty()) {
+            if (!"PENDING_PAYMENT".equals(normalizedStatus)
+                    && !"PENDING_CONFIRMATION".equals(normalizedStatus)
+                    && !"COMPLETED".equals(normalizedStatus)
+                    && !"CANCELLED".equals(normalizedStatus)) {
+                throw new BusinessException("订单状态不合法");
+            }
+            int statusUpdated = adminRepository.updateOrderStatusByOrderNo(normalizedOrderNo, normalizedStatus, now);
+            if (statusUpdated <= 0) {
+                throw new BusinessException("订单不存在");
+            }
+        }
+
+        String normalizedRefund = refundStatus == null ? "" : refundStatus.trim().toUpperCase();
+        if (!normalizedRefund.isEmpty()) {
+            if (!"NONE".equals(normalizedRefund)
+                    && !"APPLIED".equals(normalizedRefund)
+                    && !"APPROVED".equals(normalizedRefund)
+                    && !"REJECTED".equals(normalizedRefund)) {
+                throw new BusinessException("退款状态不合法");
+            }
+            int refundUpdated = adminRepository.updateOrderRefundStatusByOrderNo(normalizedOrderNo, normalizedRefund,
+                    now);
+            if (refundUpdated <= 0) {
+                throw new BusinessException("订单不存在");
+            }
+        }
+
+        AdminRepository.TradeOrderNotifyRecord after = adminRepository
+                .findTradeOrderNotifyRecordByOrderNo(normalizedOrderNo);
+        notifyTradeOrderUpdatedByAdmin(before, after, now);
     }
 
     public List<AdminSupportConversationDto> listConversations() {
@@ -278,7 +333,7 @@ public class AdminService {
     }
 
     @Transactional
-    public void appendUserSupportMessage(Long userId, String content) {
+    public void appendUserSupportMessage(Long userId, String content, Long orderId) {
         if (userId == null || userId <= 0) {
             throw new BusinessException("用户参数无效");
         }
@@ -291,22 +346,32 @@ public class AdminService {
         }
 
         LocalDateTime now = LocalDateTime.now();
+        String orderContext = "";
+        if (orderId != null && orderId > 0) {
+            String orderNo = adminRepository.findOrderNoByOrderIdAndUserId(orderId, userId);
+            if (orderNo != null && !orderNo.trim().isEmpty()) {
+                orderContext = "\n[订单号:" + orderNo.trim() + "]";
+            } else {
+                orderContext = "\n[订单号#" + orderId + "]";
+            }
+        }
+        String finalMessage = trimmed + orderContext;
         Long conversationId = adminRepository.findActiveConversationIdByReporter(userId);
         if (conversationId == null || conversationId <= 0) {
             conversationId = adminRepository.createSupportConversationForUser(
                     userId,
                     "客服咨询",
                     "OTHER",
-                    trimmed,
-                    trimmed.length() > 120 ? trimmed.substring(0, 120) : trimmed,
+                    finalMessage,
+                    finalMessage.length() > 120 ? finalMessage.substring(0, 120) : finalMessage,
                     "OPEN",
                     now);
             if (conversationId == null || conversationId <= 0) {
                 throw new BusinessException("创建客服会话失败");
             }
         }
-        adminRepository.insertSupportMessage(conversationId, "USER", trimmed, "", now);
-        adminRepository.touchConversation(conversationId, trimmed, now);
+        adminRepository.insertSupportMessage(conversationId, "USER", finalMessage, "", now);
+        adminRepository.touchConversation(conversationId, finalMessage, now);
 
         Long adminUserId = adminRepository.findUserIdByEmail(adminEmail);
         if (adminUserId != null && adminUserId > 0) {
@@ -322,12 +387,12 @@ public class AdminService {
                             "客服工单",
                             "",
                             1,
-                            trimmed,
+                            finalMessage,
                             now.toString()),
                     new MessageItemDto(
                             0L,
                             "other",
-                            trimmed,
+                            finalMessage,
                             "",
                             now.toString(),
                             "TEXT",
@@ -347,12 +412,12 @@ public class AdminService {
                         "客服工单",
                         "",
                         0,
-                        trimmed,
+                        finalMessage,
                         now.toString()),
                 new MessageItemDto(
                         0L,
                         "self",
-                        trimmed,
+                        finalMessage,
                         "",
                         now.toString(),
                         "TEXT",
@@ -458,5 +523,144 @@ public class AdminService {
 
     private int safeInt(Integer value) {
         return value == null ? 0 : value;
+    }
+
+    private void notifyTradeOrderUpdatedByAdmin(
+            AdminRepository.TradeOrderNotifyRecord before,
+            AdminRepository.TradeOrderNotifyRecord after,
+            LocalDateTime now) {
+        if (after == null) {
+            return;
+        }
+        if (after.orderId() == null || after.orderId() <= 0
+                || after.itemId() == null || after.itemId() <= 0
+                || after.buyerUserId() == null || after.buyerUserId() <= 0
+                || after.sellerUserId() == null || after.sellerUserId() <= 0) {
+            return;
+        }
+
+        String beforeStatus = normalizeUpper(before == null ? null : before.status());
+        String afterStatus = normalizeUpper(after.status());
+        String beforeRefundStatus = normalizeUpper(before == null ? null : before.refundStatus());
+        String afterRefundStatus = normalizeUpper(after.refundStatus());
+
+        boolean statusChanged = !beforeStatus.equals(afterStatus);
+        boolean refundChanged = !beforeRefundStatus.equals(afterRefundStatus);
+        if (!statusChanged && !refundChanged) {
+            return;
+        }
+
+        Long conversationId = resolveOrCreateTradeConversationId(after.itemId(), after.buyerUserId(),
+                after.sellerUserId(), now);
+        if (conversationId == null || conversationId <= 0) {
+            return;
+        }
+
+        String content = buildAdminOrderUpdateContent(afterStatus, afterRefundStatus, statusChanged, refundChanged);
+        String reminderText = buildTradeReminderText(
+                "ADMIN_ORDER_UPDATED",
+                after.orderId(),
+                after.itemTitle(),
+                content,
+                "查看订单",
+                "");
+
+        Long senderUserId = after.sellerUserId();
+        try {
+            MessageService.MessageDispatchResult result = messageService.sendMessage(
+                    senderUserId,
+                    new MessageSendRequest(conversationId, reminderText, ""));
+            messageWebSocketNotifier.notifyMessageCreated(result);
+        } catch (RuntimeException ex) {
+            // 管理员改状态不应被通知失败阻断
+        }
+    }
+
+    private Long resolveOrCreateTradeConversationId(Long itemId, Long buyerUserId, Long sellerUserId,
+            LocalDateTime now) {
+        Long conversationId = messageRepository.findConversationIdByItemAndPair(itemId, buyerUserId, sellerUserId);
+        if (conversationId != null && conversationId > 0) {
+            return conversationId;
+        }
+        try {
+            conversationId = messageRepository.createConversation(itemId, buyerUserId, sellerUserId, now);
+        } catch (DataAccessException ex) {
+            conversationId = messageRepository.findConversationIdByItemAndPair(itemId, buyerUserId, sellerUserId);
+        }
+        return conversationId;
+    }
+
+    private String buildAdminOrderUpdateContent(
+            String tradeStatus,
+            String refundStatus,
+            boolean statusChanged,
+            boolean refundChanged) {
+        if (statusChanged && refundChanged) {
+            return "管理员已更新订单状态为「" + toOrderStatusTextZh(tradeStatus)
+                    + "」，退款状态为「" + toRefundStatusTextZh(refundStatus) + "」，请留意最新进展。";
+        }
+        if (statusChanged) {
+            return "管理员已将订单状态更新为「" + toOrderStatusTextZh(tradeStatus) + "」，请留意最新进展。";
+        }
+        return "管理员已将退款状态更新为「" + toRefundStatusTextZh(refundStatus) + "」，请留意最新进展。";
+    }
+
+    private String buildTradeReminderText(
+            String type,
+            Long orderId,
+            String itemTitle,
+            String content,
+            String actionText,
+            String targetMenu) {
+        String safeType = jsonEscape(type == null ? "TRADE_REMINDER" : type.trim());
+        String safeItemTitle = jsonEscape(itemTitle == null ? "" : itemTitle.trim());
+        String safeContent = jsonEscape(content == null ? "交易状态已更新，请及时处理。" : content.trim());
+        String safeActionText = jsonEscape(actionText == null ? "去查看" : actionText.trim());
+        String safeTargetMenu = jsonEscape(targetMenu == null ? "" : targetMenu.trim());
+        String orderPart = orderId != null && orderId > 0 ? String.valueOf(orderId) : "null";
+        return "[TRADE_REMINDER]{\"type\":\"" + safeType
+                + "\",\"orderId\":" + orderPart
+                + ",\"itemTitle\":\"" + safeItemTitle
+                + "\",\"content\":\"" + safeContent
+                + "\",\"actionText\":\"" + safeActionText
+                + "\",\"targetMenu\":\"" + safeTargetMenu + "\"}";
+    }
+
+    private String jsonEscape(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        return raw
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\r", "\\r")
+                .replace("\n", "\\n");
+    }
+
+    private String normalizeUpper(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.trim().toUpperCase();
+    }
+
+    private String toOrderStatusTextZh(String status) {
+        return switch (normalizeUpper(status)) {
+            case "PENDING_PAYMENT" -> "待付款";
+            case "PENDING_CONFIRMATION" -> "待确认";
+            case "COMPLETED" -> "已完成";
+            case "CANCELLED" -> "已取消";
+            default -> "处理中";
+        };
+    }
+
+    private String toRefundStatusTextZh(String status) {
+        return switch (normalizeUpper(status)) {
+            case "NONE" -> "无退款";
+            case "APPLIED" -> "退款申请中";
+            case "APPROVED" -> "已退款";
+            case "REJECTED" -> "退款已拒绝";
+            default -> "处理中";
+        };
     }
 }

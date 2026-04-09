@@ -73,7 +73,7 @@ public class MessageWebSocketHandler extends TextWebSocketHandler {
 
         if ("SEND_SUPPORT_MESSAGE".equals(action)) {
             try {
-                adminService.appendUserSupportMessage(userId, payload.text());
+                adminService.appendUserSupportMessage(userId, payload.text(), payload.orderId());
             } catch (RuntimeException ex) {
                 sendError(session, ex.getMessage() == null ? "发送失败" : ex.getMessage());
             }
@@ -120,6 +120,7 @@ public class MessageWebSocketHandler extends TextWebSocketHandler {
             String action,
             Long conversationId,
             String text,
-            String imageUrl) {
+            String imageUrl,
+            Long orderId) {
     }
 }
