@@ -23,9 +23,11 @@ public class TradeOrderService {
     private static final String STATUS_CANCELLED = "CANCELLED";
     private static final String REFUND_STATUS_NONE = "NONE";
     private static final String REFUND_STATUS_APPLIED = "APPLIED";
+    private static final String REFUND_STATUS_APPROVED = "APPROVED";
     private static final String REFUND_STATUS_REJECTED = "REJECTED";
     private static final String REFUND_TYPE_NO_RECEIPT = "NO_RECEIPT";
     private static final String REFUND_TYPE_RETURN_AFTER_RECEIPT = "RETURN_AFTER_RECEIPT";
+    private static final String REFUND_TYPE_PLATFORM_INTERVENTION = "PLATFORM_INTERVENTION";
     private static final DateTimeFormatter ORDER_NO_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     private final TradeOrderRepository tradeOrderRepository;
@@ -266,6 +268,9 @@ public class TradeOrderService {
         if (Boolean.TRUE.equals(order.buyerConfirmed())) {
             throw new BusinessException("买家已确认收货，无法申请退款");
         }
+        if (REFUND_STATUS_REJECTED.equalsIgnoreCase(String.valueOf(order.refundStatus()))) {
+            throw new BusinessException("卖家已拒绝退款，当前订单不可再次申请退款");
+        }
         String normalizedType = normalizeRefundType(refundType);
         int updatedRows = tradeOrderRepository.applyRefund(orderId, normalizedType);
         if (updatedRows <= 0) {
@@ -287,6 +292,9 @@ public class TradeOrderService {
         }
         if (!REFUND_STATUS_APPLIED.equals(order.refundStatus())) {
             throw new BusinessException("当前订单未处于退款申请状态");
+        }
+        if (REFUND_TYPE_PLATFORM_INTERVENTION.equalsIgnoreCase(String.valueOf(order.refundType()))) {
+            throw new BusinessException("当前订单已申请平台介入，仅管理员可判定退款");
         }
 
         int updatedRows;
@@ -310,6 +318,50 @@ public class TradeOrderService {
     }
 
     @Transactional
+    public TradeOrderDto withdrawRejectedRefund(Long actorUserId, Long orderId) {
+        TradeOrderRecord order = requireOrderActorAndPendingConfirmation(actorUserId, orderId);
+        if (!actorUserId.equals(order.buyerUserId())) {
+            throw new BusinessException("仅买家可撤销退款申请");
+        }
+        if (!REFUND_STATUS_REJECTED.equalsIgnoreCase(String.valueOf(order.refundStatus()))) {
+            throw new BusinessException("当前订单未处于退款拒绝状态");
+        }
+
+        int updatedRows = tradeOrderRepository.withdrawRejectedRefund(orderId);
+        if (updatedRows <= 0) {
+            throw new BusinessException("撤销退款申请失败，请稍后重试");
+        }
+
+        TradeOrderRecord updated = tradeOrderRepository.findOrderById(orderId);
+        if (updated == null) {
+            throw new BusinessException("撤销退款申请失败，请稍后重试");
+        }
+        return toDto(updated);
+    }
+
+    @Transactional
+    public TradeOrderDto escalateRejectedRefundToPlatform(Long actorUserId, Long orderId) {
+        TradeOrderRecord order = requireOrderActorAndPendingConfirmation(actorUserId, orderId);
+        if (!actorUserId.equals(order.buyerUserId())) {
+            throw new BusinessException("仅买家可申请平台介入");
+        }
+        if (!REFUND_STATUS_REJECTED.equalsIgnoreCase(String.valueOf(order.refundStatus()))) {
+            throw new BusinessException("当前订单未处于退款拒绝状态");
+        }
+
+        int updatedRows = tradeOrderRepository.escalateRejectedRefundToPlatform(orderId);
+        if (updatedRows <= 0) {
+            throw new BusinessException("申请平台介入失败，请稍后重试");
+        }
+
+        TradeOrderRecord updated = tradeOrderRepository.findOrderById(orderId);
+        if (updated == null) {
+            throw new BusinessException("申请平台介入失败，请稍后重试");
+        }
+        return toDto(updated);
+    }
+
+    @Transactional
     public TradeOrderDto rejectRefund(Long actorUserId, Long orderId) {
         TradeOrderRecord order = requireOrderActorAndPendingConfirmation(actorUserId, orderId);
         if (!actorUserId.equals(order.sellerUserId())) {
@@ -317,6 +369,9 @@ public class TradeOrderService {
         }
         if (!REFUND_STATUS_APPLIED.equals(order.refundStatus())) {
             throw new BusinessException("当前订单未处于退款申请状态");
+        }
+        if (REFUND_TYPE_PLATFORM_INTERVENTION.equalsIgnoreCase(String.valueOf(order.refundType()))) {
+            throw new BusinessException("当前订单已申请平台介入，仅管理员可判定退款");
         }
 
         int updatedRows = tradeOrderRepository.rejectRefund(orderId);
@@ -415,6 +470,9 @@ public class TradeOrderService {
         }
         if (REFUND_STATUS_APPLIED.equalsIgnoreCase(String.valueOf(refundStatus))) {
             return "售后中";
+        }
+        if (REFUND_STATUS_APPROVED.equalsIgnoreCase(String.valueOf(refundStatus))) {
+            return "已退款";
         }
         if (STATUS_PENDING_PAYMENT.equals(status)) {
             return "待付款";

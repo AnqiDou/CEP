@@ -113,3 +113,23 @@ export const rejectTradeOrderRefund = async (orderId) => {
     },
   });
 };
+
+export const withdrawTradeOrderRefund = async (orderId) => {
+  const accessToken = await ensureValidAccessToken();
+  return requestJson(`${PAYMENT_API_BASE}/${orderId}/refund/withdraw`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+};
+
+export const escalateTradeOrderRefund = async (orderId) => {
+  const accessToken = await ensureValidAccessToken();
+  return requestJson(`${PAYMENT_API_BASE}/${orderId}/refund/escalate`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+};

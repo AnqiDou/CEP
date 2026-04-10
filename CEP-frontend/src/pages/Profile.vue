@@ -285,7 +285,7 @@
             >
               <div class="published-card__thumb">
                 <label
-                  v-if="batchActionMode"
+                  v-if="batchActionMode && item.listSource !== 'sold'"
                   class="published-card__check"
                   @click.stop
                 >
@@ -315,7 +315,10 @@
                   <h4 class="published-card__title" :title="item.title">
                     {{ item.title }}
                   </h4>
-                  <div class="published-card__menu-wrap">
+                  <div
+                    v-if="item.listSource !== 'sold'"
+                    class="published-card__menu-wrap"
+                  >
                     <button
                       class="published-card__more-btn"
                       type="button"
@@ -496,7 +499,20 @@
                     v-if="
                       selectedMenu === 'trade-bought' &&
                       item.status === 'PENDING_CONFIRMATION' &&
-                      !isRefundAfterSaleOrder(item)
+                      item.refundStatus === 'REJECTED'
+                    "
+                    class="section-item__btn section-item__btn--edit"
+                    type="button"
+                    @click="handleWithdrawRejectedRefund(item)"
+                  >
+                    撤销退款申请
+                  </button>
+                  <button
+                    v-if="
+                      selectedMenu === 'trade-bought' &&
+                      item.status === 'PENDING_CONFIRMATION' &&
+                      !isRefundAfterSaleOrder(item) &&
+                      !hasRefundRejectedHistory(item)
                     "
                     class="section-item__btn section-item__btn--danger"
                     type="button"
@@ -508,7 +524,8 @@
                     v-if="
                       selectedMenu === 'trade-bought' &&
                       item.status === 'PENDING_CONFIRMATION' &&
-                      !isRefundAfterSaleOrder(item)
+                      !isRefundAfterSaleOrder(item) &&
+                      !hasRefundRejectedHistory(item)
                     "
                     class="section-item__btn section-item__btn--danger"
                     type="button"
@@ -545,6 +562,14 @@
                     不同意退款
                   </button>
                   <button
+                    v-if="tradeOrderStatusMenuKeys.includes(selectedMenu)"
+                    class="section-item__btn"
+                    type="button"
+                    @click="goSupportWithOrder(item)"
+                  >
+                    联系客服
+                  </button>
+                  <button
                     v-if="selectedMenu === 'trade-sold'"
                     class="section-item__btn section-item__btn--contact"
                     type="button"
@@ -559,14 +584,6 @@
                     @click="handleContactSeller(item)"
                   >
                     联系卖家
-                  </button>
-                  <button
-                    v-if="tradeOrderStatusMenuKeys.includes(selectedMenu)"
-                    class="section-item__btn"
-                    type="button"
-                    @click="goSupportWithOrder(item)"
-                  >
-                    联系客服
                   </button>
                   <button
                     v-if="
@@ -750,6 +767,7 @@ import {
   confirmBuyerReceived,
   confirmSellerDelivered,
   rejectTradeOrderRefund,
+  withdrawTradeOrderRefund,
 } from "../service/payment/paymentApiService";
 import {
   deleteMyPublishItem,
@@ -900,8 +918,26 @@ const isRefundAfterSaleOrder = (item) => {
   const refundStatus = String(item?.refundStatus || "")
     .trim()
     .toUpperCase();
-  return refundStatus === "APPLIED";
+  return refundStatus === "APPLIED" || refundStatus === "REJECTED";
 };
+
+const hasRefundRejectedHistory = (item) =>
+  String(item?.refundStatus || "")
+    .trim()
+    .toUpperCase() === "REJECTED" ||
+  String(item?.refundType || "")
+    .trim()
+    .toUpperCase() === "REJECTED_WITHDRAWN";
+
+const isRefundRejectedOrder = (item) =>
+  String(item?.refundStatus || "")
+    .trim()
+    .toUpperCase() === "REJECTED";
+
+const isRefundApprovedOrder = (item) =>
+  String(item?.refundStatus || "")
+    .trim()
+    .toUpperCase() === "APPROVED";
 
 const isReturnAfterReceiptApproved = (item) => {
   const refundStatus = String(item?.refundStatus || "")
@@ -1113,13 +1149,17 @@ const goToOrderDetail = (orderId) => {
 
 const goSupportWithOrder = (item) => {
   const orderId = getTradeOrderId(item);
+  const orderNo = String(item?.orderNo || "").trim();
   if (!orderId) {
     ElMessage.warning("订单信息无效");
     return;
   }
   const resolved = router.resolve({
     name: "support",
-    query: { orderId: String(orderId) },
+    query: {
+      orderId: String(orderId),
+      ...(orderNo ? { orderNo } : {}),
+    },
   });
   window.open(resolved.href, "_blank");
 };
@@ -1257,6 +1297,7 @@ const mapTradeItem = (item) => {
   return {
     id: item.id,
     orderId: item.orderId || item.id,
+    orderNo: String(item.orderNo || "").trim(),
     itemId: item.itemId || item.id,
     title: item.title || item.name || "未命名物品",
     price: toPrice(item.price),
@@ -1276,6 +1317,7 @@ const mapTradeItem = (item) => {
     totalQuantity,
     soldQuantity,
     remainingQuantity,
+    listSource: "published",
   };
 };
 
@@ -1288,6 +1330,12 @@ const mapFollowUser = (item) => ({
 });
 
 const mapTradeOrderStatusText = (status, item) => {
+  if (isRefundApprovedOrder(item)) {
+    return "已退款";
+  }
+  if (isRefundRejectedOrder(item)) {
+    return "退款已拒绝";
+  }
   if (isRefundAfterSaleOrder(item)) {
     return "退款";
   }
@@ -1317,6 +1365,9 @@ const getTradeItemPhoto = (item) => {
 };
 
 const mapStatusText = (item) => {
+  if (item?.listSource === "sold") {
+    return "已售出";
+  }
   if (item?.status === "DELETED") {
     return "已删除";
   }
@@ -1333,6 +1384,9 @@ const mapStatusText = (item) => {
 };
 
 const buildPublishedQuantityText = (item) => {
+  if (item?.listSource === "sold") {
+    return "数量：已售出";
+  }
   if (item?.quantityMode === "UNLIMITED") {
     return "数量：无限量";
   }
@@ -1343,9 +1397,33 @@ const buildPublishedQuantityText = (item) => {
 };
 
 const reloadMyPublishedItems = async () => {
-  const publishedRes = await fetchMyPublishItems();
-  sectionItemMap["trade-published"] =
-    normalizeListData(publishedRes).map(mapTradeItem);
+  const [publishedRes, soldRes] = await Promise.all([
+    fetchMyPublishItems(),
+    fetchSoldItems("all"),
+  ]);
+
+  const publishedItems = normalizeListData(publishedRes).map(mapTradeItem);
+  const mergedByItemId = new Map(
+    publishedItems.map((item) => [String(item.itemId), item])
+  );
+
+  normalizeListData(soldRes)
+    .map(mapTradeItem)
+    .forEach((item) => {
+      const itemIdKey = String(item.itemId || "").trim();
+      if (!itemIdKey || mergedByItemId.has(itemIdKey)) {
+        return;
+      }
+      mergedByItemId.set(itemIdKey, {
+        ...item,
+        listSource: "sold",
+        status: "COMPLETED",
+      });
+    });
+
+  sectionItemMap["trade-published"] = Array.from(mergedByItemId.values()).sort(
+    (a, b) => Number(b.id || 0) - Number(a.id || 0)
+  );
   selectedPublishedItemIds.value = [];
   activePublishedActionMenuId.value = null;
   batchActionMode.value = "";
@@ -1425,8 +1503,8 @@ const selectedPublishedItems = computed(() => {
   const selectedSet = new Set(
     selectedPublishedItemIds.value.map((itemId) => String(itemId))
   );
-  return sectionItemMap["trade-published"].filter((item) =>
-    selectedSet.has(String(item.itemId))
+  return sectionItemMap["trade-published"].filter(
+    (item) => item.listSource !== "sold" && selectedSet.has(String(item.itemId))
   );
 });
 
@@ -1884,6 +1962,33 @@ const handleRejectRefund = async (item) => {
   }
 };
 
+const handleWithdrawRejectedRefund = async (item) => {
+  const orderId = getTradeOrderId(item);
+  if (!orderId) {
+    ElMessage.warning("订单信息无效");
+    return;
+  }
+  try {
+    await withdrawTradeOrderRefund(orderId);
+    await loadMenuData("trade-bought", true);
+    ElMessage.success("已撤销退款申请，订单恢复待确认");
+    try {
+      await sendTradeReminderMessage({
+        item,
+        fetchContactFn: fetchBoughtOrderContact,
+        type: "REFUND_WITHDRAWN_BY_BUYER",
+        content: "买家已撤销退款申请，订单恢复待确认状态。",
+        actionText: "查看订单",
+        targetMenu: "trade-sold",
+      });
+    } catch {
+      ElMessage.warning("退款状态已更新，但聊天提醒发送失败");
+    }
+  } catch (error) {
+    ElMessage.error(error.message || "撤销退款申请失败");
+  }
+};
+
 const getTradeOrderId = (item) => item?.orderId || item?.id;
 
 const openContactChat = async (item, fetchContactFn) => {
@@ -1964,16 +2069,16 @@ onMounted(async () => {
 <style scoped>
 .profile-page {
   min-height: 100vh;
-  padding: 24px;
+  padding: 30px;
   background: #f8f7fd;
 }
 
 .profile-layout {
-  max-width: 1460px;
+  max-width: 1580px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: 290px minmax(0, 1fr);
+  gap: 24px;
   align-items: start;
 }
 
@@ -1984,7 +2089,7 @@ onMounted(async () => {
 }
 
 .profile-sidebar {
-  padding: 18px 14px;
+  padding: 22px 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1995,7 +2100,7 @@ onMounted(async () => {
 
 .sidebar-title {
   margin: 4px 8px 10px;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 700;
   color: #6f5ab8;
 }
@@ -2015,9 +2120,9 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 11px 12px;
+  padding: 13px 14px;
   border-radius: 12px;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
 }
 
@@ -2030,9 +2135,9 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 11px 12px;
+  padding: 13px 14px;
   border-radius: 12px;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
 }
 
@@ -2051,9 +2156,9 @@ onMounted(async () => {
 .sub-item {
   border-radius: 10px;
   margin: 2px 0;
-  padding: 9px 35px;
+  padding: 11px 36px;
   color: #6a6482;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .sub-item:hover,
@@ -2065,16 +2170,16 @@ onMounted(async () => {
 .profile-main {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 22px;
   margin-top: 0;
 }
 
 .hero-card {
-  padding: 24px;
+  padding: 30px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 16px;
+  gap: 20px;
   background: linear-gradient(135deg, #efe8ff 0%, #ffeefa 100%);
 }
 
@@ -2087,7 +2192,7 @@ onMounted(async () => {
 .profile-user {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 20px;
 }
 
 .profile-avatar {
@@ -2097,7 +2202,7 @@ onMounted(async () => {
 
 .user-name {
   margin: 0;
-  font-size: 28px;
+  font-size: 34px;
   color: #2f2f3f;
 }
 
@@ -2196,7 +2301,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 15px;
+  font-size: 18px;
   color: #6f6a83;
 }
 
@@ -2215,10 +2320,10 @@ onMounted(async () => {
 .action-btn {
   border: none;
   border-radius: 999px;
-  padding: 9px 16px;
+  padding: 11px 18px;
   background: #8c7cf0;
   color: #fff;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -2235,7 +2340,7 @@ onMounted(async () => {
 }
 
 .profile-content {
-  padding: 20px 22px 22px;
+  padding: 24px 26px 26px;
   min-height: 380px;
 }
 
@@ -2270,9 +2375,9 @@ onMounted(async () => {
 .batch-btn {
   border: none;
   border-radius: 999px;
-  padding: 7px 12px;
+  padding: 9px 14px;
   color: #ffffff;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -2292,13 +2397,13 @@ onMounted(async () => {
 
 .section-title {
   margin: 0;
-  font-size: 23px;
+  font-size: 30px;
   color: #2f2f3f;
 }
 
 .section-count {
   color: #938cb0;
-  font-size: 14px;
+  font-size: 18px;
 }
 
 .review-tabs {
@@ -2521,8 +2626,8 @@ onMounted(async () => {
 .published-grid {
   margin-top: 14px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
 }
 
 .published-grid > .pending-empty {
@@ -2602,10 +2707,10 @@ onMounted(async () => {
 }
 
 .published-card__body {
-  padding: 12px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .published-card__title-row {
@@ -2672,7 +2777,7 @@ onMounted(async () => {
 
 .published-card__title {
   margin: 0;
-  font-size: 16px;
+  font-size: 20px;
   color: #2f2f3f;
   white-space: nowrap;
   overflow: hidden;
@@ -2682,13 +2787,13 @@ onMounted(async () => {
 .published-card__meta {
   margin: 0;
   color: #8e88aa;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .published-card__desc {
   margin: 0;
   color: #6f6a83;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;

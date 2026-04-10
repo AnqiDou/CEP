@@ -267,13 +267,13 @@ watch(
 .wechat-page {
   min-height: 100vh;
   background: #ededed;
-  padding: 24px 14px;
+  padding: 30px 20px;
 }
 
 .wechat-main {
-  max-width: 460px;
+  max-width: 580px;
   margin: 0 auto;
-  border-radius: 14px;
+  border-radius: 18px;
   overflow: hidden;
   box-shadow: 0 16px 34px rgba(15, 23, 42, 0.2);
   background: #ffffff;
@@ -282,16 +282,16 @@ watch(
 .wechat-head {
   background: #07c160;
   color: #ffffff;
-  padding: 16px;
+  padding: 20px;
 }
 
 .wechat-logo {
-  font-size: 20px;
+  font-size: 26px;
   font-weight: 700;
 }
 
 .wechat-card {
-  padding: 24px 20px;
+  padding: 30px 24px;
   text-align: center;
 }
 
@@ -301,19 +301,19 @@ watch(
 
 .pay-item-name {
   margin: 0;
-  font-size: 20px;
+  font-size: 26px;
   color: #111827;
 }
 
 .pay-order-no {
   margin: 10px 0 0;
   color: #6b7280;
-  font-size: 13px;
+  font-size: 16px;
 }
 
 .pay-amount {
-  margin: 16px 0 26px;
-  font-size: 40px;
+  margin: 20px 0 30px;
+  font-size: 52px;
   font-weight: 700;
   color: #111827;
 }
@@ -321,7 +321,7 @@ watch(
 .confirm-btn,
 .outline-btn {
   border-radius: 999px;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -329,7 +329,7 @@ watch(
 .confirm-btn {
   width: 100%;
   border: none;
-  padding: 12px 20px;
+  padding: 14px 22px;
   background: #07c160;
   color: #ffffff;
 }
@@ -343,7 +343,7 @@ watch(
   border: 1px solid #d1d5db;
   background: #ffffff;
   color: #374151;
-  padding: 8px 18px;
+  padding: 10px 20px;
 }
 </style>
 

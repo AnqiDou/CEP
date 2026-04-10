@@ -405,6 +405,24 @@ public class TradeOrderRepository {
         return jdbcTemplate.update(sql, orderId);
     }
 
+    public int approveRefundPlatformIntervention(Long orderId) {
+        if (!hasRefundStatusColumn || !hasRefundTypeColumn) {
+            return 0;
+        }
+        String sql = """
+                UPDATE trade_orders
+                SET status = 'COMPLETED',
+                    refund_status = 'APPROVED',
+                    completed_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                  AND status = 'PENDING_CONFIRMATION'
+                  AND refund_status = 'APPLIED'
+                  AND refund_type = 'PLATFORM_INTERVENTION'
+                """;
+        return jdbcTemplate.update(sql, orderId);
+    }
+
     public int rejectRefund(Long orderId) {
         if (!hasRefundStatusColumn || !hasRefundTypeColumn) {
             return 0;
@@ -412,11 +430,42 @@ public class TradeOrderRepository {
         String sql = """
                 UPDATE trade_orders
                 SET refund_status = 'REJECTED',
-                    refund_type = NULL,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                   AND status = 'PENDING_CONFIRMATION'
                   AND refund_status = 'APPLIED'
+                """;
+        return jdbcTemplate.update(sql, orderId);
+    }
+
+    public int withdrawRejectedRefund(Long orderId) {
+        if (!hasRefundStatusColumn || !hasRefundTypeColumn) {
+            return 0;
+        }
+        String sql = """
+                UPDATE trade_orders
+                SET refund_status = 'NONE',
+                    refund_type = 'REJECTED_WITHDRAWN',
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                  AND status = 'PENDING_CONFIRMATION'
+                  AND refund_status = 'REJECTED'
+                """;
+        return jdbcTemplate.update(sql, orderId);
+    }
+
+    public int escalateRejectedRefundToPlatform(Long orderId) {
+        if (!hasRefundStatusColumn || !hasRefundTypeColumn) {
+            return 0;
+        }
+        String sql = """
+                UPDATE trade_orders
+                SET refund_status = 'APPLIED',
+                    refund_type = 'PLATFORM_INTERVENTION',
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                  AND status = 'PENDING_CONFIRMATION'
+                  AND refund_status = 'REJECTED'
                 """;
         return jdbcTemplate.update(sql, orderId);
     }

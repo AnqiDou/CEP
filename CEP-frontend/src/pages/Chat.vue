@@ -74,6 +74,12 @@
                 class="session-item__avatar-icon"
                 >🔔</span
               >
+              <img
+                v-else-if="conversation.peerAvatar"
+                :src="conversation.peerAvatar"
+                :alt="conversation.sellerName"
+                class="session-item__avatar-img"
+              />
               <template v-else>
                 {{ conversation.sellerName.slice(0, 1) }}
               </template>
@@ -127,6 +133,18 @@
           >
             <div class="conversation-peer">
               <div class="conversation-peer__head">
+                <div
+                  v-if="activeConversation && !isNotificationPanel"
+                  class="conversation-peer__avatar"
+                >
+                  <img
+                    v-if="activeConversation.peerAvatar"
+                    :src="activeConversation.peerAvatar"
+                    :alt="activePanelName"
+                    class="conversation-peer__avatar-img"
+                  />
+                  <span v-else>{{ activePanelName.slice(0, 1) }}</span>
+                </div>
                 <h3 class="conversation-peer__name">
                   {{ activePanelName }}
                 </h3>
@@ -158,6 +176,7 @@
                   </div>
                 </div>
                 <button
+                  v-if="showApplyTradeButton"
                   class="conversation-trade-btn"
                   type="button"
                   @click="applyTradeFromConversation"
@@ -457,6 +476,11 @@ const normalizeConversation = (raw) => ({
     typeof raw?.itemImage === "string" && raw.itemImage.trim()
       ? raw.itemImage.trim()
       : "",
+  peerAvatar:
+    typeof raw?.peerAvatar === "string" && raw.peerAvatar.trim()
+      ? raw.peerAvatar.trim()
+      : "",
+  viewerIsBuyer: Boolean(raw?.viewerIsBuyer),
   unread: Number.isInteger(raw?.unread) ? Math.max(raw.unread, 0) : 0,
   lastMessage: formatConversationLastMessage(raw?.lastMessage),
   lastTime:
@@ -537,6 +561,8 @@ const notificationConversation = computed(() => ({
   itemId: null,
   itemTitle: "",
   itemImage: "",
+  peerAvatar: "",
+  viewerIsBuyer: false,
   unread: notificationUnread.value,
   lastMessage: notificationLastMessage.value,
   lastTime: notificationLastTime.value,
@@ -563,6 +589,15 @@ const isNotificationPanel = computed(
 const hasActivePanel = computed(
   () => isNotificationPanel.value || Boolean(activeConversation.value)
 );
+
+const showApplyTradeButton = computed(() => {
+  if (isNotificationPanel.value || !activeConversation.value) {
+    return false;
+  }
+  return Boolean(
+    activeConversation.value.itemId && activeConversation.value.viewerIsBuyer
+  );
+});
 
 const activePanelName = computed(() => {
   if (isNotificationPanel.value) {
@@ -1257,6 +1292,13 @@ onBeforeUnmount(() => {
   color: #5e4eb6;
   font-size: 24px;
   font-weight: 700;
+  overflow: hidden;
+}
+
+.session-item__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .session-item__avatar--notification {
@@ -1378,6 +1420,26 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: flex-start;
   gap: 10px;
+}
+
+.conversation-peer__avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #cbc0ff, #f0d9ff);
+  color: #5e4eb6;
+  font-size: 18px;
+  font-weight: 700;
+  overflow: hidden;
+}
+
+.conversation-peer__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .conversation-peer__name {

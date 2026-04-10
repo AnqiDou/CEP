@@ -184,19 +184,6 @@
             {{ cat.name }}
           </button>
         </div>
-
-        <div class="sort-actions sort-actions--inline">
-          <button
-            v-for="option in sortOptions"
-            :key="option.id"
-            class="sort-btn"
-            :class="isSortActive(option) ? 'sort-btn--active' : ''"
-            type="button"
-            @click="applySort(option)"
-          >
-            {{ option.label }}
-          </button>
-        </div>
       </nav>
 
       <section class="content">
@@ -265,6 +252,16 @@
         </section>
       </section>
     </main>
+
+    <button
+      v-show="showBackToTop"
+      type="button"
+      class="back-to-top-btn"
+      aria-label="回到顶部"
+      @click="scrollToTop"
+    >
+      ↑
+    </button>
 
     <div v-if="isAuthModalVisible" class="login-modal-mask">
       <section class="login-modal" @click.stop>
@@ -826,8 +823,6 @@ const VIEWER_SCOPE_ALL = "all";
 const VIEWER_SCOPE_OTHERS = "others";
 const VIEWER_SCOPE_SELF = "self";
 const activeCategoryId = ref(HOT_CATEGORY_ID);
-const sortBy = ref("price");
-const sortOrder = ref("desc");
 const homeAccessToken = computed(() =>
   isUserLoggedIn.value ? authState.accessToken : ""
 );
@@ -840,6 +835,7 @@ const listHasMore = ref(true);
 const isLoadingMore = ref(false);
 const cardGridRef = ref(null);
 const homeScrollRef = ref(null);
+const showBackToTop = ref(false);
 const hotKeywords = ref([]);
 const unreadMessageCount = ref(0);
 const homeNotices = ref([]);
@@ -988,23 +984,6 @@ const handleUnreadBadgeSync = (event) => {
   }
   loadUnreadMessageCount();
 };
-
-const sortOptions = [
-  {
-    id: "price-asc",
-    sortBy: "price",
-    sortOrder: "asc",
-    label: "价格升序",
-    icon: "↑",
-  },
-  {
-    id: "price-desc",
-    sortBy: "price",
-    sortOrder: "desc",
-    label: "价格降序",
-    icon: "↓",
-  },
-];
 
 const activeCategory = computed(() =>
   categories.value.find((cat) => cat.id === activeCategoryId.value)
@@ -1522,8 +1501,8 @@ const loadHotItems = async ({ append = false } = {}) => {
     keyword: "",
     categoryId: undefined,
     viewerScope: hotViewerScope.value,
-    sortBy: sortBy.value,
-    sortOrder: sortOrder.value,
+    sortBy: "price",
+    sortOrder: "desc",
     page: nextPage,
     size: HOT_BATCH_SIZE,
     accessToken: homeAccessToken.value,
@@ -1570,8 +1549,8 @@ const loadListItems = async ({ append = false } = {}) => {
       ? activeOpsColumn.value?.columnCode
       : undefined,
     viewerScope: listViewerScope.value,
-    sortBy: sortBy.value,
-    sortOrder: sortOrder.value,
+    sortBy: "price",
+    sortOrder: "desc",
     page: nextPage,
     size: LIST_PAGE_SIZE,
     accessToken: homeAccessToken.value,
@@ -1627,11 +1606,16 @@ const handleHomeScroll = async () => {
   if (!element) {
     return;
   }
+  showBackToTop.value = element.scrollTop > 260;
   const reachBottom =
     element.scrollTop + element.clientHeight >= element.scrollHeight - 80;
   if (reachBottom) {
     await loadMoreItems();
   }
+};
+
+const scrollToTop = () => {
+  homeScrollRef.value?.scrollTo({ top: 0, behavior: "smooth" });
 };
 
 const ensureScrollableContent = async () => {
@@ -1791,28 +1775,6 @@ const selectCategory = async (id) => {
       await loadListItems({ append: false });
       await ensureScrollableContent();
     });
-  } catch (error) {
-    homeError.value = error.message || "获取物品列表失败";
-  }
-};
-
-const isSortActive = (option) =>
-  sortBy.value === option.sortBy && sortOrder.value === option.sortOrder;
-
-const applySort = async (option) => {
-  sortBy.value = option.sortBy;
-  sortOrder.value = option.sortOrder;
-  if (isHotMode.value) {
-    await loadHotItems({ append: false });
-    scrollGridToTop();
-    await ensureScrollableContent();
-    return;
-  }
-  homeError.value = "";
-  try {
-    await loadListItems({ append: false });
-    scrollGridToTop();
-    await ensureScrollableContent();
   } catch (error) {
     homeError.value = error.message || "获取物品列表失败";
   }
@@ -2933,6 +2895,28 @@ watch(
   padding: 0 28px 20px;
 }
 
+.back-to-top-btn {
+  position: fixed;
+  right: 36px;
+  bottom: 56px;
+  width: 52px;
+  height: 52px;
+  border: 1px solid #dcd9f4;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #6b5ac9;
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(106, 92, 201, 0.22);
+  z-index: 20;
+}
+
+.back-to-top-btn:hover {
+  background: #f4f1ff;
+}
+
 .content {
   display: flex;
   flex-direction: column;
@@ -3004,38 +2988,6 @@ watch(
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 18px;
-}
-
-.sort-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.sort-actions--inline {
-  width: 240px;
-  justify-content: space-between;
-  flex: 0 0 auto;
-}
-
-.sort-actions--inline .sort-btn {
-  flex: 1;
-}
-
-.sort-btn {
-  border: 1px solid #e0e4f2;
-  border-radius: 10px;
-  background: #ffffff;
-  color: #495274;
-  font-size: 14px;
-  padding: 7px 12px;
-  cursor: pointer;
-}
-
-.sort-btn--active {
-  border-color: #b8a9f7;
-  color: #6d5ccf;
-  background: #f1edff;
 }
 
 .card-grid {
@@ -3469,15 +3421,14 @@ watch(
     padding-right: 16px;
   }
 
+  .back-to-top-btn {
+    right: 24px;
+    bottom: 28px;
+  }
+
   .category-tabs {
     flex-wrap: wrap;
     justify-content: flex-start;
-  }
-
-  .sort-actions--inline {
-    width: 100%;
-    justify-content: stretch;
-    gap: 10px;
   }
 
   .card-grid {
@@ -3524,6 +3475,12 @@ watch(
 
   .search-bar__input {
     font-size: 14px;
+  }
+
+  .back-to-top-btn {
+    width: 46px;
+    height: 46px;
+    font-size: 26px;
   }
 
   .search-bar__btn {

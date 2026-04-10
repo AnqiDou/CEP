@@ -109,19 +109,23 @@ body,
 }
 
 .confirm-page::before {
-  content: "📝";
+  content: none;
+  display: none;
 }
 
 .method-page::before {
-  content: "💳";
+  content: none;
+  display: none;
 }
 
 .wechat-page::before {
-  content: "🪄";
+  content: none;
+  display: none;
 }
 
 .result-page::before {
-  content: "🎉";
+  content: none;
+  display: none;
 }
 
 .review-page::before {

@@ -147,20 +147,20 @@ watch(
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: 28px;
 }
 
 .result-main {
   width: 100%;
-  max-width: 420px;
+  max-width: 560px;
 }
 
 .result-card {
-  border-radius: 18px;
+  border-radius: 22px;
   background: #ffffff;
   box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
   text-align: center;
-  padding: 28px 22px;
+  padding: 36px 28px;
 }
 
 .result-card--error {
@@ -168,8 +168,8 @@ watch(
 }
 
 .success-icon {
-  width: 74px;
-  height: 74px;
+  width: 90px;
+  height: 90px;
   margin: 0 auto;
   border-radius: 50%;
   background: #22c55e;
@@ -177,19 +177,19 @@ watch(
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 36px;
+  font-size: 44px;
   font-weight: 700;
 }
 
 .title {
   margin: 16px 0 0;
-  font-size: 28px;
+  font-size: 36px;
   color: #111827;
 }
 
 .amount {
   margin: 12px 0 0;
-  font-size: 38px;
+  font-size: 50px;
   font-weight: 700;
   color: #111827;
 }
@@ -197,13 +197,13 @@ watch(
 .order-no {
   margin: 10px 0 24px;
   color: #6b7280;
-  font-size: 13px;
+  font-size: 16px;
 }
 
 .primary-btn,
 .secondary-btn {
   border-radius: 999px;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -211,7 +211,7 @@ watch(
 .primary-btn {
   width: 100%;
   border: none;
-  padding: 12px 20px;
+  padding: 14px 24px;
   color: #ffffff;
   background: linear-gradient(135deg, #16a34a, #22c55e);
 }
@@ -220,7 +220,7 @@ watch(
   border: 1px solid #bfdbfe;
   background: #eff6ff;
   color: #1d4ed8;
-  padding: 8px 18px;
+  padding: 10px 20px;
 }
 </style>
 

@@ -570,7 +570,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .publish-page {
   min-height: 100vh;
-  padding: 24px;
+  padding: 32px;
   background: radial-gradient(
       circle at 12% 16%,
       rgba(198, 185, 255, 0.52),
@@ -588,11 +588,11 @@ onBeforeUnmount(() => {
 }
 
 .publish-main {
-  max-width: 1320px;
+  max-width: 1580px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) 300px;
-  gap: 20px;
+  grid-template-columns: 260px minmax(0, 1fr) 340px;
+  gap: 24px;
   align-items: start;
 }
 
@@ -605,14 +605,14 @@ onBeforeUnmount(() => {
 }
 
 .left-rail {
-  padding: 18px 14px;
+  padding: 24px 18px;
   position: sticky;
   top: 18px;
 }
 
 .rail-title {
-  margin: 0 0 14px;
-  font-size: 15px;
+  margin: 0 0 18px;
+  font-size: 18px;
   font-weight: 700;
   color: #6656b6;
 }
@@ -629,8 +629,8 @@ onBeforeUnmount(() => {
 .left-nav-item {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 10px;
+  gap: 12px;
+  padding: 14px;
   border-radius: 14px;
   background: #f8f5ff;
 }
@@ -640,8 +640,8 @@ onBeforeUnmount(() => {
 }
 
 .left-nav-icon {
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -651,25 +651,25 @@ onBeforeUnmount(() => {
 
 .left-nav-text {
   margin: 0;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   color: #5f4fa8;
 }
 
 .left-nav-sub {
   margin: 3px 0 0;
-  font-size: 12px;
+  font-size: 13px;
   color: #948ab7;
 }
 
 .center-rail {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
 }
 
 .publish-header {
-  padding: 20px 22px;
+  padding: 28px 32px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -684,7 +684,7 @@ onBeforeUnmount(() => {
 
 .publish-title {
   margin: 0;
-  font-size: 30px;
+  font-size: 40px;
   font-weight: 800;
   letter-spacing: 0.5px;
   color: #6452b5;
@@ -692,18 +692,18 @@ onBeforeUnmount(() => {
 
 .publish-subtitle {
   margin: 8px 0 0;
-  font-size: 14px;
+  font-size: 17px;
   color: #9388b5;
 }
 
 .form-card {
-  padding: 24px;
+  padding: 30px;
 }
 
 .publish-form {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 22px;
 }
 
 .form-grid {
@@ -719,18 +719,18 @@ onBeforeUnmount(() => {
 }
 
 .form-label {
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 600;
   color: #635790;
 }
 
 .form-input {
-  min-height: 44px;
+  min-height: 52px;
   border: 1px solid #ebe5ff;
   border-radius: 14px;
-  padding: 10px 14px;
+  padding: 12px 16px;
   background: #fdfcff;
-  font-size: 14px;
+  font-size: 16px;
   color: #4a3f6c;
   outline: none;
   box-sizing: border-box;
@@ -762,7 +762,7 @@ onBeforeUnmount(() => {
 }
 
 :deep(.publish-category-select .el-select__wrapper) {
-  min-height: 44px;
+  min-height: 52px;
   border-radius: 14px;
   border: 1px solid #ebe5ff;
   padding: 0 14px;
@@ -877,7 +877,7 @@ onBeforeUnmount(() => {
 }
 
 .form-textarea {
-  min-height: 120px;
+  min-height: 160px;
   resize: vertical;
 }
 
@@ -891,11 +891,11 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 12px;
+  padding: 10px 16px;
   border-radius: 999px;
   background: #f7f2ff;
   color: #5f4fa8;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
 }
 
@@ -903,7 +903,7 @@ onBeforeUnmount(() => {
   position: relative;
   border: 1px dashed #c8bbff;
   border-radius: 16px;
-  padding: 20px 14px;
+  padding: 26px 18px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -923,18 +923,19 @@ onBeforeUnmount(() => {
 .upload-text {
   color: #6754b9;
   font-weight: 600;
+  font-size: 17px;
 }
 
 .upload-hint {
-  font-size: 12px;
+  font-size: 14px;
   color: #9c92be;
 }
 
 .preview-grid {
-  margin-top: 10px;
+  margin-top: 14px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .preview-card {
@@ -955,24 +956,24 @@ onBeforeUnmount(() => {
 .preview-remove {
   width: 100%;
   border: none;
-  padding: 8px;
+  padding: 10px;
   background: #efe9ff;
   color: #6754b9;
-  font-size: 12px;
+  font-size: 14px;
   cursor: pointer;
 }
 
 .submit-message {
   margin: 0;
-  font-size: 13px;
+  font-size: 15px;
   color: #6b5ab5;
 }
 
 .primary-btn {
   border: none;
   border-radius: 999px;
-  padding: 10px 20px;
-  font-size: 15px;
+  padding: 12px 24px;
+  font-size: 17px;
   font-weight: 600;
   background: linear-gradient(135deg, #8c7cf0 0%, #c6b9ff 58%, #ffbfd9 100%);
   color: #ffffff;
@@ -992,8 +993,8 @@ onBeforeUnmount(() => {
 
 .ghost-btn {
   border-radius: 999px;
-  padding: 8px 16px;
-  font-size: 14px;
+  padding: 10px 20px;
+  font-size: 16px;
   border: 1px solid #e3dcff;
   background: #ffffff;
   color: #61548f;
@@ -1009,13 +1010,13 @@ onBeforeUnmount(() => {
 }
 
 .status-card {
-  padding: 16px;
+  padding: 22px;
 }
 
 .status-line {
   margin: 0;
   color: #7465af;
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .status-progress {
@@ -1038,7 +1039,7 @@ onBeforeUnmount(() => {
 .status-tip {
   margin: 10px 0 0;
   color: #9a8fbd;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.5;
 }
 

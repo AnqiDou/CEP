@@ -124,28 +124,28 @@ watch(
 .method-page {
   min-height: 100vh;
   background: #f5f7fb;
-  padding: 24px 14px;
+  padding: 30px 20px;
 }
 
 .method-main {
-  max-width: 760px;
+  max-width: 940px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 18px;
 }
 
 .page-title {
   margin: 0;
-  font-size: 24px;
+  font-size: 32px;
 }
 
 .card,
 .state-card {
-  border-radius: 14px;
+  border-radius: 16px;
   background: #ffffff;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
-  padding: 16px;
+  padding: 20px;
 }
 
 .state-card--error {
@@ -153,14 +153,14 @@ watch(
 }
 
 h2 {
-  margin: 0 0 12px;
-  font-size: 18px;
+  margin: 0 0 14px;
+  font-size: 24px;
 }
 
 .order-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .order-row {
@@ -168,6 +168,7 @@ h2 {
   justify-content: space-between;
   gap: 12px;
   color: #4b5563;
+  font-size: 17px;
 }
 
 .order-row strong {
@@ -177,23 +178,24 @@ h2 {
 
 .order-row .price {
   color: #f97316;
-  font-size: 22px;
+  font-size: 30px;
 }
 
 .channel-option {
-  border-radius: 12px;
+  border-radius: 14px;
   border: 1px solid #d1fae5;
-  padding: 12px;
+  padding: 16px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   background: #ecfdf5;
   color: #065f46;
+  font-size: 18px;
 }
 
 .radio {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: #10b981;
   box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
@@ -203,20 +205,20 @@ h2 {
 .secondary-btn {
   border-radius: 999px;
   border: none;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .pay-btn {
   width: 100%;
-  padding: 12px 20px;
+  padding: 14px 22px;
   color: #ffffff;
   background: linear-gradient(135deg, #16a34a, #22c55e);
 }
 
 .secondary-btn {
-  padding: 8px 18px;
+  padding: 10px 20px;
   color: #1d4ed8;
   border: 1px solid #bfdbfe;
   background: #eff6ff;

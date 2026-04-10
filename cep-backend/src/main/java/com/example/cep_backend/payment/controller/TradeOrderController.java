@@ -83,6 +83,22 @@ public class TradeOrderController {
         return ApiResponse.ok("已拒绝退款", tradeOrderService.rejectRefund(user.userId(), orderId));
     }
 
+    @PatchMapping("/{orderId}/refund/withdraw")
+    public ApiResponse<TradeOrderDto> withdrawRejectedRefund(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long orderId) {
+        AuthUserDto user = authService.currentUser(authorization);
+        return ApiResponse.ok("已撤销退款申请", tradeOrderService.withdrawRejectedRefund(user.userId(), orderId));
+    }
+
+    @PatchMapping("/{orderId}/refund/escalate")
+    public ApiResponse<TradeOrderDto> escalateRejectedRefundToPlatform(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long orderId) {
+        AuthUserDto user = authService.currentUser(authorization);
+        return ApiResponse.ok("已申请平台介入", tradeOrderService.escalateRejectedRefundToPlatform(user.userId(), orderId));
+    }
+
     @PatchMapping("/{orderId}/cancel")
     public ApiResponse<TradeOrderDto> cancelOrder(
             @RequestHeader("Authorization") String authorization,

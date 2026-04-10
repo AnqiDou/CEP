@@ -34,6 +34,7 @@ public class MessageRepository {
                 rs.getLong("item_id"),
                 rs.getString("item_title"),
                 rs.getString("item_image"),
+                rs.getBoolean("viewer_is_buyer"),
                 rs.getInt("unread_count"),
                 lastMessage == null ? "" : lastMessage,
                 lastMessageAt.format(DATE_TIME_FORMATTER));
@@ -59,6 +60,7 @@ public class MessageRepository {
                         ORDER BY p.sort_order ASC, p.id ASC
                         LIMIT 1
                     ) AS item_image,
+                    CASE WHEN c.buyer_user_id = ? THEN TRUE ELSE FALSE END AS viewer_is_buyer,
                     CASE WHEN c.buyer_user_id = ? THEN c.unread_buyer ELSE c.unread_seller END AS unread_count,
                     c.last_message,
                     c.last_message_type,
@@ -78,9 +80,11 @@ public class MessageRepository {
         sql.append(" ORDER BY c.last_message_at DESC, c.id DESC ");
 
         if ("all".equals(filter)) {
-            return jdbcTemplate.query(sql.toString(), conversationRowMapper, userId, userId, userId, userId, userId);
+            return jdbcTemplate.query(sql.toString(), conversationRowMapper, userId, userId, userId, userId, userId,
+                    userId);
         }
         return jdbcTemplate.query(sql.toString(), conversationRowMapper, userId, userId, userId, userId, userId,
+                userId,
                 userId);
     }
 
@@ -100,6 +104,7 @@ public class MessageRepository {
                         ORDER BY p.sort_order ASC, p.id ASC
                         LIMIT 1
                     ) AS item_image,
+                    CASE WHEN c.buyer_user_id = ? THEN TRUE ELSE FALSE END AS viewer_is_buyer,
                     CASE WHEN c.buyer_user_id = ? THEN c.unread_buyer ELSE c.unread_seller END AS unread_count,
                     c.last_message,
                     c.last_message_type,
@@ -114,6 +119,7 @@ public class MessageRepository {
         List<MessageConversationDto> list = jdbcTemplate.query(
                 sql,
                 conversationRowMapper,
+                userId,
                 userId,
                 userId,
                 userId,

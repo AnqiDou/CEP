@@ -234,30 +234,30 @@ watch(
 .confirm-page {
   min-height: 100vh;
   background: #f7f8fc;
-  padding: 14px 14px 12px;
+  padding: 24px 20px 18px;
 }
 
 .confirm-main {
-  max-width: 780px;
+  max-width: 980px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .page-title {
   margin: 0;
-  font-size: 24px;
+  font-size: 32px;
   line-height: 1.1;
   color: #40376d;
 }
 
 .card,
 .state-card {
-  border-radius: 16px;
+  border-radius: 18px;
   background: #ffffff;
   box-shadow: 0 8px 20px rgba(134, 123, 199, 0.1);
-  padding: 14px;
+  padding: 18px;
 }
 
 .state-card--error {
@@ -265,19 +265,19 @@ watch(
 }
 
 h2 {
-  margin: 0 0 8px;
-  font-size: 20px;
+  margin: 0 0 10px;
+  font-size: 24px;
   color: #3f3868;
 }
 
 .item-row {
   display: flex;
-  gap: 12px;
+  gap: 16px;
 }
 
 .item-cover {
-  width: 82px;
-  height: 82px;
+  width: 96px;
+  height: 96px;
   border-radius: 12px;
   object-fit: cover;
   background: #ede9ff;
@@ -301,21 +301,21 @@ h2 {
 .item-title {
   margin: 0;
   font-weight: 600;
-  font-size: 22px;
+  font-size: 26px;
   color: #3f3868;
 }
 
 .item-price {
   margin: 0;
   color: #7764de;
-  font-size: 28px;
+  font-size: 34px;
   font-weight: 700;
 }
 
 .address-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .address-card::before {
@@ -330,11 +330,11 @@ h2 {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .field span {
-  font-size: 16px;
+  font-size: 18px;
   color: #5d537f;
 }
 
@@ -342,8 +342,8 @@ h2 {
 .field textarea {
   border: none;
   border-radius: 12px;
-  padding: 8px 12px;
-  font-size: 16px;
+  padding: 10px 14px;
+  font-size: 17px;
   line-height: 1.35;
   outline: none;
   background: #faf9ff;
@@ -352,7 +352,7 @@ h2 {
 
 .field textarea {
   resize: vertical;
-  min-height: 54px;
+  min-height: 72px;
 }
 
 .field input:focus,
@@ -364,20 +364,20 @@ h2 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
 }
 
 .total-row {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: 8px;
   color: #574b7c;
-  font-size: 18px;
+  font-size: 22px;
 }
 
 .total-row strong {
   color: #f26f3d;
-  font-size: 28px;
+  font-size: 34px;
 }
 
 .primary-btn,
@@ -389,10 +389,10 @@ h2 {
 }
 
 .primary-btn {
-  padding: 8px 20px;
+  padding: 10px 24px;
   color: #ffffff;
   background: #26ba5f;
-  font-size: 18px;
+  font-size: 20px;
 }
 
 .primary-btn:disabled {
@@ -401,10 +401,11 @@ h2 {
 }
 
 .secondary-btn {
-  padding: 8px 18px;
+  padding: 10px 20px;
   color: #61538b;
   border: 1px solid #dcd4ff;
   background: #f6f3ff;
+  font-size: 17px;
 }
 
 @media (max-width: 640px) {

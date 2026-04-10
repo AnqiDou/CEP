@@ -194,6 +194,7 @@ const orderPickerVisible = ref(false);
 const orderListLoading = ref(false);
 const orderSelectionItems = ref([]);
 const selectedOrderId = ref(null);
+const selectedOrderNo = ref("");
 
 const IMAGE_PREFIX = "【图片】";
 
@@ -217,6 +218,10 @@ const getOrderDisplayNo = (item) => {
 const selectedOrderDisplayNo = computed(() => {
   if (selectedOrder.value) {
     return getOrderDisplayNo(selectedOrder.value);
+  }
+  const orderNo = String(selectedOrderNo.value || "").trim();
+  if (orderNo) {
+    return orderNo;
   }
   const orderId = Number(selectedOrderId.value || 0);
   return orderId > 0 ? String(orderId) : "";
@@ -319,11 +324,13 @@ const selectOrder = (item) => {
     return;
   }
   selectedOrderId.value = orderId;
+  selectedOrderNo.value = String(item?.orderNo || "").trim();
   closeOrderPicker();
 };
 
 const clearSelectedOrder = () => {
   selectedOrderId.value = null;
+  selectedOrderNo.value = "";
 };
 
 const formatTime = (value) => {
@@ -552,6 +559,10 @@ const sendMessage = async () => {
 };
 
 onMounted(async () => {
+  const routeOrderNo = String(route.query?.orderNo || "").trim();
+  if (routeOrderNo) {
+    selectedOrderNo.value = routeOrderNo;
+  }
   const routeOrderId = String(route.query?.orderId || "").trim();
   if (/^\d+$/.test(routeOrderId) && Number(routeOrderId) > 0) {
     selectedOrderId.value = Number(routeOrderId);
