@@ -2,10 +2,10 @@
     "configurations": [
         {
             "type": "java",
-            "name": "Spring Boot-CepBackendApplication<cep-backend>",
+            "name": "Spring Boot-CepBackendApplication",
             "request": "launch",
             "cwd": "${workspaceFolder}/cep-backend",
-            "mainClass": "com.example.cep_backend.CepBackendApplication",
+            "mainClass": "cep_backend.CepBackendApplication",
             "projectName": "cep-backend",
             "args": "",
             "envFile": "${workspaceFolder}/.env",
