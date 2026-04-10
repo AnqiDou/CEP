@@ -159,11 +159,38 @@
             class="toolbar-input"
             placeholder="商品名称"
           />
-          <input
-            v-model.trim="itemCategoryKeyword"
-            class="toolbar-input"
-            placeholder="分类"
-          />
+          <div ref="itemCategoryDropdownRef" class="status-select">
+            <button
+              type="button"
+              class="status-select__trigger"
+              @click="itemCategoryOpen = !itemCategoryOpen"
+            >
+              <span>{{ itemCategoryLabel }}</span>
+              <span
+                class="status-select__arrow"
+                :class="{ 'is-open': itemCategoryOpen }"
+                >▾</span
+              >
+            </button>
+            <ul v-if="itemCategoryOpen" class="status-select__menu">
+              <li
+                class="status-select__option"
+                :class="{ 'is-selected': itemCategoryKeyword === '' }"
+                @click="selectItemCategory('')"
+              >
+                全部分类
+              </li>
+              <li
+                v-for="option in itemCategoryOptions"
+                :key="option.value"
+                class="status-select__option"
+                :class="{ 'is-selected': itemCategoryKeyword === option.value }"
+                @click="selectItemCategory(option.value)"
+              >
+                {{ option.label }}
+              </li>
+            </ul>
+          </div>
           <input
             v-model.trim="itemPriceKeyword"
             class="toolbar-input"
@@ -641,6 +668,7 @@ import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { logout } from "../service/common/authSessionService";
 import { buildMessageWebSocketUrl } from "../service/chat/chatApiService";
+import { fetchHomeCategories } from "../service/home/homeApiService";
 import { uploadPublishImage } from "../service/publish/publishApiService";
 import {
   approveAdminItem,
@@ -706,9 +734,12 @@ const itemPriceKeyword = ref("");
 const itemPublisherKeyword = ref("");
 const itemPage = ref(1);
 const itemStatus = ref("all");
+const itemCategoryOpen = ref(false);
 const itemStatusOpen = ref(false);
+const itemCategoryDropdownRef = ref(null);
 const itemStatusDropdownRef = ref(null);
 const itemSearchTimer = ref(null);
+const itemCategoryOptions = ref([]);
 const itemStatusOptions = [
   { value: "all", label: "全部状态" },
   { value: "pending", label: "待审核" },
@@ -720,6 +751,14 @@ const itemStatusLabel = computed(
     itemStatusOptions.find((option) => option.value === itemStatus.value)
       ?.label || "全部状态"
 );
+const itemCategoryLabel = computed(() => {
+  if (!itemCategoryKeyword.value) return "全部分类";
+  return (
+    itemCategoryOptions.value.find(
+      (option) => option.value === itemCategoryKeyword.value
+    )?.label || itemCategoryKeyword.value
+  );
+});
 
 const orders = ref([]);
 const orderNoKeyword = ref("");
@@ -967,6 +1006,19 @@ const loadItems = async () => {
   updateNavCount();
 };
 
+const loadItemCategories = async () => {
+  const response = await fetchHomeCategories();
+  const remoteOptions = Array.isArray(response?.data)
+    ? response.data
+        .map((item) => ({
+          value: String(item?.name || "").trim(),
+          label: String(item?.name || "").trim(),
+        }))
+        .filter((item) => item.value)
+    : [];
+  itemCategoryOptions.value = remoteOptions;
+};
+
 const loadOrders = async () => {
   const { data } = await fetchAdminOrders({
     orderNo: orderNoKeyword.value,
@@ -1095,7 +1147,7 @@ const ensureMenuDataLoaded = async (menuKey, options = {}) => {
     } else if (menuKey === "users") {
       await loadUsers();
     } else if (menuKey === "items") {
-      await loadItems();
+      await Promise.all([loadItemCategories(), loadItems()]);
     } else if (menuKey === "orders") {
       await loadOrders();
     } else if (menuKey === "support") {
@@ -1229,6 +1281,11 @@ const selectItemStatus = (value) => {
   itemStatusOpen.value = false;
 };
 
+const selectItemCategory = (value) => {
+  itemCategoryKeyword.value = value;
+  itemCategoryOpen.value = false;
+};
+
 const selectOrderState = (value) => {
   orderState.value = value;
   orderStateOpen.value = false;
@@ -1236,6 +1293,12 @@ const selectOrderState = (value) => {
 
 const handleDocumentClick = (event) => {
   const target = event.target;
+  if (
+    itemCategoryDropdownRef.value &&
+    !itemCategoryDropdownRef.value.contains(target)
+  ) {
+    itemCategoryOpen.value = false;
+  }
   if (
     itemStatusDropdownRef.value &&
     !itemStatusDropdownRef.value.contains(target)
@@ -1768,8 +1831,8 @@ onBeforeUnmount(() => {
 
 .status-select__trigger {
   width: 100%;
-  border: 1px solid #d8ccff;
-  border-radius: 14px;
+  border: 1px solid #c8b7ff;
+  border-radius: 16px;
   background: #ffffff;
   color: #1f2937;
   padding: 12px 14px;
@@ -1779,6 +1842,18 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   box-sizing: border-box;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.status-select__trigger:hover {
+  border-color: #b59cff;
+}
+
+.status-select__trigger:focus,
+.status-select__trigger:active {
+  border-color: #a78bfa;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
 }
 
 .status-select__trigger:focus-visible {
@@ -1798,16 +1873,16 @@ onBeforeUnmount(() => {
 .status-select__menu {
   position: absolute;
   z-index: 20;
-  top: calc(100% + 8px);
+  top: calc(100% + 6px);
   left: 0;
   right: 0;
   margin: 0;
-  padding: 8px 0;
+  padding: 6px 0;
   list-style: none;
-  border: 1px solid #e9ddff;
+  border: 1px solid #d8cbff;
   border-radius: 14px;
   background: #fff;
-  box-shadow: 0 10px 26px rgba(76, 29, 149, 0.12);
+  box-shadow: 0 12px 26px rgba(76, 29, 149, 0.15);
   max-height: 240px;
   overflow-y: auto;
 }
@@ -1826,7 +1901,7 @@ onBeforeUnmount(() => {
 }
 
 .status-select__option.is-selected {
-  background: #ece2ff;
+  background: #e9defe;
   color: #5b21b6;
   font-weight: 600;
 }

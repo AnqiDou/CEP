@@ -17,7 +17,10 @@
 
         <div class="menu-group">
           <button
-            class="menu-title"
+            :class="[
+              'menu-title',
+              selectedMenu.startsWith('trade-') ? 'menu-title--active' : '',
+            ]"
             type="button"
             @click="tradeOpen = !tradeOpen"
           >
@@ -56,19 +59,39 @@
           <span>我的收藏</span>
         </button>
 
-        <button
-          v-for="item in followMenus"
-          :key="item.key"
-          :class="[
-            'menu-item',
-            selectedMenu === item.key ? 'menu-item--active' : '',
-          ]"
-          type="button"
-          @click="selectMenu(item.key)"
-        >
-          <el-icon><User /></el-icon>
-          <span>{{ item.label }}</span>
-        </button>
+        <div class="menu-group">
+          <button
+            :class="[
+              'menu-title',
+              selectedMenu === 'following' || selectedMenu === 'fans'
+                ? 'menu-title--active'
+                : '',
+            ]"
+            type="button"
+            @click="followOpen = !followOpen"
+          >
+            <span class="menu-title__left"
+              ><el-icon><User /></el-icon>关注/粉丝</span
+            >
+            <el-icon
+              ><ArrowDown v-if="followOpen" /><ArrowRight v-else
+            /></el-icon>
+          </button>
+          <div v-if="followOpen" class="menu-sublist">
+            <button
+              v-for="item in followMenus"
+              :key="item.key"
+              :class="[
+                'sub-item',
+                selectedMenu === item.key ? 'sub-item--active' : '',
+              ]"
+              type="button"
+              @click="selectMenu(item.key)"
+            >
+              {{ item.label }}
+            </button>
+          </div>
+        </div>
       </aside>
 
       <main class="profile-main">
@@ -793,17 +816,18 @@ const userInfo = reactive({
   passwordUpdatedAt: "2026-03-01",
 });
 const tradeMenus = [
-  { key: "trade-published", label: "我发布的" },
-  { key: "trade-sold", label: "我卖出的" },
-  { key: "trade-bought", label: "我买到的" },
+  { key: "trade-published", label: "发布的订单" },
+  { key: "trade-sold", label: "卖出的订单" },
+  { key: "trade-bought", label: "买到的订单" },
 ];
 
 const followMenus = [
-  { key: "following", label: "我的关注" },
-  { key: "fans", label: "我的粉丝" },
+  { key: "following", label: "关注" },
+  { key: "fans", label: "粉丝" },
 ];
 
 const tradeOpen = ref(true);
+const followOpen = ref(false);
 const selectedMenu = ref("idle");
 const editDialogVisible = ref(false);
 const itemEditDialogVisible = ref(false);
@@ -2051,6 +2075,8 @@ onMounted(async () => {
     localStorage.setItem(PROFILE_SELECTED_MENU_KEY, "idle");
   }
   tradeOpen.value = selectedMenu.value.startsWith("trade-");
+  followOpen.value =
+    selectedMenu.value === "following" || selectedMenu.value === "fans";
   activeReviewTab.value = "all";
   await initAuthSession();
   if (!authState.user) {
@@ -2139,6 +2165,11 @@ onMounted(async () => {
   border-radius: 12px;
   font-size: 16px;
   font-weight: 600;
+}
+
+.menu-title--active {
+  background: #f1ecff;
+  color: #6f5ab8;
 }
 
 .menu-title__left {

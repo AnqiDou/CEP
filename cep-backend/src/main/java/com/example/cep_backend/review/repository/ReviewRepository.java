@@ -84,6 +84,31 @@ public class ReviewRepository {
                   AND status = 'PENDING'
                 """;
         jdbcTemplate.update(updateTaskSql, Timestamp.valueOf(now), Timestamp.valueOf(now), orderId, reviewerUserId);
+
+        applyCreditScoreDelta(targetUserId, targetRole, rating, now);
+    }
+
+    private void applyCreditScoreDelta(Long targetUserId, String targetRole, String rating, LocalDateTime now) {
+        if (targetUserId == null || targetUserId <= 0) {
+            return;
+        }
+        String normalizedRole = targetRole == null ? "" : targetRole.trim().toUpperCase();
+        String column = "SELLER".equals(normalizedRole) ? "seller_credit_score"
+                : "BUYER".equals(normalizedRole) ? "buyer_credit_score" : "";
+        if (column.isEmpty()) {
+            return;
+        }
+
+        int delta = "good".equalsIgnoreCase(rating) ? 1 : -1;
+        String sql = """
+                INSERT INTO user_profiles (user_id, seller_credit_score, buyer_credit_score, created_at, updated_at)
+                VALUES (?, 100.0, 100.0, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    %s = GREATEST(0.0, %s + ?),
+                    updated_at = VALUES(updated_at)
+                """.formatted(column, column);
+        Timestamp ts = Timestamp.valueOf(now);
+        jdbcTemplate.update(sql, targetUserId, ts, ts, delta);
     }
 
     public void ensureReviewInvite(Long orderId, Long itemId, Long buyerUserId, Long sellerUserId) {

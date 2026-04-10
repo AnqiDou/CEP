@@ -30,8 +30,7 @@ public class HomeRepository {
             rs.getBoolean("is_self"),
             rs.getString("seller_name"),
             rs.getString("seller_avatar_url"),
-            rs.getInt("seller_good_count"),
-            rs.getInt("seller_bad_count"),
+            rs.getBigDecimal("seller_credit_score"),
             rs.getString("category_code"),
             rs.getString("category_name"),
             rs.getString("title"),
@@ -130,20 +129,7 @@ public class HomeRepository {
                     %s AS is_self,
                     COALESCE(NULLIF(u.username, ''), '校园用户') AS seller_name,
                     up.avatar_url AS seller_avatar_url,
-                    (
-                        SELECT COUNT(1)
-                        FROM user_credit_reviews ucr
-                        WHERE ucr.target_user_id = COALESCE(i.publisher_user_id, d.publisher_user_id)
-                          AND ucr.target_role = 'SELLER'
-                          AND ucr.rating = 'good'
-                    ) AS seller_good_count,
-                    (
-                        SELECT COUNT(1)
-                        FROM user_credit_reviews ucr
-                        WHERE ucr.target_user_id = COALESCE(i.publisher_user_id, d.publisher_user_id)
-                          AND ucr.target_role = 'SELLER'
-                          AND ucr.rating = 'bad'
-                    ) AS seller_bad_count,
+                    COALESCE(up.seller_credit_score, 100.0) AS seller_credit_score,
                     c.code AS category_code,
                     c.name AS category_name,
                     i.title,
@@ -232,20 +218,7 @@ public class HomeRepository {
                         %s AS is_self,
                         COALESCE(NULLIF(u.username, ''), '校园用户') AS seller_name,
                         up.avatar_url AS seller_avatar_url,
-                        (
-                            SELECT COUNT(1)
-                            FROM user_credit_reviews ucr
-                            WHERE ucr.target_user_id = COALESCE(i.publisher_user_id, d.publisher_user_id)
-                              AND ucr.target_role = 'SELLER'
-                              AND ucr.rating = 'good'
-                        ) AS seller_good_count,
-                        (
-                            SELECT COUNT(1)
-                            FROM user_credit_reviews ucr
-                            WHERE ucr.target_user_id = COALESCE(i.publisher_user_id, d.publisher_user_id)
-                              AND ucr.target_role = 'SELLER'
-                              AND ucr.rating = 'bad'
-                        ) AS seller_bad_count,
+                        COALESCE(up.seller_credit_score, 100.0) AS seller_credit_score,
                         c.code AS category_code,
                         c.name AS category_name,
                         i.title,

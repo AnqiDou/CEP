@@ -161,9 +161,7 @@ public class HomeService {
                 Boolean.TRUE.equals(record.self()),
                 record.sellerName(),
                 record.sellerAvatarUrl(),
-                CreditLevelResolver.resolveLabel(
-                        record.sellerGoodCount() == null ? 0 : record.sellerGoodCount(),
-                        record.sellerBadCount() == null ? 0 : record.sellerBadCount()),
+                CreditLevelResolver.resolveLabel(record.sellerCreditScore()),
                 record.categoryCode(),
                 record.categoryName(),
                 record.title(),
