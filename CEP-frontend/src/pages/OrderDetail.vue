@@ -68,7 +68,7 @@
 import { onMounted, reactive } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
-import { fetchTradeOrderDetail } from "../service/payment/paymentApiService";
+import { fetchTradeOrderDetail } from "../api/payment/paymentApiService";
 
 const route = useRoute();
 const router = useRouter();

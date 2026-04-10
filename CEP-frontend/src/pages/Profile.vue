@@ -765,7 +765,7 @@ import {
   authState,
   initAuthSession,
   logout,
-} from "../service/common/authSessionService";
+} from "../api/common/authSessionService";
 import {
   fetchBoughtOrderContact,
   fetchBoughtItems,
@@ -778,11 +778,11 @@ import {
   fetchSoldItems,
   updateProfileBasic,
   uploadProfileAvatar,
-} from "../service/profile/profileApiService";
+} from "../api/profile/profileApiService";
 import {
   buildMessageWebSocketUrl,
   createOrGetDirectConversation,
-} from "../service/chat/chatApiService";
+} from "../api/chat/chatApiService";
 import {
   applyTradeOrderRefund,
   approveTradeOrderRefund,
@@ -791,13 +791,13 @@ import {
   confirmSellerDelivered,
   rejectTradeOrderRefund,
   withdrawTradeOrderRefund,
-} from "../service/payment/paymentApiService";
+} from "../api/payment/paymentApiService";
 import {
   deleteMyPublishItem,
   fetchMyPublishItems,
   updateMyPublishItem,
   updateMyPublishItemStatus,
-} from "../service/publish/publishApiService";
+} from "../api/publish/publishApiService";
 
 const router = useRouter();
 const PROFILE_SELECTED_MENU_KEY = "profile:selectedMenu";

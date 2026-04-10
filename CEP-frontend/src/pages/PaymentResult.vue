@@ -20,7 +20,7 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { fetchTradeOrder } from "../service/payment/paymentApiService";
+import { fetchTradeOrder } from "../api/payment/paymentApiService";
 
 const route = useRoute();
 const router = useRouter();

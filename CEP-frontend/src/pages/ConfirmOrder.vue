@@ -80,9 +80,9 @@
 import { computed, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
 import { useRoute, useRouter } from "vue-router";
-import { fetchItemDetail } from "../service/item-detail/itemDetailApiService";
-import { createTradeOrder } from "../service/payment/paymentApiService";
-import { fetchProfileOverview } from "../service/profile/profileApiService";
+import { fetchItemDetail } from "../api/item-detail/itemDetailApiService";
+import { createTradeOrder } from "../api/payment/paymentApiService";
+import { fetchProfileOverview } from "../api/profile/profileApiService";
 
 const route = useRoute();
 const router = useRouter();

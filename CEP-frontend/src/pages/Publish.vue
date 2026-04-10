@@ -249,7 +249,7 @@ import {
   fetchMyPublishItems,
   updateMyPublishItem,
   uploadPublishImage,
-} from "../service/publish/publishApiService";
+} from "../api/publish/publishApiService";
 
 const router = useRouter();
 const route = useRoute();

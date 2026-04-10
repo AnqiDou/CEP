@@ -38,12 +38,12 @@ import { useRoute, useRouter } from "vue-router";
 import {
   buildMessageWebSocketUrl,
   createOrGetDirectConversation,
-} from "../service/chat/chatApiService";
+} from "../api/chat/chatApiService";
 import {
   fetchTradeOrder,
   markTradeOrderPaid,
-} from "../service/payment/paymentApiService";
-import { fetchBoughtOrderContact } from "../service/profile/profileApiService";
+} from "../api/payment/paymentApiService";
+import { fetchBoughtOrderContact } from "../api/profile/profileApiService";
 
 const TRADE_REMINDER_PREFIX = "[TRADE_REMINDER]";
 

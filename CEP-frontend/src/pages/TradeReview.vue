@@ -95,7 +95,7 @@ import { useRoute, useRouter } from "vue-router";
 import {
   fetchReviewOrderDetail,
   submitTradeReview,
-} from "../service/review/reviewApiService";
+} from "../api/review/reviewApiService";
 
 const route = useRoute();
 const router = useRouter();

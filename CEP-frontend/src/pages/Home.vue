@@ -706,22 +706,22 @@ import {
   sendResetPasswordCode,
   verifyRegisterCode,
   verifyResetPasswordCode,
-} from "../service/login/loginApiService";
+} from "../api/login/loginApiService";
 import {
   authState,
   initAuthSession,
   saveAuthSession,
-} from "../service/common/authSessionService";
+} from "../api/common/authSessionService";
 import {
   fetchHomeCategories,
   fetchHotKeywords,
   fetchHomeItems,
   fetchHomeNotices,
-} from "../service/home/homeApiService";
+} from "../api/home/homeApiService";
 import {
   fetchMessageConversations,
   fetchMessageNotificationUnreadCount,
-} from "../service/chat/chatApiService";
+} from "../api/chat/chatApiService";
 
 const router = useRouter();
 const route = useRoute();

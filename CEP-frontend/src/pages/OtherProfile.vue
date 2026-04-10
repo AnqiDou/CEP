@@ -199,7 +199,7 @@ import {
   fetchOtherProfileReviews,
   followOtherProfile,
   unfollowOtherProfile,
-} from "../service/profile/profileApiService";
+} from "../api/profile/profileApiService";
 
 const route = useRoute();
 const router = useRouter();

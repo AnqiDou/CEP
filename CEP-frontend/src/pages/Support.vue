@@ -169,13 +169,13 @@ import { useRoute } from "vue-router";
 import {
   fetchMySupportMessages,
   sendMySupportMessage,
-} from "../service/admin/adminApiService";
-import { buildMessageWebSocketUrl } from "../service/chat/chatApiService";
+} from "../api/admin/adminApiService";
+import { buildMessageWebSocketUrl } from "../api/chat/chatApiService";
 import {
   fetchBoughtItems,
   fetchSoldItems,
-} from "../service/profile/profileApiService";
-import { uploadPublishImage } from "../service/publish/publishApiService";
+} from "../api/profile/profileApiService";
+import { uploadPublishImage } from "../api/publish/publishApiService";
 
 const route = useRoute();
 

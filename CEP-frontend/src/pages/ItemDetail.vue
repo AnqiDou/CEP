@@ -209,7 +209,7 @@ import {
   fetchItemFavoriteStatus,
   removeItemFavorite,
   reportItem,
-} from "../service/item-detail/itemDetailApiService";
+} from "../api/item-detail/itemDetailApiService";
 
 const route = useRoute();
 const router = useRouter();

@@ -18,7 +18,7 @@ import Support from "../pages/Support.vue";
 import {
   authState,
   initAuthSession,
-} from "../service/common/authSessionService";
+} from "../api/common/authSessionService";
 
 const ADMIN_EMAIL = "3299166215@qq.com";
 const PUBLIC_ROUTE_NAMES = new Set(["home", "terms", "privacy"]);

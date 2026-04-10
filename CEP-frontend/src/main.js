@@ -5,7 +5,7 @@ import "element-plus/dist/index.css";
 import "./styles/soft-neo-theme.css";
 import * as ElementPlusIconsVue from "@element-plus/icons-vue";
 import router from "./router";
-import { AUTH_EXPIRED_EVENT } from "./service/common/authSessionService";
+import { AUTH_EXPIRED_EVENT } from "./api/common/authSessionService";
 
 const app = createApp(App);
 

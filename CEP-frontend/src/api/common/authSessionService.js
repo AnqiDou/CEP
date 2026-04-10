@@ -1,5 +1,5 @@
 import { reactive } from "vue";
-import { parseAuthSessionResponse } from "../../interface/login/loginInterfaces";
+import { parseAuthSessionResponse } from "../../utils/login/loginInterfaces";
 import {
   fetchCurrentUser as fetchCurrentUserApi,
   logoutSession,

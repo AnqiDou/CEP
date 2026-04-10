@@ -666,10 +666,10 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
-import { logout } from "../service/common/authSessionService";
-import { buildMessageWebSocketUrl } from "../service/chat/chatApiService";
-import { fetchHomeCategories } from "../service/home/homeApiService";
-import { uploadPublishImage } from "../service/publish/publishApiService";
+import { logout } from "../api/common/authSessionService";
+import { buildMessageWebSocketUrl } from "../api/chat/chatApiService";
+import { fetchHomeCategories } from "../api/home/homeApiService";
+import { uploadPublishImage } from "../api/publish/publishApiService";
 import {
   approveAdminItem,
   createAdminNotice,
@@ -688,7 +688,7 @@ import {
   updateAdminConversationStatus,
   updateAdminUserCreditScore,
   updateAdminUserStatus,
-} from "../service/admin/adminApiService";
+} from "../api/admin/adminApiService";
 
 const router = useRouter();
 const loading = ref(false);
