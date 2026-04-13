@@ -1,4 +1,5 @@
 package cep_backend.service;
+
 import cep_backend.common.exception.BusinessException;
 import cep_backend.service.AuthService;
 import cep_backend.dto.HomeCategoryDto;
@@ -165,7 +166,6 @@ public class HomeService {
                 record.title(),
                 record.description(),
                 record.price(),
-                record.badge(),
                 record.opsColumns(),
                 record.photoUrl(),
                 record.createdAt());

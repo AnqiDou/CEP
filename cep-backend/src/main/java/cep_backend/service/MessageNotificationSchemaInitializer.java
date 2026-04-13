@@ -1,4 +1,5 @@
 package cep_backend.service;
+
 import jakarta.annotation.PostConstruct;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -23,6 +24,7 @@ public class MessageNotificationSchemaInitializer {
     public void ensureSchema() {
         try {
             ensureMessageNotificationsTable();
+            dropColumnIfExists(TABLE_MESSAGE_NOTIFICATIONS, "read_at");
             createIndexIfMissing(
                     TABLE_MESSAGE_NOTIFICATIONS,
                     "idx_message_notifications_user",
@@ -50,7 +52,6 @@ public class MessageNotificationSchemaInitializer {
                     related_item_id BIGINT NULL,
                     related_user_id BIGINT NULL,
                     is_read TINYINT(1) NOT NULL DEFAULT 0,
-                    read_at DATETIME(6) NULL,
                     created_at DATETIME(6) NOT NULL,
                     updated_at DATETIME(6) NOT NULL,
                     CONSTRAINT fk_message_notifications_user FOREIGN KEY (user_id) REFERENCES users (id),
@@ -88,6 +89,33 @@ public class MessageNotificationSchemaInitializer {
             return;
         }
         jdbcTemplate.execute(ddl);
+    }
+
+    private void dropColumnIfExists(String tableName, String columnName) throws SQLException {
+        if (!columnExists(tableName, columnName)) {
+            return;
+        }
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " DROP COLUMN " + columnName);
+    }
+
+    private boolean columnExists(String tableName, String columnName) throws SQLException {
+        return matchMetadataTableName(tableName, (metaData, normalizedTableName) -> {
+            try (ResultSet columns = metaData.getColumns(null, null, normalizedTableName, columnName)) {
+                if (columns.next()) {
+                    return true;
+                }
+            }
+            try (ResultSet columns = metaData.getColumns(null, null, normalizedTableName,
+                    columnName.toUpperCase(Locale.ROOT))) {
+                if (columns.next()) {
+                    return true;
+                }
+            }
+            try (ResultSet columns = metaData.getColumns(null, null, normalizedTableName,
+                    columnName.toLowerCase(Locale.ROOT))) {
+                return columns.next();
+            }
+        });
     }
 
     private boolean matchMetadataTableName(String tableName, MetadataMatcher matcher) throws SQLException {

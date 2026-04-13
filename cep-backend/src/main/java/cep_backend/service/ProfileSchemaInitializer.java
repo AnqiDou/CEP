@@ -1,4 +1,5 @@
 package cep_backend.service;
+
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,7 +61,6 @@ public class ProfileSchemaInitializer {
                 CREATE TABLE user_profiles (
                     id BIGINT AUTO_INCREMENT PRIMARY KEY,
                     user_id BIGINT NOT NULL UNIQUE,
-                    college VARCHAR(80) NULL,
                     name VARCHAR(50) NULL,
                     phone VARCHAR(30) NULL,
                     address VARCHAR(200) NULL,
@@ -77,6 +77,7 @@ public class ProfileSchemaInitializer {
     }
 
     private void ensureUserProfilesColumns() throws SQLException {
+        dropColumnIfExists(TABLE_USER_PROFILES, "college");
         dropColumnIfExists(TABLE_USER_PROFILES, "campus");
         dropColumnIfExists(TABLE_USER_PROFILES, "note");
         migrateCreditScoreColumnsSafely();

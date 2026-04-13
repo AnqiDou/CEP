@@ -1,4 +1,5 @@
 package cep_backend.service;
+
 import cep_backend.common.exception.BusinessException;
 import cep_backend.dto.ItemDetailDto;
 import cep_backend.dto.ItemDetailPublisherDto;
@@ -17,10 +18,6 @@ import java.util.Locale;
 @Service
 public class ItemDetailService {
     private static final String DEFAULT_USAGE_DURATION = "未填写";
-    private static final String DEFAULT_CONDITION = "以实物为准";
-    private static final String DEFAULT_ACCESSORIES = "以实际交易信息为准";
-    private static final String DEFAULT_NOTE = "支持当面交易，注意安全。";
-    private static final String DEFAULT_LOCATION = "未填写";
     private static final String DEFAULT_PUBLISHER_NAME = "校园用户";
 
     private final ItemDetailRepository itemDetailRepository;

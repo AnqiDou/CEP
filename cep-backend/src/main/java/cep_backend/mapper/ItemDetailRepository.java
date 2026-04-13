@@ -1,4 +1,5 @@
 package cep_backend.mapper;
+
 import cep_backend.entity.po.ItemDetailRecord;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -25,11 +26,6 @@ public class ItemDetailRepository {
             rs.getTimestamp("created_at").toLocalDateTime(),
             rs.getDate("purchase_date") == null ? null : rs.getDate("purchase_date").toLocalDate(),
             rs.getString("usage_duration"),
-            rs.getString("item_condition"),
-            rs.getString("accessories"),
-            rs.getString("detail_note"),
-            rs.getString("trade_location"),
-            rs.getBigDecimal("original_price"),
             rs.getObject("publisher_id", Long.class),
             rs.getString("publisher_name"),
             rs.getString("publisher_avatar"),
@@ -53,11 +49,6 @@ public class ItemDetailRepository {
                     i.created_at,
                     d.purchase_date,
                     d.usage_duration,
-                    d.item_condition,
-                    d.accessories,
-                    d.detail_note,
-                    d.trade_location,
-                    d.original_price,
                     u.id AS publisher_id,
                     COALESCE(NULLIF(u.username, ''), '校园用户') AS publisher_name,
                     up.avatar_url AS publisher_avatar,

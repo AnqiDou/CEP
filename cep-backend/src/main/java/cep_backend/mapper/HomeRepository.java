@@ -1,4 +1,5 @@
 package cep_backend.mapper;
+
 import cep_backend.entity.po.HomeCategoryRecord;
 import cep_backend.entity.po.HomeItemRecord;
 import cep_backend.entity.po.HotKeywordRecord;
@@ -34,7 +35,6 @@ public class HomeRepository {
             rs.getString("title"),
             rs.getString("description"),
             rs.getBigDecimal("price"),
-            rs.getString("badge"),
             rs.getString("ops_columns"),
             rs.getString("photo_url"),
             rs.getTimestamp("created_at").toLocalDateTime());
@@ -133,7 +133,6 @@ public class HomeRepository {
                     i.title,
                     i.description,
                     i.price,
-                    i.badge,
                     (
                         SELECT GROUP_CONCAT(ioc.column_code ORDER BY ioc.column_code SEPARATOR ',')
                         FROM item_ops_columns ioc
@@ -222,7 +221,6 @@ public class HomeRepository {
                         i.title,
                         i.description,
                         i.price,
-                        i.badge,
                         (
                             SELECT GROUP_CONCAT(ioc.column_code ORDER BY ioc.column_code SEPARATOR ',')
                             FROM item_ops_columns ioc

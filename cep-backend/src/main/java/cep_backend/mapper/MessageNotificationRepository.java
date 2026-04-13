@@ -1,4 +1,5 @@
 package cep_backend.mapper;
+
 import cep_backend.dto.MessageNotificationDto;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -62,26 +63,24 @@ public class MessageNotificationRepository {
         String sql = """
                 UPDATE message_notifications
                 SET is_read = 1,
-                    read_at = ?,
                     updated_at = ?
                 WHERE id = ?
                   AND user_id = ?
                 """;
         Timestamp timestamp = Timestamp.valueOf(now);
-        jdbcTemplate.update(sql, timestamp, timestamp, notificationId, userId);
+        jdbcTemplate.update(sql, timestamp, notificationId, userId);
     }
 
     public void markAllRead(Long userId, LocalDateTime now) {
         String sql = """
                 UPDATE message_notifications
                 SET is_read = 1,
-                    read_at = CASE WHEN read_at IS NULL THEN ? ELSE read_at END,
                     updated_at = ?
                 WHERE user_id = ?
                   AND is_read = 0
                 """;
         Timestamp timestamp = Timestamp.valueOf(now);
-        jdbcTemplate.update(sql, timestamp, timestamp, userId);
+        jdbcTemplate.update(sql, timestamp, userId);
     }
 
     public void insertNotification(

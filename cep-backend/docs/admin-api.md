@@ -37,6 +37,9 @@
     - `email`：按邮箱搜索
 - `PATCH /api/admin/users/{userId}/status`
   - 请求体：`{ "disabled": true }`
+- `PATCH /api/admin/users/{userId}/credit-score`
+  - 请求体：`{ "role": "seller", "creditScore": 105.5 }`
+  - `role` 可选值：`seller|buyer`
 - `DELETE /api/admin/users/{userId}`
 
 ## 3. 商品管理
@@ -71,6 +74,8 @@
     - `itemTitle`：商品
     - `status`：`all|pending-pay|completed|cancelled`
 - `POST /api/admin/orders/{orderNo}/handle-abnormal`
+- `PATCH /api/admin/orders/{orderNo}`
+  - 请求体：`{ "status": "PAID", "refundStatus": "NONE" }`
 
 状态映射：
 
@@ -96,6 +101,14 @@
 - `PATCH /api/admin/support/conversations/{conversationId}/status`
   - 请求体：`{ "status": "RESOLVED" }`
   - 可选状态：`OPEN/PROCESSING/RESOLVED/CLOSED`
+
+用户侧工单接口（同一控制器，前台“联系客服”页面使用）：
+
+- `GET /api/admin/support/me/messages`
+  - 返回当前登录用户与平台客服会话的消息列表
+- `POST /api/admin/support/me/messages`
+  - 请求体：`{ "content": "订单有问题", "orderId": 100 }`
+  - `orderId` 可为空
 
 ## 6. 公告管理
 

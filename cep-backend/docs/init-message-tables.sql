@@ -55,7 +55,6 @@ CREATE TABLE message_notifications (
     related_item_id BIGINT NULL,
     related_user_id BIGINT NULL,
     is_read BIT NOT NULL DEFAULT 0,
-    read_at DATETIME2 NULL,
     created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_message_notifications_user FOREIGN KEY (user_id) REFERENCES users (id),

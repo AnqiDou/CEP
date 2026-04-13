@@ -1,4 +1,5 @@
 package cep_backend.mapper;
+
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -61,11 +62,10 @@ public class PublishRepository {
                     quantity_mode,
                     total_quantity,
                     sold_quantity,
-                    badge,
                     status,
                     created_at,
                     updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PUBLISHED', ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PUBLISHED', ?, ?)
                 """;
 
         KeyHolder keyHolder = new GeneratedKeyHolder();
@@ -79,9 +79,8 @@ public class PublishRepository {
             statement.setString(6, quantityMode);
             statement.setObject(7, totalQuantity);
             statement.setObject(8, soldQuantity);
-            statement.setString(9, null);
+            statement.setTimestamp(9, Timestamp.valueOf(now));
             statement.setTimestamp(10, Timestamp.valueOf(now));
-            statement.setTimestamp(11, Timestamp.valueOf(now));
             return statement;
         }, keyHolder);
 
@@ -112,14 +111,9 @@ public class PublishRepository {
                     publisher_user_id,
                     purchase_date,
                     usage_duration,
-                    item_condition,
-                    accessories,
-                    detail_note,
-                    trade_location,
-                    original_price,
                     created_at,
                     updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?)
                 """;
         jdbcTemplate.update(
                 sql,
@@ -127,11 +121,6 @@ public class PublishRepository {
                 userId,
                 purchaseDate,
                 usageDuration,
-                "",
-                "",
-                "",
-                "",
-                null,
                 Timestamp.valueOf(now),
                 Timestamp.valueOf(now));
     }
@@ -241,14 +230,9 @@ public class PublishRepository {
                     publisher_user_id,
                     purchase_date,
                     usage_duration,
-                    item_condition,
-                    accessories,
-                    detail_note,
-                    trade_location,
-                    original_price,
                     created_at,
                     updated_at
-                ) VALUES (?, ?, ?, ?, '', '', '', '', NULL, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                     publisher_user_id = VALUES(publisher_user_id),
                     purchase_date = VALUES(purchase_date),

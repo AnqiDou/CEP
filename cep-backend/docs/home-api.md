@@ -73,8 +73,6 @@
         "title": "降噪无线蓝牙耳机",
         "description": "音质不错，适合通勤与自习使用。",
         "price": 80.0,
-        "campus": "本部",
-        "badge": "精选",
         "photoUrl": "https://example.com/item-4-1.jpg",
         "createdAt": "2026-03-25T16:15:00"
       }
@@ -142,6 +140,43 @@
     {
       "keyword": "平板",
       "searchCount": 95
+    }
+  ]
+}
+```
+
+---
+
+## 5. 获取首页公告
+
+- **URL**: `GET /api/home/notices`
+
+### Query 参数
+
+| 字段  | 类型   | 必填 | 默认值 | 说明                  |
+| ----- | ------ | ---- | ------ | --------------------- |
+| limit | number | 否   | `3`    | 返回条数，范围 `1-20` |
+
+### 请求示例
+
+`GET /api/home/notices?limit=3`
+
+### 成功响应示例
+
+```json
+{
+  "success": true,
+  "message": "获取成功",
+  "data": [
+    {
+      "id": 12,
+      "content": "毕业季闲置专区已上线，欢迎发布。",
+      "createdAt": "2026-04-10 12:30"
+    },
+    {
+      "id": 11,
+      "content": "请勿在商品描述中发布站外联系方式。",
+      "createdAt": "2026-04-09 09:15"
     }
   ]
 }

@@ -1,4 +1,5 @@
 package cep_backend.service;
+
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,6 +80,25 @@ public class PublishSchemaInitializer {
     if (campusColumnCount != null && campusColumnCount > 0) {
       jdbcTemplate.execute("ALTER TABLE items DROP COLUMN campus");
     }
+
+    Integer badgeColumnCount = jdbcTemplate.queryForObject(
+        """
+            SELECT COUNT(1)
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = 'items'
+              AND column_name = 'badge'
+            """,
+        Integer.class);
+    if (badgeColumnCount != null && badgeColumnCount > 0) {
+      jdbcTemplate.execute("ALTER TABLE items DROP COLUMN badge");
+    }
+
+    dropItemDetailsColumnIfExists("item_condition");
+    dropItemDetailsColumnIfExists("accessories");
+    dropItemDetailsColumnIfExists("detail_note");
+    dropItemDetailsColumnIfExists("trade_location");
+    dropItemDetailsColumnIfExists("original_price");
 
     jdbcTemplate.execute("""
         UPDATE items i
@@ -182,5 +202,21 @@ public class PublishSchemaInitializer {
     }
 
     log.info("Publish schema ensured: items.publisher_user_id");
+  }
+
+  private void dropItemDetailsColumnIfExists(String columnName) {
+    Integer columnCount = jdbcTemplate.queryForObject(
+        """
+            SELECT COUNT(1)
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = 'item_details'
+              AND column_name = ?
+            """,
+        Integer.class,
+        columnName);
+    if (columnCount != null && columnCount > 0) {
+      jdbcTemplate.execute("ALTER TABLE item_details DROP COLUMN " + columnName);
+    }
   }
 }

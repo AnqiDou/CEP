@@ -121,7 +121,62 @@
 
 ---
 
-## 3. 获取通知消息列表（系统自动通知）
+## 3. 创建/获取与指定用户的私聊会话
+
+- **URL**: `POST /api/messages/conversations/direct`
+
+### 请求体
+
+```json
+{
+  "peerUserId": 12,
+  "itemId": 301
+}
+```
+
+### 字段说明
+
+| 字段       | 类型 | 必填 | 说明                |
+| ---------- | ---- | ---- | ------------------- |
+| peerUserId | long | 是   | 对方用户 ID         |
+| itemId     | long | 否   | 关联商品 ID（可空） |
+
+### 成功响应示例
+
+```json
+{
+  "success": true,
+  "message": "获取成功",
+  "data": {
+    "conversationId": 12,
+    "peerUserId": 5,
+    "peerName": "王同学",
+    "peerAvatar": "https://xxx/avatar.jpg",
+    "itemId": 301,
+    "itemTitle": "机械键盘",
+    "itemImage": "https://xxx/item.jpg",
+    "unread": 0,
+    "lastMessage": "",
+    "lastTime": ""
+  }
+}
+```
+
+---
+
+## 4. 标记会话为已读
+
+- **URL**: `POST /api/messages/conversations/{conversationId}/read`
+
+### Path 参数
+
+| 字段           | 类型 | 必填 | 说明    |
+| -------------- | ---- | ---- | ------- |
+| conversationId | long | 是   | 会话 ID |
+
+---
+
+## 5. 获取通知消息列表（系统自动通知）
 
 - **URL**: `GET /api/messages/notifications`
 
@@ -171,7 +226,7 @@
 
 ---
 
-## 4. 获取通知未读数
+## 6. 获取通知未读数
 
 - **URL**: `GET /api/messages/notifications/unread-count`
 
@@ -189,7 +244,7 @@
 
 ---
 
-## 5. 标记单条通知已读
+## 7. 标记单条通知已读
 
 - **URL**: `POST /api/messages/notifications/{notificationId}/read`
 
@@ -201,13 +256,13 @@
 
 ---
 
-## 6. 全部通知标记已读
+## 8. 全部通知标记已读
 
 - **URL**: `POST /api/messages/notifications/read-all`
 
 ---
 
-## 7. 系统自动通知触发规则
+## 9. 系统自动通知触发规则
 
 以下通知均由系统自动检测并写入，不依赖管理员后台手动发送：
 
@@ -215,3 +270,45 @@
 2. 收藏商品降价：卖家编辑商品价格且新价格低于原价格时，向收藏该商品的用户发送 `FAVORITE_PRICE_DROP`
 3. 收藏商品下架：卖家将商品下架或删除时，向收藏该商品的用户发送 `FAVORITE_OFF_SHELF`
 4. 被关注：用户关注他人后，向被关注者发送 `FOLLOWED`
+
+---
+
+## 10. WebSocket 实时消息
+
+- **URL**: `GET /ws/messages?accessToken={accessToken}`（WebSocket 握手）
+- **鉴权**: 通过 query 参数 `accessToken` 传入登录令牌
+
+### 客户端发送示例
+
+1. 心跳：
+
+```json
+{ "action": "PING" }
+```
+
+2. 发送普通消息：
+
+```json
+{
+  "action": "SEND_MESSAGE",
+  "conversationId": 12,
+  "text": "你好，这个还在吗？",
+  "imageUrl": ""
+}
+```
+
+3. 发送用户客服消息：
+
+```json
+{
+  "action": "SEND_SUPPORT_MESSAGE",
+  "text": "我的订单有问题，麻烦协助处理",
+  "orderId": 100
+}
+```
+
+### 服务端事件
+
+- `PONG`：心跳响应
+- `ERROR`：错误事件（字段 `message`）
+- 其余业务事件由后端推送，用于刷新会话列表、消息列表和通知状态
