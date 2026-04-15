@@ -20,6 +20,7 @@ public class ProfileSchemaInitializer {
     private static final String TABLE_USER_FOLLOWS = "user_follows";
     private static final String TABLE_USER_FAVORITES = "user_favorites";
     private static final String TABLE_USER_CREDIT_REVIEWS = "user_credit_reviews";
+    private static final String TABLE_REVIEW_SENSITIVE_WORDS = "review_sensitive_words";
     private static final String TABLE_TRADE_ORDERS = "trade_orders";
 
     private final JdbcTemplate jdbcTemplate;
@@ -36,6 +37,8 @@ public class ProfileSchemaInitializer {
             ensureUserFollowsTable();
             ensureUserFavoritesTable();
             ensureUserCreditReviewsTable();
+            ensureReviewSensitiveWordsTable();
+            seedReviewSensitiveWords();
             ensureTradeOrdersColumns();
 
             createIndexIfMissing(TABLE_USER_FOLLOWS, "idx_user_follows_target",
@@ -44,6 +47,8 @@ public class ProfileSchemaInitializer {
                     "CREATE INDEX idx_user_favorites_user ON user_favorites (user_id, created_at DESC)");
             createIndexIfMissing(TABLE_USER_CREDIT_REVIEWS, "idx_user_credit_reviews_target",
                     "CREATE INDEX idx_user_credit_reviews_target ON user_credit_reviews (target_user_id, created_at DESC)");
+            createIndexIfMissing(TABLE_REVIEW_SENSITIVE_WORDS, "idx_review_sensitive_words_category",
+                    "CREATE INDEX idx_review_sensitive_words_category ON review_sensitive_words (category, enabled)");
             createIndexIfMissing(TABLE_TRADE_ORDERS, "idx_trade_orders_buyer",
                     "CREATE INDEX idx_trade_orders_buyer ON trade_orders (buyer_user_id, created_at DESC)");
             createIndexIfMissing(TABLE_TRADE_ORDERS, "idx_trade_orders_seller",
@@ -210,6 +215,73 @@ public class ProfileSchemaInitializer {
                 """;
         jdbcTemplate.execute(ddl);
         log.info("Created table: {}", TABLE_USER_CREDIT_REVIEWS);
+    }
+
+    private void ensureReviewSensitiveWordsTable() throws SQLException {
+        if (tableExists(TABLE_REVIEW_SENSITIVE_WORDS)) {
+            return;
+        }
+        String ddl = """
+                CREATE TABLE review_sensitive_words (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    category VARCHAR(50) NOT NULL,
+                    word VARCHAR(50) NOT NULL,
+                    enabled TINYINT(1) NOT NULL DEFAULT 1,
+                    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                    CONSTRAINT uq_review_sensitive_words_word UNIQUE (word)
+                )
+                """;
+        jdbcTemplate.execute(ddl);
+        log.info("Created table: {}", TABLE_REVIEW_SENSITIVE_WORDS);
+    }
+
+    private void seedReviewSensitiveWords() {
+        insertSensitiveWordIfMissing("辱骂人身攻击类", "傻逼");
+        insertSensitiveWordIfMissing("辱骂人身攻击类", "垃圾");
+        insertSensitiveWordIfMissing("辱骂人身攻击类", "废物");
+        insertSensitiveWordIfMissing("辱骂人身攻击类", "脑残");
+        insertSensitiveWordIfMissing("辱骂人身攻击类", "滚");
+
+        insertSensitiveWordIfMissing("广告导流类", "微信");
+        insertSensitiveWordIfMissing("广告导流类", "wechat");
+        insertSensitiveWordIfMissing("广告导流类", "vx");
+        insertSensitiveWordIfMissing("广告导流类", "qq");
+        insertSensitiveWordIfMissing("广告导流类", "电话");
+        insertSensitiveWordIfMissing("广告导流类", "加好友");
+        insertSensitiveWordIfMissing("广告导流类", "私聊");
+
+        insertSensitiveWordIfMissing("违规承诺类", "包过");
+        insertSensitiveWordIfMissing("违规承诺类", "代写");
+        insertSensitiveWordIfMissing("违规承诺类", "作弊");
+        insertSensitiveWordIfMissing("违规承诺类", "代考");
+        insertSensitiveWordIfMissing("违规承诺类", "刷分");
+
+        insertSensitiveWordIfMissing("涉政涉黄暴力类", "约炮");
+        insertSensitiveWordIfMissing("涉政涉黄暴力类", "嫖娼");
+        insertSensitiveWordIfMissing("涉政涉黄暴力类", "枪支");
+        insertSensitiveWordIfMissing("涉政涉黄暴力类", "爆炸物");
+        insertSensitiveWordIfMissing("涉政涉黄暴力类", "恐袭");
+
+        insertSensitiveWordIfMissing("隐私信息类", "手机号");
+        insertSensitiveWordIfMissing("隐私信息类", "身份证号");
+        insertSensitiveWordIfMissing("隐私信息类", "住址");
+        insertSensitiveWordIfMissing("隐私信息类", "银行卡号");
+        insertSensitiveWordIfMissing("隐私信息类", "门牌号");
+    }
+
+    private void insertSensitiveWordIfMissing(String category, String word) {
+        String sql = """
+                INSERT INTO review_sensitive_words (category, word, enabled, created_at, updated_at)
+                SELECT ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                FROM DUAL
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM review_sensitive_words
+                    WHERE word = ?
+                )
+                """;
+        jdbcTemplate.update(sql, category, word, word);
     }
 
     private void ensureTradeOrdersColumns() throws SQLException {

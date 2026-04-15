@@ -1,4 +1,5 @@
 package cep_backend.service;
+
 import cep_backend.common.exception.BusinessException;
 import cep_backend.dto.ReviewOrderDetailDto;
 import cep_backend.dto.SubmitReviewRequest;
@@ -11,9 +12,11 @@ import java.time.LocalDateTime;
 @Service
 public class ReviewService {
     private final ReviewRepository reviewRepository;
+    private final ReviewSensitiveWordService reviewSensitiveWordService;
 
-    public ReviewService(ReviewRepository reviewRepository) {
+    public ReviewService(ReviewRepository reviewRepository, ReviewSensitiveWordService reviewSensitiveWordService) {
         this.reviewRepository = reviewRepository;
+        this.reviewSensitiveWordService = reviewSensitiveWordService;
     }
 
     public ReviewOrderDetailDto getOrderDetail(Long reviewerUserId, Long orderId) {
@@ -85,6 +88,7 @@ public class ReviewService {
         if (value.length() > 300) {
             throw new BusinessException("评价内容不能超过300字");
         }
+        reviewSensitiveWordService.validateReviewContent(value);
         return value;
     }
 
