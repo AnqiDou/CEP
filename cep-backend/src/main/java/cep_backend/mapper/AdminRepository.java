@@ -5,6 +5,7 @@ import cep_backend.dto.AdminOrderDto;
 import cep_backend.dto.AdminSupportConversationDto;
 import cep_backend.dto.AdminSupportMessageDto;
 import cep_backend.dto.AdminUserDto;
+import cep_backend.dto.AdminUserCreditReviewDto;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import java.sql.Timestamp;
@@ -88,8 +89,14 @@ public class AdminRepository {
     public Integer countPendingConversations() {
         String sql = """
                 SELECT COUNT(1)
-                FROM admin_support_conversations
-                WHERE status = 'OPEN'
+                FROM admin_support_conversations c
+                INNER JOIN (
+                    SELECT conversation_id, MAX(id) AS last_message_id
+                    FROM admin_support_messages
+                    GROUP BY conversation_id
+                ) lm ON lm.conversation_id = c.id
+                INNER JOIN admin_support_messages m ON m.id = lm.last_message_id
+                WHERE UPPER(COALESCE(m.sender_type, '')) = 'USER'
                 """;
         return jdbcTemplate.queryForObject(sql, Integer.class);
     }
@@ -478,7 +485,6 @@ public class AdminRepository {
                     c.reporter_user_id,
                     c.item_id,
                     c.report_content,
-                    c.status,
                     c.preview,
                     m.id AS message_id,
                     m.sender_type,
@@ -510,7 +516,6 @@ public class AdminRepository {
                             toNullableLong(row.get("item_id")),
                             toNullableString(row.get("item_title")),
                             toNullableString(row.get("report_content")),
-                            toNullableString(row.get("status")),
                             String.valueOf(row.get("preview")),
                             new ArrayList<>()));
 
@@ -537,7 +542,6 @@ public class AdminRepository {
                         item.itemId(),
                         item.itemTitle(),
                         item.reportContent(),
-                        item.status(),
                         item.preview(),
                         item.messages()))
                 .toList();
@@ -574,21 +578,10 @@ public class AdminRepository {
         String sql = """
                 UPDATE admin_support_conversations
                 SET preview = ?,
-                    status = CASE WHEN status = 'OPEN' THEN 'PROCESSING' ELSE status END,
                     updated_at = ?
                 WHERE id = ?
                 """;
         return jdbcTemplate.update(sql, preview, Timestamp.valueOf(now), conversationId);
-    }
-
-    public int updateSupportConversationStatus(Long conversationId, String status, LocalDateTime now) {
-        String sql = """
-                UPDATE admin_support_conversations
-                SET status = ?,
-                    updated_at = ?
-                WHERE id = ?
-                """;
-        return jdbcTemplate.update(sql, status, Timestamp.valueOf(now), conversationId);
     }
 
     public Long findUserIdByEmail(String email) {
@@ -629,7 +622,6 @@ public class AdminRepository {
                 SELECT id
                 FROM admin_support_conversations
                 WHERE reporter_user_id = ?
-                  AND status IN ('OPEN', 'PROCESSING')
                 ORDER BY updated_at DESC, id DESC
                 LIMIT 1
                 """;
@@ -643,7 +635,6 @@ public class AdminRepository {
             String reportType,
             String reportContent,
             String preview,
-            String status,
             LocalDateTime now) {
         String sql = """
                 INSERT INTO admin_support_conversations (
@@ -652,10 +643,9 @@ public class AdminRepository {
                     reporter_user_id,
                     report_content,
                     preview,
-                    status,
                     created_at,
                     updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """;
         org.springframework.jdbc.support.KeyHolder keyHolder = new org.springframework.jdbc.support.GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
@@ -665,9 +655,8 @@ public class AdminRepository {
             statement.setLong(3, reporterUserId);
             statement.setString(4, reportContent);
             statement.setString(5, preview);
-            statement.setString(6, status);
+            statement.setTimestamp(6, Timestamp.valueOf(now));
             statement.setTimestamp(7, Timestamp.valueOf(now));
-            statement.setTimestamp(8, Timestamp.valueOf(now));
             return statement;
         }, keyHolder);
         Number key = keyHolder.getKey();
@@ -719,6 +708,55 @@ public class AdminRepository {
         return jdbcTemplate.update(sql, noticeId);
     }
 
+    public List<AdminUserCreditReviewDto> listCreditReviews(String keyword, String role, String rating) {
+        String normalizedKeyword = keyword == null ? "" : keyword.trim();
+        String normalizedRole = role == null ? "" : role.trim();
+        String normalizedRating = rating == null ? "" : rating.trim();
+        String sql = """
+                SELECT
+                    r.id,
+                    r.order_id,
+                    COALESCE(NULLIF(ru.username, ''), ru.email, '用户') AS rater_name,
+                    COALESCE(NULLIF(tu.username, ''), tu.email, '用户') AS target_name,
+                    r.target_role,
+                    r.rating,
+                    COALESCE(r.content, '') AS content,
+                    r.created_at
+                FROM user_credit_reviews r
+                LEFT JOIN users ru ON ru.id = r.rater_user_id
+                LEFT JOIN users tu ON tu.id = r.target_user_id
+                WHERE (? = '' OR r.content LIKE ? OR ru.email LIKE ? OR ru.username LIKE ? OR tu.email LIKE ? OR tu.username LIKE ?)
+                  AND (? = '' OR UPPER(r.target_role) = UPPER(?))
+                  AND (? = '' OR UPPER(r.rating) = UPPER(?))
+                ORDER BY r.created_at DESC, r.id DESC
+                """;
+        String like = "%" + normalizedKeyword + "%";
+        return jdbcTemplate.query(sql, (rs, rowNum) -> new AdminUserCreditReviewDto(
+                rs.getLong("id"),
+                rs.getObject("order_id", Long.class),
+                rs.getString("rater_name"),
+                rs.getString("target_name"),
+                rs.getString("target_role"),
+                rs.getString("rating"),
+                rs.getString("content"),
+                rs.getTimestamp("created_at").toLocalDateTime()),
+                normalizedKeyword,
+                like,
+                like,
+                like,
+                like,
+                like,
+                normalizedRole,
+                normalizedRole,
+                normalizedRating,
+                normalizedRating);
+    }
+
+    public int deleteCreditReview(Long reviewId) {
+        String sql = "DELETE FROM user_credit_reviews WHERE id = ?";
+        return jdbcTemplate.update(sql, reviewId);
+    }
+
     private String mapItemStatus(String status) {
         return switch (status) {
             case "pending" -> "PENDING_REVIEW";
@@ -746,7 +784,6 @@ public class AdminRepository {
             Long itemId,
             String itemTitle,
             String reportContent,
-            String status,
             String preview,
             List<AdminSupportMessageDto> messages) {
     }

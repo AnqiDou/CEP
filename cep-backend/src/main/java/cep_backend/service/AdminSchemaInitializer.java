@@ -46,7 +46,6 @@ public class AdminSchemaInitializer {
                                                     item_id BIGINT NULL,
                                                     report_content VARCHAR(500) NULL,
                                                     preview VARCHAR(200) NOT NULL DEFAULT '',
-                                                    status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
                                                     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
                                                     updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
                                                     CONSTRAINT fk_admin_support_conversations_reporter FOREIGN KEY (reporter_user_id) REFERENCES users (id),
@@ -122,8 +121,6 @@ public class AdminSchemaInitializer {
         }
 
         private void ensureIndexes() {
-                createIndexIfMissing("admin_support_conversations", "idx_admin_support_conversations_status",
-                                "CREATE INDEX idx_admin_support_conversations_status ON admin_support_conversations (status, updated_at DESC)");
                 createIndexIfMissing("admin_support_conversations", "idx_admin_support_conversations_reporter",
                                 "CREATE INDEX idx_admin_support_conversations_reporter ON admin_support_conversations (reporter_user_id, created_at DESC)");
                 createIndexIfMissing("admin_support_conversations", "idx_admin_support_conversations_item",

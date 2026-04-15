@@ -7,6 +7,7 @@ import cep_backend.dto.AdminOrderStateStatDto;
 import cep_backend.dto.AdminSupportConversationDto;
 import cep_backend.dto.AdminSupportMessageDto;
 import cep_backend.dto.AdminUserDto;
+import cep_backend.dto.AdminUserCreditReviewDto;
 import cep_backend.mapper.AdminRepository;
 import cep_backend.common.exception.BusinessException;
 import cep_backend.dto.AuthUserDto;
@@ -363,7 +364,6 @@ public class AdminService {
                     "OTHER",
                     finalMessage,
                     finalMessage.length() > 120 ? finalMessage.substring(0, 120) : finalMessage,
-                    "OPEN",
                     now);
             if (conversationId == null || conversationId <= 0) {
                 throw new BusinessException("创建客服会话失败");
@@ -437,22 +437,18 @@ public class AdminService {
         return adminRepository.listSupportMessages(conversationId);
     }
 
+    public List<AdminUserCreditReviewDto> listCreditReviews(String keyword, String role, String rating) {
+        return adminRepository.listCreditReviews(keyword, role, rating);
+    }
+
     @Transactional
-    public void updateConversationStatus(Long conversationId, String status) {
-        if (conversationId == null || conversationId <= 0) {
-            throw new BusinessException("会话参数无效");
+    public void deleteCreditReview(Long reviewId) {
+        if (reviewId == null || reviewId <= 0) {
+            throw new BusinessException("评价参数无效");
         }
-        if (status == null || status.trim().isEmpty()) {
-            throw new BusinessException("状态不能为空");
-        }
-        String normalized = status.trim().toUpperCase();
-        if (!"OPEN".equals(normalized) && !"PROCESSING".equals(normalized) && !"RESOLVED".equals(normalized)
-                && !"CLOSED".equals(normalized)) {
-            throw new BusinessException("状态不合法");
-        }
-        int updated = adminRepository.updateSupportConversationStatus(conversationId, normalized, LocalDateTime.now());
-        if (updated <= 0) {
-            throw new BusinessException("会话不存在");
+        int deleted = adminRepository.deleteCreditReview(reviewId);
+        if (deleted <= 0) {
+            throw new BusinessException("评价不存在或已删除");
         }
     }
 

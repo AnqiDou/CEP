@@ -18,7 +18,6 @@ CREATE TABLE admin_support_conversations (
     item_id BIGINT NULL,
     report_content NVARCHAR (500) NULL,
     preview NVARCHAR (200) NOT NULL DEFAULT '',
-    status NVARCHAR (20) NOT NULL DEFAULT 'OPEN',
     created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_admin_support_conversations_reporter FOREIGN KEY (reporter_user_id) REFERENCES users (id),
@@ -40,8 +39,6 @@ CREATE TABLE admin_notices (
     created_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME2 NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE INDEX idx_admin_support_conversations_status ON admin_support_conversations (status, updated_at DESC);
 
 CREATE INDEX idx_admin_support_messages_conversation ON admin_support_messages (
     conversation_id,
@@ -65,7 +62,6 @@ INSERT INTO
         item_id,
         report_content,
         preview,
-        status,
         created_at,
         updated_at
     )
@@ -76,7 +72,6 @@ VALUES (
         NULL,
         'User reported item does not match description',
         'User reported item does not match description',
-        'OPEN',
         CURRENT_TIMESTAMP,
         CURRENT_TIMESTAMP
     ),
@@ -87,7 +82,6 @@ VALUES (
         NULL,
         'User reported prohibited contact info in detail page',
         'User reported prohibited contact info in detail page',
-        'OPEN',
         CURRENT_TIMESTAMP,
         CURRENT_TIMESTAMP
     );

@@ -426,6 +426,97 @@
         </div>
       </section>
 
+      <section v-else-if="activeMenu === 'reviews'" class="card panel">
+        <div class="toolbar toolbar--multi toolbar--grid4">
+          <input
+            v-model.trim="reviewKeyword"
+            class="toolbar-input"
+            placeholder="搜索评价内容 / 用户"
+          />
+          <select v-model="reviewRole" class="toolbar-select">
+            <option value="">全部角色</option>
+            <option value="buyer">买家</option>
+            <option value="seller">卖家</option>
+          </select>
+          <select v-model="reviewRating" class="toolbar-select">
+            <option value="">全部评级</option>
+            <option value="good">好评</option>
+            <option value="bad">差评</option>
+          </select>
+        </div>
+
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>订单号</th>
+                <th>评价人</th>
+                <th>被评人</th>
+                <th>角色</th>
+                <th>评级</th>
+                <th>评价内容</th>
+                <th>时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="review in pagedReviews" :key="review.id">
+                <td>{{ review.orderId || "-" }}</td>
+                <td>{{ review.rater || "-" }}</td>
+                <td>{{ review.target || "-" }}</td>
+                <td>{{ review.targetRole === "seller" ? "卖家" : "买家" }}</td>
+                <td>
+                  <span
+                    :class="[
+                      'pill',
+                      review.rating === 'good' ? 'pill--ok' : 'pill--danger',
+                    ]"
+                  >
+                    {{ review.rating === "good" ? "好评" : "差评" }}
+                  </span>
+                </td>
+                <td>
+                  <p class="review-content-cell" :title="review.content || '-'">
+                    {{ review.content || "-" }}
+                  </p>
+                </td>
+                <td>{{ formatNoticeDate(review.createdAt) }}</td>
+                <td>
+                  <button
+                    class="text-btn text-btn--danger"
+                    @click="removeReview(review.id)"
+                  >
+                    删除
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination-bar">
+          <span class="pagination-info"
+            >第 {{ reviewPage }} / {{ reviewTotalPages }} 页 · 共
+            {{ reviews.length }} 条</span
+          >
+          <div class="pagination-actions">
+            <button
+              class="text-btn"
+              :disabled="reviewPage <= 1"
+              @click="goReviewPage(reviewPage - 1)"
+            >
+              上一页
+            </button>
+            <button
+              class="text-btn"
+              :disabled="reviewPage >= reviewTotalPages"
+              @click="goReviewPage(reviewPage + 1)"
+            >
+              下一页
+            </button>
+          </div>
+        </div>
+      </section>
+
       <section
         v-else-if="activeMenu === 'support'"
         class="card panel support-panel"
@@ -457,34 +548,8 @@
           <section class="conversation-main">
             <div class="support-topbar">
               <h3>{{ supportConversationTitle(currentConversation) }}</h3>
-              <button
-                v-if="
-                  currentConversation &&
-                  currentConversation.status !== 'RESOLVED' &&
-                  currentConversation.status !== 'CLOSED'
-                "
-                class="text-btn"
-                @click="resolveConversation"
-              >
-                标记已解决
-              </button>
-              <button
-                v-else-if="currentConversation"
-                class="text-btn"
-                @click="reopenConversation"
-              >
-                重新打开
-              </button>
             </div>
             <div v-if="currentConversation" class="support-meta">
-              <span
-                :class="[
-                  'pill',
-                  supportStatusClass(currentConversation.status),
-                ]"
-              >
-                {{ supportStatusText(currentConversation.status) }}
-              </span>
               <span>举报人：{{ currentConversation.reporterName || "-" }}</span>
               <span>商品：{{ currentConversation.itemTitle || "-" }}</span>
             </div>
@@ -675,17 +740,18 @@ import {
   createAdminNotice,
   deleteAdminItem,
   deleteAdminNotice,
+  deleteAdminReview,
   deleteAdminUser,
   fetchAdminConversations,
   fetchAdminDashboard,
   fetchAdminItems,
   fetchAdminNotices,
   fetchAdminOrders,
+  fetchAdminReviews,
   fetchAdminUsers,
   offlineAdminItem,
   replyAdminConversation,
   updateAdminOrder,
-  updateAdminConversationStatus,
   updateAdminUserCreditScore,
   updateAdminUserStatus,
 } from "../api/admin/adminApiService";
@@ -702,6 +768,7 @@ const navItems = ref([
   { key: "users", label: "用户管理", count: "00" },
   { key: "items", label: "商品管理", count: "00" },
   { key: "orders", label: "订单管理", count: "00" },
+  { key: "reviews", label: "评价管理", count: "00" },
   { key: "support", label: "客服模块", count: "00" },
   { key: "settings", label: "系统设置", count: "00" },
 ]);
@@ -795,6 +862,13 @@ const currentConversation = computed(() =>
   )
 );
 
+const reviews = ref([]);
+const reviewKeyword = ref("");
+const reviewRole = ref("");
+const reviewRating = ref("");
+const reviewPage = ref(1);
+const reviewSearchTimer = ref(null);
+
 const notices = ref([]);
 const newNotice = ref("");
 const currentNotice = computed(() => notices.value[0] || null);
@@ -818,6 +892,9 @@ const itemTotalPages = computed(() =>
 const orderTotalPages = computed(() =>
   Math.max(1, Math.ceil(orders.value.length / PAGE_SIZE))
 );
+const reviewTotalPages = computed(() =>
+  Math.max(1, Math.ceil(reviews.value.length / PAGE_SIZE))
+);
 
 const pagedUsers = computed(() => {
   const start = (userPage.value - 1) * PAGE_SIZE;
@@ -832,6 +909,11 @@ const pagedItems = computed(() => {
 const pagedOrders = computed(() => {
   const start = (orderPage.value - 1) * PAGE_SIZE;
   return orders.value.slice(start, start + PAGE_SIZE);
+});
+
+const pagedReviews = computed(() => {
+  const start = (reviewPage.value - 1) * PAGE_SIZE;
+  return reviews.value.slice(start, start + PAGE_SIZE);
 });
 
 const goUserPage = (nextPage) => {
@@ -857,6 +939,15 @@ const goOrderPage = (nextPage) => {
   if (!Number.isFinite(page)) return;
   orderPage.value = Math.min(
     orderTotalPages.value,
+    Math.max(1, Math.trunc(page))
+  );
+};
+
+const goReviewPage = (nextPage) => {
+  const page = Number(nextPage || 1);
+  if (!Number.isFinite(page)) return;
+  reviewPage.value = Math.min(
+    reviewTotalPages.value,
     Math.max(1, Math.trunc(page))
   );
 };
@@ -967,6 +1058,7 @@ const updateNavCount = () => {
     items: items.value.length,
     orders: orders.value.length,
     support: conversations.value.length,
+    reviews: reviews.value.length,
     settings: notices.value.length,
   };
   navItems.value = navItems.value.map((item) =>
@@ -1065,6 +1157,29 @@ const scheduleOrdersReload = () => {
   }, 260);
 };
 
+const loadReviews = async () => {
+  const { data } = await fetchAdminReviews({
+    keyword: reviewKeyword.value,
+    role: reviewRole.value,
+    rating: reviewRating.value,
+  });
+  reviews.value = data || [];
+  goReviewPage(1);
+  updateNavCount();
+};
+
+const scheduleReviewsReload = () => {
+  if (activeMenu.value !== "reviews" || !loadedMenus.value.has("reviews"))
+    return;
+  if (reviewSearchTimer.value) clearTimeout(reviewSearchTimer.value);
+  reviewSearchTimer.value = window.setTimeout(() => {
+    reviewSearchTimer.value = null;
+    loadReviews().catch((error) =>
+      ElMessage.error(error.message || "评价搜索失败")
+    );
+  }, 260);
+};
+
 const loadConversations = async () => {
   const { data } = await fetchAdminConversations();
   conversations.value = data || [];
@@ -1152,6 +1267,8 @@ const ensureMenuDataLoaded = async (menuKey, options = {}) => {
       await loadOrders();
     } else if (menuKey === "support") {
       await loadConversations();
+    } else if (menuKey === "reviews") {
+      await loadReviews();
     } else if (menuKey === "settings") {
       await loadNotices();
     }
@@ -1225,23 +1342,6 @@ const orderStatusClass = (order) => {
   if (refundStatus === "approved") return "pill--ok";
   if (refundStatus === "rejected") return "pill--danger";
   return statusClass(order?.status);
-};
-
-const supportStatusText = (status) => {
-  const map = {
-    OPEN: "待处理",
-    PROCESSING: "处理中",
-    RESOLVED: "已解决",
-    CLOSED: "已关闭",
-  };
-  return map[String(status || "").toUpperCase()] || "待处理";
-};
-
-const supportStatusClass = (status) => {
-  const value = String(status || "").toUpperCase();
-  if (value === "RESOLVED" || value === "CLOSED") return "pill--ok";
-  if (value === "PROCESSING") return "pill--warn";
-  return "pill--danger";
 };
 
 const mapReportTypeText = (type) => {
@@ -1523,26 +1623,13 @@ const handleSupportImageUpload = async (event) => {
   }
 };
 
-const resolveConversation = () => {
-  const target = currentConversation.value;
-  if (!target) return;
-  updateAdminConversationStatus(target.id, "RESOLVED")
+const removeReview = (id) => {
+  deleteAdminReview(id)
     .then(async () => {
-      await Promise.all([loadConversations(), loadDashboard()]);
-      ElMessage.success("会话已标记为已解决");
+      await Promise.all([loadReviews(), loadDashboard()]);
+      ElMessage.success("评价已删除");
     })
-    .catch((error) => ElMessage.error(error.message || "更新失败"));
-};
-
-const reopenConversation = () => {
-  const target = currentConversation.value;
-  if (!target) return;
-  updateAdminConversationStatus(target.id, "OPEN")
-    .then(async () => {
-      await Promise.all([loadConversations(), loadDashboard()]);
-      ElMessage.success("会话已重新打开");
-    })
-    .catch((error) => ElMessage.error(error.message || "更新失败"));
+    .catch((error) => ElMessage.error(error.message || "删除失败"));
 };
 
 const publishNotice = () => {
@@ -1624,11 +1711,17 @@ watch(
   }
 );
 
+watch([reviewKeyword, reviewRole, reviewRating], () => {
+  goReviewPage(1);
+  scheduleReviewsReload();
+});
+
 onBeforeUnmount(() => {
   document.removeEventListener("click", handleDocumentClick);
   if (userSearchTimer.value) clearTimeout(userSearchTimer.value);
   if (itemSearchTimer.value) clearTimeout(itemSearchTimer.value);
   if (orderSearchTimer.value) clearTimeout(orderSearchTimer.value);
+  if (reviewSearchTimer.value) clearTimeout(reviewSearchTimer.value);
 });
 </script>
 
@@ -1927,6 +2020,18 @@ onBeforeUnmount(() => {
 .table th {
   color: #64748b;
   font-weight: 600;
+}
+
+.review-content-cell {
+  margin: 0;
+  max-width: 360px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
+  line-height: 1.5;
 }
 
 .pagination-bar {

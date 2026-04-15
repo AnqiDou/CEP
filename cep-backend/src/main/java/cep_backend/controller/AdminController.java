@@ -8,8 +8,8 @@ import cep_backend.dto.AdminOrderUpdateRequest;
 import cep_backend.dto.AdminSupportConversationDto;
 import cep_backend.dto.AdminSupportMessageDto;
 import cep_backend.dto.AdminSupportReplyRequest;
-import cep_backend.dto.AdminSupportStatusRequest;
 import cep_backend.dto.AdminUserCreditScoreRequest;
+import cep_backend.dto.AdminUserCreditReviewDto;
 import cep_backend.dto.AdminUserDto;
 import cep_backend.dto.AdminUserStatusRequest;
 import cep_backend.service.AdminService;
@@ -185,16 +185,6 @@ public class AdminController {
         return ApiResponse.ok("发送成功");
     }
 
-    @PatchMapping("/support/conversations/{conversationId}/status")
-    public ApiResponse<Void> updateConversationStatus(
-            @RequestHeader("Authorization") String authorization,
-            @PathVariable Long conversationId,
-            @RequestBody AdminSupportStatusRequest request) {
-        ensureAdmin(authorization);
-        adminService.updateConversationStatus(conversationId, request == null ? null : request.status());
-        return ApiResponse.ok("更新成功");
-    }
-
     @GetMapping("/support/me/messages")
     public ApiResponse<List<AdminSupportMessageDto>> mySupportMessages(
             @RequestHeader("Authorization") String authorization) {
@@ -236,6 +226,25 @@ public class AdminController {
             @PathVariable Long noticeId) {
         ensureAdmin(authorization);
         adminService.deleteNotice(noticeId);
+        return ApiResponse.ok("删除成功");
+    }
+
+    @GetMapping("/reviews")
+    public ApiResponse<List<AdminUserCreditReviewDto>> reviews(
+            @RequestHeader("Authorization") String authorization,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String role,
+            @RequestParam(required = false) String rating) {
+        ensureAdmin(authorization);
+        return ApiResponse.ok("获取成功", adminService.listCreditReviews(keyword, role, rating));
+    }
+
+    @DeleteMapping("/reviews/{reviewId}")
+    public ApiResponse<Void> deleteReview(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long reviewId) {
+        ensureAdmin(authorization);
+        adminService.deleteCreditReview(reviewId);
         return ApiResponse.ok("删除成功");
     }
 

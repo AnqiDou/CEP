@@ -172,18 +172,6 @@ export const replyAdminConversation = async (conversationId, payload) =>
     },
   );
 
-export const updateAdminConversationStatus = async (conversationId, status) =>
-  requestJson(
-    `${ADMIN_API_BASE}/support/conversations/${conversationId}/status`,
-    {
-      method: "PATCH",
-      headers: await withAuthHeaders({
-        "Content-Type": "application/json",
-      }),
-      body: JSON.stringify({ status }),
-    },
-  );
-
 export const fetchMySupportMessages = async () =>
   requestJson(`${ADMIN_API_BASE}/support/me/messages`, {
     headers: await withAuthHeaders(),
@@ -214,6 +202,29 @@ export const createAdminNotice = async (content) =>
 
 export const deleteAdminNotice = async (noticeId) =>
   requestJson(`${ADMIN_API_BASE}/notices/${noticeId}`, {
+    method: "DELETE",
+    headers: await withAuthHeaders(),
+  });
+
+export const fetchAdminReviews = async (params = {}) => {
+  const normalized = {
+    keyword: "",
+    role: "",
+    rating: "",
+    ...(params || {}),
+  };
+  const query = new URLSearchParams();
+  ["keyword", "role", "rating"].forEach((key) => {
+    const value = String(normalized[key] || "").trim();
+    if (value) query.set(key, value);
+  });
+  return requestJson(`${ADMIN_API_BASE}/reviews?${query.toString()}`, {
+    headers: await withAuthHeaders(),
+  });
+};
+
+export const deleteAdminReview = async (reviewId) =>
+  requestJson(`${ADMIN_API_BASE}/reviews/${reviewId}`, {
     method: "DELETE",
     headers: await withAuthHeaders(),
   });

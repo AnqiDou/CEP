@@ -9,7 +9,6 @@ public record AdminSupportConversationDto(
                 Long itemId,
                 String itemTitle,
                 String reportContent,
-                String status,
                 String preview,
                 List<AdminSupportMessageDto> messages) {
 }
