@@ -1,4 +1,5 @@
 package cep_backend.service;
+
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +44,19 @@ public class PaymentSchemaInitializer {
                     "ALTER TABLE trade_orders ADD COLUMN refund_status VARCHAR(30) NOT NULL DEFAULT 'NONE'");
             ensureColumnExists("refund_type", "ALTER TABLE trade_orders ADD COLUMN refund_type VARCHAR(40) NULL");
             ensureColumnExists("completed_at", "ALTER TABLE trade_orders ADD COLUMN completed_at DATETIME(6) NULL");
+            ensureColumnExists("pending_confirmation_at",
+                    "ALTER TABLE trade_orders ADD COLUMN pending_confirmation_at DATETIME(6) NULL");
+            ensureColumnExists("refund_applied_at",
+                    "ALTER TABLE trade_orders ADD COLUMN refund_applied_at DATETIME(6) NULL");
+            ensureColumnExists("cancelled_at", "ALTER TABLE trade_orders ADD COLUMN cancelled_at DATETIME(6) NULL");
+            ensureColumnExists("seller_name",
+                    "ALTER TABLE trade_orders ADD COLUMN seller_name VARCHAR(50) NULL");
+            ensureColumnExists("payment_channel",
+                    "ALTER TABLE trade_orders ADD COLUMN payment_channel VARCHAR(20) NULL");
+            ensureColumnExists("payment_url",
+                    "ALTER TABLE trade_orders ADD COLUMN payment_url VARCHAR(300) NULL");
+            ensureColumnExists("payment_expire_at",
+                    "ALTER TABLE trade_orders ADD COLUMN payment_expire_at DATETIME(6) NULL");
         } catch (SQLException ex) {
             throw new IllegalStateException("初始化支付表结构失败", ex);
         }
@@ -64,10 +78,17 @@ public class PaymentSchemaInitializer {
                     receiver_address VARCHAR(200) NOT NULL,
                     status VARCHAR(30) NOT NULL DEFAULT 'PENDING_PAYMENT',
                     paid_at DATETIME(6) NULL,
+                    seller_name VARCHAR(50) NULL,
+                    payment_channel VARCHAR(20) NULL,
+                    payment_url VARCHAR(300) NULL,
+                    payment_expire_at DATETIME(6) NULL,
                     buyer_confirmed TINYINT(1) NOT NULL DEFAULT 0,
                     seller_confirmed TINYINT(1) NOT NULL DEFAULT 0,
                     refund_status VARCHAR(30) NOT NULL DEFAULT 'NONE',
                     refund_type VARCHAR(40) NULL,
+                    pending_confirmation_at DATETIME(6) NULL,
+                    refund_applied_at DATETIME(6) NULL,
+                    cancelled_at DATETIME(6) NULL,
                     completed_at DATETIME(6) NULL,
                     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,

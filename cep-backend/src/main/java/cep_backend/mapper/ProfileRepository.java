@@ -1,4 +1,5 @@
 package cep_backend.mapper;
+
 import cep_backend.dto.ProfilePendingTradeDto;
 import cep_backend.dto.ProfileFollowUserDto;
 import cep_backend.dto.OtherProfileItemDto;
@@ -33,21 +34,28 @@ public class ProfileRepository {
                 rs.getObject("buyer_confirmed", Boolean.class),
                 rs.getObject("seller_confirmed", Boolean.class),
                 rs.getString("refund_status"),
-                rs.getString("refund_type"));
+                rs.getString("refund_type"),
+                rs.getObject("reviewed", Boolean.class));
     };
 
     private final RowMapper<ProfilePendingTradeDto> pendingTradeRowMapper = (rs, rowNum) -> {
         LocalDateTime createdAt = rs.getTimestamp("created_at").toLocalDateTime();
+        Timestamp cancelDeadlineTs = rs.getTimestamp("cancel_deadline_at");
+        LocalDateTime cancelDeadlineAt = cancelDeadlineTs == null ? null : cancelDeadlineTs.toLocalDateTime();
+        Integer remainingSeconds = rs.getObject("cancel_countdown_seconds", Integer.class);
         return new ProfilePendingTradeDto(
                 rs.getLong("id"),
                 rs.getLong("order_id"),
                 rs.getLong("item_id"),
                 rs.getString("title"),
+                rs.getBigDecimal("price"),
                 rs.getString("partner"),
                 rs.getString("location"),
                 createdAt.format(DATE_TIME_FORMATTER),
                 rs.getString("status"),
-                "待付款");
+                "待付款",
+                remainingSeconds == null ? 0L : Math.max(remainingSeconds.longValue(), 0L),
+                cancelDeadlineAt == null ? "" : cancelDeadlineAt.format(DATE_TIME_FORMATTER));
     };
 
     private final RowMapper<ProfileReviewItemDto> reviewRowMapper = (rs, rowNum) -> {
@@ -191,7 +199,8 @@ public class ProfileRepository {
                     NULL AS buyer_confirmed,
                     NULL AS seller_confirmed,
                     NULL AS refund_status,
-                    NULL AS refund_type
+                    NULL AS refund_type,
+                    NULL AS reviewed
                 FROM items i
                 LEFT JOIN item_details d ON d.item_id = i.id
                 WHERE COALESCE(i.publisher_user_id, d.publisher_user_id) = ?
@@ -215,7 +224,8 @@ public class ProfileRepository {
                     o.buyer_confirmed,
                     o.seller_confirmed,
                     o.refund_status,
-                    o.refund_type
+                    o.refund_type,
+                    NULL AS reviewed
                 FROM trade_orders o
                 WHERE o.seller_user_id = ?
                   AND NOT EXISTS (
@@ -249,8 +259,11 @@ public class ProfileRepository {
                     o.buyer_confirmed,
                     o.seller_confirmed,
                     o.refund_status,
-                    o.refund_type
+                    o.refund_type,
+                    CASE WHEN rt.status = 'SUBMITTED' THEN TRUE ELSE FALSE END AS reviewed
                 FROM trade_orders o
+                LEFT JOIN trade_review_tasks rt
+                    ON rt.order_id = o.id AND rt.reviewer_user_id = ?
                 WHERE o.buyer_user_id = ?
                   AND NOT EXISTS (
                       SELECT 1
@@ -265,7 +278,7 @@ public class ProfileRepository {
                   AND (? = 'ALL' OR o.status = ?)
                 ORDER BY COALESCE(o.paid_at, o.created_at) DESC, o.id DESC
                 """;
-        return jdbcTemplate.query(sql, tradeItemRowMapper, userId, mappedStatus, mappedStatus);
+        return jdbcTemplate.query(sql, tradeItemRowMapper, userId, userId, mappedStatus, mappedStatus);
     }
 
     public List<ProfileTradeItemDto> findFavoriteItems(Long userId) {
@@ -288,7 +301,8 @@ public class ProfileRepository {
                     NULL AS buyer_confirmed,
                     NULL AS seller_confirmed,
                     NULL AS refund_status,
-                    NULL AS refund_type
+                    NULL AS refund_type,
+                    NULL AS reviewed
                 FROM user_favorites f
                 INNER JOIN items i ON i.id = f.item_id
                 WHERE f.user_id = ?
@@ -304,10 +318,14 @@ public class ProfileRepository {
                     o.id AS order_id,
                     o.item_id,
                     o.item_title AS title,
+                    o.amount AS price,
                     COALESCE(NULLIF(s.username, ''), '校园用户') AS partner,
                     o.receiver_address AS location,
                     o.status,
-                    o.created_at
+                    o.created_at,
+                    DATE_ADD(o.created_at, INTERVAL 15 MINUTE) AS cancel_deadline_at,
+                    GREATEST(TIMESTAMPDIFF(SECOND, CURRENT_TIMESTAMP, DATE_ADD(o.created_at, INTERVAL 15 MINUTE)), 0)
+                        AS cancel_countdown_seconds
                 FROM trade_orders o
                 LEFT JOIN users s ON s.id = o.seller_user_id
                 WHERE o.buyer_user_id = ? AND o.status = 'PENDING_PAYMENT'

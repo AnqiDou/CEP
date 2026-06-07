@@ -1,10 +1,14 @@
 package cep_backend.controller;
+
 import cep_backend.dto.AdminDashboardDto;
 import cep_backend.dto.AdminItemDto;
 import cep_backend.dto.AdminNoticeCreateRequest;
 import cep_backend.dto.AdminNoticeDto;
 import cep_backend.dto.AdminOrderDto;
 import cep_backend.dto.AdminOrderUpdateRequest;
+import cep_backend.dto.AdminSensitiveWordCreateRequest;
+import cep_backend.dto.AdminSensitiveWordDto;
+import cep_backend.dto.AdminSensitiveWordUpdateRequest;
 import cep_backend.dto.AdminSupportConversationDto;
 import cep_backend.dto.AdminSupportMessageDto;
 import cep_backend.dto.AdminSupportReplyRequest;
@@ -21,6 +25,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -121,6 +126,15 @@ public class AdminController {
         return ApiResponse.ok("下架成功");
     }
 
+    @PostMapping("/items/{itemId}/restore")
+    public ApiResponse<Void> restoreOnline(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long itemId) {
+        ensureAdmin(authorization);
+        adminService.restoreOnline(itemId);
+        return ApiResponse.ok("恢复成功");
+    }
+
     @DeleteMapping("/items/{itemId}")
     public ApiResponse<Void> deleteItem(
             @RequestHeader("Authorization") String authorization,
@@ -185,6 +199,15 @@ public class AdminController {
         return ApiResponse.ok("发送成功");
     }
 
+    @PostMapping("/support/conversations/{conversationId}/resolve")
+    public ApiResponse<Void> resolveConversation(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long conversationId) {
+        ensureAdmin(authorization);
+        adminService.resolveConversation(conversationId);
+        return ApiResponse.ok("处理完成");
+    }
+
     @GetMapping("/support/me/messages")
     public ApiResponse<List<AdminSupportMessageDto>> mySupportMessages(
             @RequestHeader("Authorization") String authorization) {
@@ -226,6 +249,48 @@ public class AdminController {
             @PathVariable Long noticeId) {
         ensureAdmin(authorization);
         adminService.deleteNotice(noticeId);
+        return ApiResponse.ok("删除成功");
+    }
+
+    @GetMapping("/sensitive-words")
+    public ApiResponse<List<AdminSensitiveWordDto>> sensitiveWords(
+            @RequestHeader("Authorization") String authorization) {
+        ensureAdmin(authorization);
+        return ApiResponse.ok("获取成功", adminService.listSensitiveWords());
+    }
+
+    @PostMapping("/sensitive-words")
+    public ApiResponse<Void> createSensitiveWord(
+            @RequestHeader("Authorization") String authorization,
+            @RequestBody AdminSensitiveWordCreateRequest request) {
+        ensureAdmin(authorization);
+        adminService.createSensitiveWord(
+                request == null ? null : request.category(),
+                request == null ? null : request.word(),
+                request == null ? null : request.enabled());
+        return ApiResponse.ok("新增成功");
+    }
+
+    @PutMapping("/sensitive-words/{id}")
+    public ApiResponse<Void> updateSensitiveWord(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long id,
+            @RequestBody AdminSensitiveWordUpdateRequest request) {
+        ensureAdmin(authorization);
+        adminService.updateSensitiveWord(
+                id,
+                request == null ? null : request.category(),
+                request == null ? null : request.word(),
+                request == null ? null : request.enabled());
+        return ApiResponse.ok("更新成功");
+    }
+
+    @DeleteMapping("/sensitive-words/{id}")
+    public ApiResponse<Void> deleteSensitiveWord(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long id) {
+        ensureAdmin(authorization);
+        adminService.deleteSensitiveWord(id);
         return ApiResponse.ok("删除成功");
     }
 

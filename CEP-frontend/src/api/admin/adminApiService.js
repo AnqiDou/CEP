@@ -103,6 +103,12 @@ export const offlineAdminItem = async (itemId) =>
     headers: await withAuthHeaders(),
   });
 
+export const restoreAdminItem = async (itemId) =>
+  requestJson(`${ADMIN_API_BASE}/items/${itemId}/restore`, {
+    method: "POST",
+    headers: await withAuthHeaders(),
+  });
+
 export const deleteAdminItem = async (itemId) =>
   requestJson(`${ADMIN_API_BASE}/items/${itemId}`, {
     method: "DELETE",
@@ -172,6 +178,15 @@ export const replyAdminConversation = async (conversationId, payload) =>
     },
   );
 
+export const resolveAdminConversation = async (conversationId) =>
+  requestJson(
+    `${ADMIN_API_BASE}/support/conversations/${conversationId}/resolve`,
+    {
+      method: "POST",
+      headers: await withAuthHeaders(),
+    },
+  );
+
 export const fetchMySupportMessages = async () =>
   requestJson(`${ADMIN_API_BASE}/support/me/messages`, {
     headers: await withAuthHeaders(),
@@ -202,6 +217,43 @@ export const createAdminNotice = async (content) =>
 
 export const deleteAdminNotice = async (noticeId) =>
   requestJson(`${ADMIN_API_BASE}/notices/${noticeId}`, {
+    method: "DELETE",
+    headers: await withAuthHeaders(),
+  });
+
+export const fetchAdminSensitiveWords = async () =>
+  requestJson(`${ADMIN_API_BASE}/sensitive-words`, {
+    headers: await withAuthHeaders(),
+  });
+
+export const createAdminSensitiveWord = async (payload = {}) =>
+  requestJson(`${ADMIN_API_BASE}/sensitive-words`, {
+    method: "POST",
+    headers: await withAuthHeaders({
+      "Content-Type": "application/json",
+    }),
+    body: JSON.stringify({
+      category: String(payload?.category || "").trim(),
+      word: String(payload?.word || "").trim(),
+      enabled: payload?.enabled !== false,
+    }),
+  });
+
+export const updateAdminSensitiveWord = async (id, payload = {}) =>
+  requestJson(`${ADMIN_API_BASE}/sensitive-words/${id}`, {
+    method: "PUT",
+    headers: await withAuthHeaders({
+      "Content-Type": "application/json",
+    }),
+    body: JSON.stringify({
+      category: String(payload?.category || "").trim(),
+      word: String(payload?.word || "").trim(),
+      enabled: payload?.enabled !== false,
+    }),
+  });
+
+export const deleteAdminSensitiveWord = async (id) =>
+  requestJson(`${ADMIN_API_BASE}/sensitive-words/${id}`, {
     method: "DELETE",
     headers: await withAuthHeaders(),
   });

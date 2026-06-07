@@ -465,9 +465,16 @@ const handleSubmit = async () => {
     return;
   }
 
+  // 仅允许大于等于 0 的整数或小数，不允许负数、百分数、科学计数法等格式
+  const pricePattern = /^(?:0|[1-9]\d*)(?:\.\d+)?$/;
+  if (!pricePattern.test(rawPrice)) {
+    showSubmitMessage("价格格式不正确，请输入大于等于0的整数或小数");
+    return;
+  }
+
   const normalizedPrice = Number(rawPrice);
-  if (!Number.isFinite(normalizedPrice)) {
-    showSubmitMessage("请填写价格");
+  if (!Number.isFinite(normalizedPrice) || normalizedPrice < 0) {
+    showSubmitMessage("价格格式不正确，请输入大于等于0的整数或小数");
     return;
   }
 

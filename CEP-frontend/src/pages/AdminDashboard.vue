@@ -17,7 +17,11 @@
           @click="handleMenuClick(item.key)"
         >
           <span class="menu-item__label">{{ item.label }}</span>
-          <span class="menu-item__count">{{ item.count }}</span>
+          <span
+            v-if="item.key === 'support' && supportUnreadCount > 0"
+            class="menu-item__badge"
+            >{{ supportUnreadCount }}</span
+          >
         </button>
       </nav>
 
@@ -261,11 +265,19 @@
                       审核通过
                     </button>
                     <button
+                      v-if="item.status !== 'admin-offline'"
                       class="text-btn"
                       @click="forceOffline(item)"
                       :disabled="item.status === 'offline'"
                     >
                       强制下架
+                    </button>
+                    <button
+                      v-if="item.status === 'admin-offline'"
+                      class="text-btn"
+                      @click="restoreOnline(item)"
+                    >
+                      恢复上架
                     </button>
                     <button
                       class="text-btn text-btn--danger"
@@ -380,21 +392,15 @@
                   <div class="actions actions--wrap">
                     <button
                       class="text-btn"
-                      @click="updateOrderStatusByAdmin(order, 'COMPLETED')"
+                      @click="openOrderDetailDialog(order)"
                     >
-                      设为已完成
-                    </button>
-                    <button
-                      class="text-btn text-btn--danger"
-                      @click="updateOrderStatusByAdmin(order, 'CANCELLED')"
-                    >
-                      设为已取消
+                      查看详情
                     </button>
                     <button
                       class="text-btn"
-                      @click="updateOrderRefundStatusByAdmin(order, 'APPROVED')"
+                      @click="openOrderStatusDialog(order)"
                     >
-                      设为退款
+                      修改订单状态
                     </button>
                   </div>
                 </td>
@@ -426,7 +432,131 @@
         </div>
       </section>
 
-      <section v-else-if="activeMenu === 'reviews'" class="card panel">
+      <div
+        v-if="orderDetailDialogVisible"
+        class="credit-modal-mask"
+        @click.self="closeOrderDetailDialog"
+      >
+        <section class="credit-modal card order-detail-modal">
+          <header class="credit-modal__header">
+            <h3>订单详情</h3>
+          </header>
+          <p class="credit-modal__subtitle">
+            订单号：{{ orderDetailTarget?.orderNo || "-" }}
+          </p>
+          <div class="order-detail-modal__grid">
+            <p><span>商品：</span>{{ orderDetailTarget?.itemTitle || "-" }}</p>
+            <p><span>买家：</span>{{ orderDetailTarget?.buyer || "-" }}</p>
+            <p><span>卖家：</span>{{ orderDetailTarget?.seller || "-" }}</p>
+            <p><span>金额：</span>￥{{ orderDetailTarget?.amount || 0 }}</p>
+            <p>
+              <span>当前状态：</span>{{ orderStatusText(orderDetailTarget) }}
+            </p>
+            <p>
+              <span>创建时间：</span
+              >{{ formatOrderTime(orderDetailTarget?.createdAt) }}
+            </p>
+            <p>
+              <span>支付时间：</span
+              >{{ formatOrderTime(orderDetailTarget?.paidAt) }}
+            </p>
+            <p>
+              <span>完成时间：</span
+              >{{ formatOrderTime(orderDetailTarget?.completedAt) }}
+            </p>
+            <p>
+              <span>最近状态更新时间：</span
+              >{{ formatOrderTime(orderDetailTarget?.updatedAt) }}
+            </p>
+          </div>
+          <div class="order-detail-modal__flow">
+            <span
+              v-for="state in adminOrderStateFlow"
+              :key="state.key"
+              :class="[
+                'order-detail-modal__flow-item',
+                orderCurrentStateKey(orderDetailTarget) === state.key
+                  ? 'is-active'
+                  : '',
+              ]"
+            >
+              {{ state.label }}
+            </span>
+          </div>
+          <footer class="credit-modal__actions">
+            <button
+              class="primary-btn"
+              type="button"
+              @click="closeOrderDetailDialog"
+            >
+              关闭
+            </button>
+          </footer>
+        </section>
+      </div>
+
+      <div
+        v-if="orderStatusDialogVisible"
+        class="credit-modal-mask"
+        @click.self="closeOrderStatusDialog"
+      >
+        <section class="credit-modal card order-status-modal">
+          <header class="credit-modal__header">
+            <h3>修改订单状态</h3>
+          </header>
+          <p class="credit-modal__subtitle">
+            订单号：{{ orderStatusTarget?.orderNo || "-" }}
+          </p>
+          <div
+            ref="orderStatusPickerRef"
+            class="status-select order-status-modal__select"
+          >
+            <button
+              type="button"
+              class="status-select__trigger"
+              @click="orderStatusPickerOpen = !orderStatusPickerOpen"
+            >
+              <span>{{ adminOrderStatusPickerLabel }}</span>
+              <span
+                class="status-select__arrow"
+                :class="{ 'is-open': orderStatusPickerOpen }"
+                >▾</span
+              >
+            </button>
+            <ul v-if="orderStatusPickerOpen" class="status-select__menu">
+              <li
+                v-for="option in adminOrderStatusPickerOptions"
+                :key="option.value"
+                class="status-select__option"
+                :class="{
+                  'is-selected': adminOrderStatusPickerValue === option.value,
+                }"
+                @click="selectAdminOrderStatusPicker(option.value)"
+              >
+                {{ option.label }}
+              </li>
+            </ul>
+          </div>
+          <footer class="credit-modal__actions">
+            <button
+              class="text-btn"
+              type="button"
+              @click="closeOrderStatusDialog"
+            >
+              取消
+            </button>
+            <button
+              class="primary-btn"
+              type="button"
+              @click="submitOrderStatusDialog"
+            >
+              确认修改
+            </button>
+          </footer>
+        </section>
+      </div>
+
+      <section v-if="activeMenu === 'reviews'" class="card panel">
         <div class="toolbar toolbar--multi toolbar--grid4">
           <input
             v-model.trim="reviewKeyword"
@@ -517,10 +647,7 @@
         </div>
       </section>
 
-      <section
-        v-else-if="activeMenu === 'support'"
-        class="card panel support-panel"
-      >
+      <section v-if="activeMenu === 'support'" class="card panel support-panel">
         <div class="support-layout">
           <aside class="conversation-list">
             <button
@@ -534,11 +661,17 @@
               ]"
               @click="activeConversationId = session.id"
             >
-              <strong>{{ supportConversationTitle(session) }}</strong>
-              <span class="conversation-item__meta"
-                >{{ session.reporterName || "用户" }} ·
-                {{ mapReportTypeText(session.reportType) }}</span
-              >
+              <div class="conversation-item__head">
+                <strong>{{ supportConversationTitle(session) }}</strong>
+                <span
+                  v-if="!isConversationResolved(session)"
+                  class="menu-item__badge conversation-item__badge"
+                  >1</span
+                >
+              </div>
+              <span class="conversation-item__meta">{{
+                mapReportTypeText(session.reportType)
+              }}</span>
               <span class="conversation-item__preview">{{
                 supportConversationPreview(session.preview)
               }}</span>
@@ -548,6 +681,20 @@
           <section class="conversation-main">
             <div class="support-topbar">
               <h3>{{ supportConversationTitle(currentConversation) }}</h3>
+              <button
+                class="text-btn"
+                :disabled="
+                  !currentConversation ||
+                  isConversationResolved(currentConversation)
+                "
+                @click="resolveConversation(currentConversation)"
+              >
+                {{
+                  isConversationResolved(currentConversation)
+                    ? "已处理"
+                    : "标记已处理"
+                }}
+              </button>
             </div>
             <div v-if="currentConversation" class="support-meta">
               <span>举报人：{{ currentConversation.reporterName || "-" }}</span>
@@ -614,7 +761,10 @@
         </div>
       </section>
 
-      <section v-else class="card panel">
+      <section
+        v-if="activeMenu === 'settings'"
+        class="card panel settings-panel"
+      >
         <div class="setting-block">
           <div class="setting-header">
             <h3>发布平台公告</h3>
@@ -629,8 +779,8 @@
           </div>
         </div>
 
-        <div class="setting-block">
-          <h3>当前公告</h3>
+        <div class="setting-block setting-block--notice-current">
+          <h3 class="setting-title">当前公告</h3>
           <div v-if="currentNotice" class="current-notice-card">
             <div class="notice-item__content">
               <p class="notice-item__text">{{ currentNotice.content }}</p>
@@ -649,23 +799,115 @@
         </div>
 
         <div class="setting-block">
-          <h3>历史公告</h3>
-          <ul class="notice-list">
-            <li v-for="notice in historyNotices" :key="notice.id">
-              <div class="notice-item__content">
-                <p class="notice-item__text">{{ notice.content }}</p>
-                <span class="notice-item__date"
-                  >发布时间：{{ formatNoticeDate(notice.createdAt) }}</span
-                >
-              </div>
-              <button
-                class="text-btn text-btn--danger"
-                @click="deleteNotice(notice.id)"
+          <div class="setting-header">
+            <h3>
+              敏感词管理
+              <span class="setting-header__meta"
+                >共 {{ sensitiveWords.length }} 条</span
               >
-                删除
+            </h3>
+            <button class="primary-btn" @click="createSensitiveWord">
+              添加敏感词
+            </button>
+          </div>
+          <div class="toolbar toolbar--multi toolbar--grid4">
+            <div ref="sensitiveCategoryDropdownRef" class="status-select">
+              <button
+                type="button"
+                class="status-select__trigger"
+                @click="sensitiveCategoryOpen = !sensitiveCategoryOpen"
+              >
+                <span>{{ sensitiveCategoryLabel }}</span>
+                <span
+                  class="status-select__arrow"
+                  :class="{ 'is-open': sensitiveCategoryOpen }"
+                  >▾</span
+                >
               </button>
-            </li>
-          </ul>
+              <ul v-if="sensitiveCategoryOpen" class="status-select__menu">
+                <li
+                  v-for="option in sensitiveCategoryOptions"
+                  :key="option.value"
+                  class="status-select__option"
+                  :class="{
+                    'is-selected': newSensitiveWord.category === option.value,
+                  }"
+                  @click="selectSensitiveCategory(option.value)"
+                >
+                  {{ option.label }}
+                </li>
+              </ul>
+            </div>
+            <input
+              v-model.trim="newSensitiveWord.word"
+              class="toolbar-input"
+              placeholder="输入敏感词"
+            />
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>分类</th>
+                  <th>敏感词</th>
+                  <th>更新时间</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="word in sensitiveWords"
+                  :key="word.id"
+                  class="sensitive-row"
+                >
+                  <td>{{ word.id }}</td>
+                  <td>
+                    <select
+                      v-model="word.category"
+                      class="toolbar-select table-select sensitive-category-select"
+                    >
+                      <option
+                        v-for="option in getSensitiveCategoryOptions(
+                          word.category
+                        )"
+                        :key="option.value"
+                        :value="option.value"
+                      >
+                        {{ option.label }}
+                      </option>
+                    </select>
+                  </td>
+                  <td>
+                    <input
+                      v-model.trim="word.word"
+                      class="toolbar-input table-input"
+                    />
+                  </td>
+                  <td>{{ formatNoticeDate(word.updatedAt) }}</td>
+                  <td>
+                    <div class="actions">
+                      <button
+                        class="text-btn"
+                        @click="updateSensitiveWord(word)"
+                      >
+                        保存
+                      </button>
+                      <button
+                        class="text-btn text-btn--danger"
+                        @click="deleteSensitiveWord(word.id)"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination-bar sensitive-pagination">
+            <span class="pagination-info"></span>
+          </div>
         </div>
       </section>
     </main>
@@ -738,9 +980,11 @@ import { uploadPublishImage } from "../api/publish/publishApiService";
 import {
   approveAdminItem,
   createAdminNotice,
+  createAdminSensitiveWord,
   deleteAdminItem,
   deleteAdminNotice,
   deleteAdminReview,
+  deleteAdminSensitiveWord,
   deleteAdminUser,
   fetchAdminConversations,
   fetchAdminDashboard,
@@ -748,9 +992,13 @@ import {
   fetchAdminNotices,
   fetchAdminOrders,
   fetchAdminReviews,
+  fetchAdminSensitiveWords,
   fetchAdminUsers,
   offlineAdminItem,
+  restoreAdminItem,
   replyAdminConversation,
+  resolveAdminConversation,
+  updateAdminSensitiveWord,
   updateAdminOrder,
   updateAdminUserCreditScore,
   updateAdminUserStatus,
@@ -769,7 +1017,7 @@ const navItems = ref([
   { key: "items", label: "商品管理", count: "00" },
   { key: "orders", label: "订单管理", count: "00" },
   { key: "reviews", label: "评价管理", count: "00" },
-  { key: "support", label: "客服模块", count: "00" },
+  { key: "support", label: "在线客服", count: "00" },
   { key: "settings", label: "系统设置", count: "00" },
 ]);
 
@@ -812,6 +1060,8 @@ const itemStatusOptions = [
   { value: "pending", label: "待审核" },
   { value: "online", label: "上架中" },
   { value: "offline", label: "已下架" },
+  { value: "admin-offline", label: "违规下架" },
+  { value: "sold", label: "已售出" },
 ];
 const itemStatusLabel = computed(
   () =>
@@ -849,6 +1099,47 @@ const orderStateLabel = computed(
     orderStateOptions.find((option) => option.value === orderState.value)
       ?.label || "全部状态"
 );
+const orderDetailDialogVisible = ref(false);
+const orderDetailTarget = ref(null);
+const orderStatusDialogVisible = ref(false);
+const orderStatusTarget = ref(null);
+const orderStatusPickerOpen = ref(false);
+const orderStatusPickerRef = ref(null);
+const adminOrderStatusPickerValue = ref("pending-payment");
+const adminOrderStatusPickerOptions = [
+  { value: "pending-payment", label: "待付款" },
+  { value: "pending-confirmation", label: "待确认" },
+  { value: "refund-after-sale", label: "退款中" },
+  { value: "completed", label: "已完成" },
+  { value: "cancelled", label: "已取消" },
+];
+const adminOrderStatusPickerLabel = computed(
+  () =>
+    adminOrderStatusPickerOptions.find(
+      (option) => option.value === adminOrderStatusPickerValue.value
+    )?.label || "请选择状态"
+);
+const adminOrderStateFlow = [
+  { key: "pending-payment", label: "待付款" },
+  { key: "pending-confirmation", label: "待确认" },
+  { key: "refund-after-sale", label: "退款中" },
+  { key: "completed", label: "已完成" },
+  { key: "cancelled", label: "已取消" },
+];
+
+const formatOrderTime = (value) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value || "-");
+  }
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+    date.getDate()
+  )} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(
+    date.getSeconds()
+  )}`;
+};
 
 const conversations = ref([]);
 const activeConversationId = ref(null);
@@ -861,6 +1152,10 @@ const currentConversation = computed(() =>
     (session) => session.id === activeConversationId.value
   )
 );
+const supportUnreadCount = computed(
+  () =>
+    conversations.value.filter((item) => !isConversationResolved(item)).length
+);
 
 const reviews = ref([]);
 const reviewKeyword = ref("");
@@ -872,7 +1167,41 @@ const reviewSearchTimer = ref(null);
 const notices = ref([]);
 const newNotice = ref("");
 const currentNotice = computed(() => notices.value[0] || null);
-const historyNotices = computed(() => notices.value.slice(1));
+const sensitiveWords = ref([]);
+const sensitiveCategoryOpen = ref(false);
+const sensitiveCategoryDropdownRef = ref(null);
+const sensitiveCategoryOptions = [
+  { value: "OTHER", label: "其他" },
+  { value: "ABUSE", label: "辱骂攻击" },
+  { value: "PORN", label: "色情低俗" },
+  { value: "AD", label: "广告引流" },
+  { value: "VIOLENCE", label: "涉政涉暴" },
+  { value: "PRIVACY", label: "隐私信息" },
+  { value: "FRAUD", label: "诈骗违规" },
+];
+const newSensitiveWord = ref({
+  category: "OTHER",
+  word: "",
+});
+const sensitiveCategoryLabel = computed(
+  () =>
+    sensitiveCategoryOptions.find(
+      (item) => item.value === newSensitiveWord.value.category
+    )?.label || "其他"
+);
+
+const getSensitiveCategoryOptions = (currentCategory) => {
+  const normalized = String(currentCategory || "").trim();
+  if (!normalized) return sensitiveCategoryOptions;
+  const existed = sensitiveCategoryOptions.some(
+    (item) => item.value === normalized
+  );
+  if (existed) return sensitiveCategoryOptions;
+  return [
+    { value: normalized, label: normalized },
+    ...sensitiveCategoryOptions,
+  ];
+};
 
 const abnormalOrderCount = computed(
   () => dashboardRaw.value.abnormalOrderCount || 0
@@ -1022,28 +1351,28 @@ const applyDashboard = (data = {}) => {
 
   metrics.value = [
     {
-      label: "今日新增用户",
-      value: String(data.todayNewUsers ?? 0),
-    },
-    {
       label: "总用户数",
       value: String(data.totalUsers ?? 0),
-    },
-    {
-      label: "今日新增商品",
-      value: String(data.todayNewItems ?? 0),
     },
     {
       label: "总商品数",
       value: String(data.totalItems ?? 0),
     },
     {
-      label: "今日订单数",
-      value: String(data.todayOrders ?? 0),
+      label: "总订单数",
+      value: String(data.totalOrders ?? 0),
     },
     {
-      label: "今日销售额",
-      value: `￥${moneyText(data.todaySales)}`,
+      label: "今日新增用户",
+      value: String(data.todayNewUsers ?? 0),
+    },
+    {
+      label: "今日新增商品",
+      value: String(data.todayNewItems ?? 0),
+    },
+    {
+      label: "总销售额",
+      value: `￥${moneyText(data.totalSales)}`,
     },
   ];
 
@@ -1053,19 +1382,7 @@ const applyDashboard = (data = {}) => {
 };
 
 const updateNavCount = () => {
-  const map = {
-    users: users.value.length,
-    items: items.value.length,
-    orders: orders.value.length,
-    support: conversations.value.length,
-    reviews: reviews.value.length,
-    settings: notices.value.length,
-  };
-  navItems.value = navItems.value.map((item) =>
-    map[item.key] === undefined
-      ? item
-      : { ...item, count: String(map[item.key]).padStart(2, "0") }
-  );
+  navItems.value = navItems.value.map((item) => ({ ...item, count: "" }));
 };
 
 const loadDashboard = async () => {
@@ -1233,6 +1550,22 @@ const loadNotices = async () => {
   updateNavCount();
 };
 
+const loadSensitiveWords = async () => {
+  const { data } = await fetchAdminSensitiveWords();
+  sensitiveWords.value = (data || [])
+    .map((item) => ({
+      ...item,
+      enabled: item.enabled !== false,
+    }))
+    .sort((a, b) => {
+      const ta = Date.parse(String(a?.updatedAt || a?.createdAt || "")) || 0;
+      const tb = Date.parse(String(b?.updatedAt || b?.createdAt || "")) || 0;
+      if (tb !== ta) return tb - ta;
+      return Number(b?.id || 0) - Number(a?.id || 0);
+    });
+  updateNavCount();
+};
+
 const persistActiveMenu = (menuKey) => {
   try {
     localStorage.setItem(ADMIN_ACTIVE_MENU_KEY, menuKey);
@@ -1270,7 +1603,7 @@ const ensureMenuDataLoaded = async (menuKey, options = {}) => {
     } else if (menuKey === "reviews") {
       await loadReviews();
     } else if (menuKey === "settings") {
-      await loadNotices();
+      await Promise.all([loadNotices(), loadSensitiveWords()]);
     }
     loadedMenus.value.add(menuKey);
   } finally {
@@ -1297,6 +1630,8 @@ const statusText = (status) => {
     pending: "待审核",
     online: "上架中",
     offline: "已下架",
+    "admin-offline": "违规下架",
+    sold: "已售出",
     "pending-pay": "待付款",
     "pending-confirm": "待确认",
     completed: "已完成",
@@ -1306,14 +1641,20 @@ const statusText = (status) => {
 };
 
 const statusClass = (status) => {
-  if (status === "offline" || status === "cancelled") return "pill--danger";
+  if (
+    status === "offline" ||
+    status === "cancelled" ||
+    status === "admin-offline"
+  )
+    return "pill--danger";
   if (
     status === "pending" ||
     status === "pending-pay" ||
     status === "pending-confirm"
   )
     return "pill--warn";
-  if (status === "completed" || status === "online") return "pill--ok";
+  if (status === "completed" || status === "online" || status === "sold")
+    return "pill--ok";
   return "";
 };
 
@@ -1325,7 +1666,7 @@ const normalizeRefundStatus = (refundStatus) =>
 const orderStatusText = (order) => {
   const refundStatus = normalizeRefundStatus(order?.refundStatus);
   if (refundStatus === "applied") {
-    return "退款";
+    return "退款中";
   }
   if (refundStatus === "approved") {
     return "已退款";
@@ -1357,12 +1698,14 @@ const mapReportTypeText = (type) => {
 
 const supportConversationTitle = (session) => {
   if (!session) return "请选择会话";
-  const reportTypeText = mapReportTypeText(session.reportType);
-  const base = reportTypeText === "其他" ? "客服咨询" : reportTypeText;
-  if (session.itemTitle) {
-    return `${base} · ${session.itemTitle}`;
-  }
-  return base;
+  return String(session.reporterName || "用户").trim() || "用户";
+};
+
+const isConversationResolved = (session) => {
+  const status = String(session?.status || "")
+    .trim()
+    .toUpperCase();
+  return status === "RESOLVED" || status === "CLOSED";
 };
 
 const supportConversationPreview = (value) => {
@@ -1391,6 +1734,11 @@ const selectOrderState = (value) => {
   orderStateOpen.value = false;
 };
 
+const selectSensitiveCategory = (value) => {
+  newSensitiveWord.value.category = value;
+  sensitiveCategoryOpen.value = false;
+};
+
 const handleDocumentClick = (event) => {
   const target = event.target;
   if (
@@ -1410,6 +1758,19 @@ const handleDocumentClick = (event) => {
     !orderStateDropdownRef.value.contains(target)
   ) {
     orderStateOpen.value = false;
+  }
+  if (
+    orderStatusPickerOpen.value &&
+    orderStatusPickerRef.value &&
+    !orderStatusPickerRef.value.contains(target)
+  ) {
+    orderStatusPickerOpen.value = false;
+  }
+  if (
+    sensitiveCategoryDropdownRef.value &&
+    !sensitiveCategoryDropdownRef.value.contains(target)
+  ) {
+    sensitiveCategoryOpen.value = false;
   }
 };
 
@@ -1506,6 +1867,15 @@ const forceOffline = (item) => {
     .catch((error) => ElMessage.error(error.message || "下架失败"));
 };
 
+const restoreOnline = (item) => {
+  restoreAdminItem(item.id)
+    .then(async () => {
+      await Promise.all([loadItems(), loadDashboard()]);
+      ElMessage.success("商品已恢复，可由用户自行上架");
+    })
+    .catch((error) => ElMessage.error(error.message || "恢复失败"));
+};
+
 const deleteItem = (id) => {
   deleteAdminItem(id)
     .then(async () => {
@@ -1548,35 +1918,82 @@ const toAdminRefundStatus = (status) => {
   return "NONE";
 };
 
-const updateOrderStatusByAdmin = async (order, nextStatus) => {
+const orderCurrentStateKey = (order) => {
+  const refundStatus = normalizeRefundStatus(order?.refundStatus);
+  if (refundStatus === "applied") return "refund-after-sale";
+  const status = toAdminOrderStatus(order?.status);
+  if (status === "PENDING_PAYMENT") return "pending-payment";
+  if (status === "PENDING_CONFIRMATION") return "pending-confirmation";
+  if (status === "COMPLETED") return "completed";
+  if (status === "CANCELLED") return "cancelled";
+  return "pending-payment";
+};
+
+const openOrderDetailDialog = (order) => {
+  orderDetailTarget.value = order || null;
+  orderDetailDialogVisible.value = true;
+};
+
+const closeOrderDetailDialog = () => {
+  orderDetailDialogVisible.value = false;
+  orderDetailTarget.value = null;
+};
+
+const openOrderStatusDialog = (order) => {
+  orderStatusTarget.value = order || null;
+  adminOrderStatusPickerValue.value = orderCurrentStateKey(order);
+  orderStatusPickerOpen.value = false;
+  orderStatusDialogVisible.value = true;
+};
+
+const closeOrderStatusDialog = () => {
+  orderStatusDialogVisible.value = false;
+  orderStatusTarget.value = null;
+  orderStatusPickerOpen.value = false;
+};
+
+const selectAdminOrderStatusPicker = (value) => {
+  adminOrderStatusPickerValue.value = value;
+  orderStatusPickerOpen.value = false;
+};
+
+const submitOrderStatusDialog = async () => {
+  const order = orderStatusTarget.value;
   const orderNo = String(order?.orderNo || "").trim();
-  if (!orderNo || !nextStatus) return;
+  if (!orderNo) return;
+  const selected = adminOrderStatusPickerValue.value;
+  let status = null;
+  let refundStatus = null;
+  if (selected === "pending-payment") {
+    status = "PENDING_PAYMENT";
+    refundStatus = "NONE";
+  } else if (selected === "pending-confirmation") {
+    status = "PENDING_CONFIRMATION";
+    refundStatus = "NONE";
+  } else if (selected === "refund-after-sale") {
+    status = "PENDING_CONFIRMATION";
+    refundStatus = "APPLIED";
+  } else if (selected === "completed") {
+    status = "COMPLETED";
+    refundStatus = "NONE";
+  } else if (selected === "cancelled") {
+    status = "CANCELLED";
+    refundStatus = "NONE";
+  }
   try {
     await updateAdminOrder(orderNo, {
-      status: nextStatus,
-      refundStatus: null,
+      status,
+      refundStatus,
     });
     await Promise.all([loadOrders(), loadDashboard()]);
-    ElMessage.success(`订单状态已更新为${getAdminStatusLabel(nextStatus)}`);
+    ElMessage.success("订单状态已更新");
+    closeOrderStatusDialog();
   } catch (error) {
     ElMessage.error(error.message || "更新订单状态失败");
   }
 };
 
-const updateOrderRefundStatusByAdmin = async (order, nextRefundStatus) => {
-  const orderNo = String(order?.orderNo || "").trim();
-  if (!orderNo || !nextRefundStatus) return;
-  try {
-    await updateAdminOrder(orderNo, {
-      status: null,
-      refundStatus: nextRefundStatus,
-    });
-    await Promise.all([loadOrders(), loadDashboard()]);
-    ElMessage.success("订单已设为退款");
-  } catch (error) {
-    ElMessage.error(error.message || "更新退款状态失败");
-  }
-};
+// 订单状态统一通过“修改订单状态”弹窗处理
 
 const appendReply = () => {
   if (!supportReply.value && !pendingSupportImageUrl.value) {
@@ -1596,6 +2013,17 @@ const appendReply = () => {
       ElMessage.success("回复已发送");
     })
     .catch((error) => ElMessage.error(error.message || "发送失败"));
+};
+
+const resolveConversation = async (session) => {
+  if (!session?.id || isConversationResolved(session)) return;
+  try {
+    await resolveAdminConversation(session.id);
+    await Promise.all([loadConversations(), loadDashboard()]);
+    ElMessage.success("会话已处理");
+  } catch (error) {
+    ElMessage.error(error.message || "处理失败");
+  }
 };
 
 const openSupportImagePicker = () => {
@@ -1646,6 +2074,42 @@ const publishNotice = () => {
     .catch((error) => ElMessage.error(error.message || "发布失败"));
 };
 
+const createSensitiveWord = () => {
+  if (!newSensitiveWord.value.word.trim()) {
+    ElMessage.warning("敏感词不能为空");
+    return;
+  }
+  createAdminSensitiveWord(newSensitiveWord.value)
+    .then(async () => {
+      newSensitiveWord.value = { category: "OTHER", word: "" };
+      await loadSensitiveWords();
+      ElMessage.success("敏感词已添加");
+    })
+    .catch((error) => ElMessage.error(error.message || "添加敏感词失败"));
+};
+
+const updateSensitiveWord = (word) => {
+  if (!String(word?.word || "").trim()) {
+    ElMessage.warning("敏感词不能为空");
+    return;
+  }
+  updateAdminSensitiveWord(word.id, word)
+    .then(async () => {
+      await loadSensitiveWords();
+      ElMessage.success("敏感词已更新");
+    })
+    .catch((error) => ElMessage.error(error.message || "更新敏感词失败"));
+};
+
+const deleteSensitiveWord = (id) => {
+  deleteAdminSensitiveWord(id)
+    .then(async () => {
+      await loadSensitiveWords();
+      ElMessage.success("敏感词已删除");
+    })
+    .catch((error) => ElMessage.error(error.message || "删除敏感词失败"));
+};
+
 const deleteNotice = (id) => {
   deleteAdminNotice(id)
     .then(async () => {
@@ -1672,6 +2136,9 @@ onMounted(async () => {
   persistActiveMenu(activeMenu.value);
   try {
     await ensureMenuDataLoaded(activeMenu.value);
+    if (!loadedMenus.value.has("support")) {
+      await loadConversations();
+    }
     connectWebSocket();
   } catch (error) {
     ElMessage.error(error.message || "管理后台数据加载失败");
@@ -1727,13 +2194,15 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .admin-page {
-  min-height: 100vh;
+  height: 100vh;
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr);
   gap: 20px;
   padding: 22px;
+  box-sizing: border-box;
   background: #f5f4fb;
   color: #1f2933;
+  overflow: hidden;
 }
 
 .card {
@@ -1796,6 +2265,20 @@ onBeforeUnmount(() => {
   color: #6b7280;
 }
 
+.menu-item__badge {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: #ff4d4f;
+}
+
 .logout-btn {
   margin-top: auto;
   border: none;
@@ -1812,6 +2295,8 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .dashboard-grid {
@@ -2141,6 +2626,55 @@ onBeforeUnmount(() => {
   margin-top: 14px;
 }
 
+.order-detail-modal {
+  width: min(760px, 96vw);
+}
+
+.order-detail-modal__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+  color: #5b5570;
+}
+
+.order-detail-modal__grid p {
+  margin: 0;
+}
+
+.order-detail-modal__flow {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.order-detail-modal__flow-item {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #e7ddff;
+  color: #7b7298;
+  font-size: 13px;
+}
+
+.order-detail-modal__flow-item.is-active {
+  border-color: #b39bff;
+  background: #f2edff;
+  color: #5d4db7;
+}
+
+.order-status-modal {
+  width: min(520px, 96vw);
+  overflow: visible;
+}
+
+.order-status-modal__select {
+  margin-top: 8px;
+}
+
+.order-status-modal .status-select__menu {
+  z-index: 1301;
+}
+
 .text-btn,
 .primary-btn {
   border: none;
@@ -2190,6 +2724,7 @@ onBeforeUnmount(() => {
   border-radius: 14px;
   background: #ffffff;
   cursor: pointer;
+  position: relative;
   text-align: left;
   padding: 14px;
   display: flex;
@@ -2207,6 +2742,21 @@ onBeforeUnmount(() => {
 .conversation-item strong {
   color: #0f172a;
   font-size: 18px;
+}
+
+.conversation-item__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.conversation-item__badge {
+  flex-shrink: 0;
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  color: #fff !important;
 }
 
 .conversation-item span {
@@ -2341,7 +2891,7 @@ onBeforeUnmount(() => {
 }
 
 .setting-block + .setting-block {
-  margin-top: 22px;
+  margin-top: 12px;
 }
 
 .setting-block {
@@ -2349,6 +2899,23 @@ onBeforeUnmount(() => {
   box-shadow: none !important;
   background: transparent;
   padding: 0;
+}
+
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.setting-title {
+  margin: 0;
+  font-size: 22px;
+}
+
+.setting-block--notice-current {
+  margin-top: 6px;
 }
 
 .setting-header {
@@ -2364,6 +2931,13 @@ onBeforeUnmount(() => {
   font-size: 22px;
 }
 
+.setting-header__meta {
+  margin-left: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #64748b;
+}
+
 .notice-editor {
   display: block;
 }
@@ -2372,9 +2946,59 @@ onBeforeUnmount(() => {
   display: block;
   width: 100%;
   max-width: 100%;
-  min-height: 120px;
+  min-height: 96px;
   resize: vertical;
   margin-bottom: 0;
+}
+
+.setting-block:last-child {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.setting-block:last-child .table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: visible;
+}
+
+.setting-block:last-child .table {
+  min-width: 0;
+}
+
+.sensitive-row td {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.table-input {
+  min-height: 36px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.table-select {
+  min-height: 36px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.sensitive-category-select {
+  width: 170px;
+  min-width: 170px;
+  max-width: 170px;
+}
+
+.sensitive-pagination {
+  margin-top: 10px;
+}
+
+.setting-block:last-child .table-wrap {
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .notice-list {

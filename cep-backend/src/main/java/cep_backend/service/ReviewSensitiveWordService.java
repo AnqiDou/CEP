@@ -19,6 +19,15 @@ public class ReviewSensitiveWordService {
     }
 
     public void validateReviewContent(String content) {
+        validateContent(content, BLOCKED_MESSAGE);
+    }
+
+    public void validatePublishContent(String itemName, String description) {
+        String merged = (itemName == null ? "" : itemName) + "\n" + (description == null ? "" : description);
+        validateContent(merged, "物品名称或描述中包含违规词");
+    }
+
+    private void validateContent(String content, String blockedMessage) {
         if (content == null || content.isBlank()) {
             return;
         }
@@ -27,7 +36,7 @@ public class ReviewSensitiveWordService {
         List<String> blockedWords = reviewSensitiveWordRepository.findEnabledWords();
         for (String blockedWord : blockedWords) {
             if (normalized.contains(normalize(blockedWord))) {
-                throw new BusinessException(BLOCKED_MESSAGE);
+                throw new BusinessException(blockedMessage);
             }
         }
     }

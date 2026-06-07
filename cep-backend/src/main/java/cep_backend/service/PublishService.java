@@ -1,7 +1,9 @@
 package cep_backend.service;
+
 import cep_backend.service.AdminService;
 import cep_backend.common.exception.BusinessException;
 import cep_backend.service.MessageNotificationService;
+import cep_backend.service.ReviewSensitiveWordService;
 import cep_backend.dto.PublishItemDto;
 import cep_backend.dto.PublishItemRequest;
 import cep_backend.dto.PublishItemUpdateRequest;
@@ -25,6 +27,8 @@ public class PublishService {
     private static final int MAX_PHOTO_COUNT = 6;
     private static final String STATUS_PUBLISHED = "PUBLISHED";
     private static final String STATUS_OFF_SHELF = "OFF_SHELF";
+    private static final String STATUS_ADMIN_OFFLINE = "FORCED_OFF";
+    private static final String STATUS_SOLD_OUT = "SOLD_OUT";
     private static final String STATUS_DELETED = "DELETED";
     private static final String QUANTITY_MODE_SINGLE = "SINGLE";
     private static final String QUANTITY_MODE_UNLIMITED = "UNLIMITED";
@@ -45,13 +49,16 @@ public class PublishService {
     private final PublishRepository publishRepository;
     private final MessageNotificationService messageNotificationService;
     private final AdminService adminService;
+    private final ReviewSensitiveWordService reviewSensitiveWordService;
 
     public PublishService(PublishRepository publishRepository,
             MessageNotificationService messageNotificationService,
-            AdminService adminService) {
+            AdminService adminService,
+            ReviewSensitiveWordService reviewSensitiveWordService) {
         this.publishRepository = publishRepository;
         this.messageNotificationService = messageNotificationService;
         this.adminService = adminService;
+        this.reviewSensitiveWordService = reviewSensitiveWordService;
     }
 
     @Transactional
@@ -68,6 +75,7 @@ public class PublishService {
         LocalDate purchaseDate = normalizePurchaseDate(request.purchaseDate());
         String usageDuration = normalizeOptionalText(request.usageDuration(), "使用时长", 50);
         String description = normalizeOptionalText(request.description(), "物品描述", 500);
+        validatePublishSensitiveWords(itemName, description);
         List<String> photoUrls = validatePhotoUrls(request.photoUrls());
 
         Long categoryId = publishRepository.findCategoryIdByCode(categoryCode);
@@ -152,6 +160,7 @@ public class PublishService {
         LocalDate purchaseDate = normalizePurchaseDate(request.purchaseDate());
         String usageDuration = normalizeOptionalText(request.usageDuration(), "使用时长", 50);
         String description = normalizeOptionalText(request.description(), "物品描述", 500);
+        validatePublishSensitiveWords(itemName, description);
         List<String> photoUrls = validatePhotoUrls(request.photoUrls());
 
         Long categoryId = publishRepository.findCategoryIdByCode(categoryCode);
@@ -223,6 +232,12 @@ public class PublishService {
             if (quantityState.remainingQuantity() != null && quantityState.remainingQuantity() <= 0) {
                 throw new BusinessException("该商品已售罄，请先调整数量后再上架");
             }
+            if (STATUS_ADMIN_OFFLINE.equals(before.status()) || "ADMIN_OFFLINE".equals(before.status())) {
+                throw new BusinessException("该商品因违规被管理员下架，无法自行上架");
+            }
+            if (STATUS_SOLD_OUT.equals(before.status())) {
+                throw new BusinessException("该商品已售出，无法上架");
+            }
         }
 
         int updated = publishRepository.updateStatus(userId, itemId, normalized, LocalDateTime.now());
@@ -260,6 +275,10 @@ public class PublishService {
         if (score.compareTo(AdminService.PUBLISH_CREDIT_THRESHOLD) < 0) {
             throw new BusinessException("信用分过低（当前 " + score + "），低于 85 分禁止发布物品");
         }
+    }
+
+    private void validatePublishSensitiveWords(String itemName, String description) {
+        reviewSensitiveWordService.validatePublishContent(itemName, description);
     }
 
     private void refreshItemOpsColumns(Long itemId,

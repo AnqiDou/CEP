@@ -1,4 +1,5 @@
 package cep_backend.mapper;
+
 import cep_backend.dto.AdminItemDto;
 import cep_backend.dto.AdminNoticeDto;
 import cep_backend.dto.AdminOrderDto;
@@ -15,6 +16,8 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,21 +60,16 @@ public class AdminRepository {
         return jdbcTemplate.queryForObject(sql, Integer.class);
     }
 
-    public Integer countTodayOrders() {
-        String sql = """
-                SELECT COUNT(1)
-                FROM trade_orders
-                WHERE CAST(created_at AS DATE) = CAST(CURRENT_TIMESTAMP AS DATE)
-                """;
+    public Integer countTotalOrders() {
+        String sql = "SELECT COUNT(1) FROM trade_orders";
         return jdbcTemplate.queryForObject(sql, Integer.class);
     }
 
-    public java.math.BigDecimal sumTodaySales() {
+    public java.math.BigDecimal sumTotalSales() {
         String sql = """
                 SELECT IFNULL(SUM(amount), 0)
                 FROM trade_orders
-                WHERE CAST(created_at AS DATE) = CAST(CURRENT_TIMESTAMP AS DATE)
-                  AND status = 'COMPLETED'
+                WHERE status = 'COMPLETED'
                 """;
         return jdbcTemplate.queryForObject(sql, java.math.BigDecimal.class);
     }
@@ -230,6 +228,110 @@ public class AdminRepository {
         return jdbcTemplate.update(sql, Timestamp.valueOf(now), userId);
     }
 
+    public int purgeUserCompletely(Long userId) {
+        if (userId == null || userId <= 0) {
+            return 0;
+        }
+
+        String userEmail = findUserEmailById(userId);
+        List<Long> itemIds = findItemIdsByPublisher(userId);
+
+        jdbcTemplate.update("""
+                DELETE m FROM admin_support_messages m
+                INNER JOIN admin_support_conversations c ON c.id = m.conversation_id
+                WHERE c.reporter_user_id = ?
+                   OR c.item_id IN (SELECT id FROM items WHERE publisher_user_id = ?)
+                """, userId, userId);
+
+        jdbcTemplate.update("""
+                DELETE FROM admin_support_conversations
+                WHERE reporter_user_id = ?
+                   OR item_id IN (SELECT id FROM items WHERE publisher_user_id = ?)
+                """, userId, userId);
+
+        if (!itemIds.isEmpty()) {
+            String inClause = buildInPlaceholders(itemIds.size());
+            List<Object> params = new ArrayList<>();
+            params.add(userId);
+            params.add(userId);
+            params.addAll(itemIds);
+            jdbcTemplate.update(
+                    "DELETE FROM message_notifications WHERE user_id = ? OR related_user_id = ? OR related_item_id IN ("
+                            + inClause + ")",
+                    params.toArray());
+        } else {
+            jdbcTemplate.update("DELETE FROM message_notifications WHERE user_id = ? OR related_user_id = ?", userId,
+                    userId);
+        }
+
+        jdbcTemplate.update("DELETE FROM trade_review_tasks WHERE reviewer_user_id = ? OR target_user_id = ?", userId,
+                userId);
+        jdbcTemplate.update("DELETE FROM user_credit_reviews WHERE rater_user_id = ? OR target_user_id = ?", userId,
+                userId);
+
+        jdbcTemplate.update("""
+                DELETE mr FROM message_records mr
+                INNER JOIN message_conversations mc ON mc.id = mr.conversation_id
+                WHERE mc.buyer_user_id = ? OR mc.seller_user_id = ?
+                """, userId, userId);
+        jdbcTemplate.update("DELETE FROM message_conversations WHERE buyer_user_id = ? OR seller_user_id = ?", userId,
+                userId);
+
+        jdbcTemplate.update("DELETE FROM user_follows WHERE user_id = ? OR target_user_id = ?", userId, userId);
+        jdbcTemplate.update("DELETE FROM user_favorites WHERE user_id = ?", userId);
+        if (!itemIds.isEmpty()) {
+            jdbcTemplate.update(
+                    "DELETE FROM user_favorites WHERE item_id IN (" + buildInPlaceholders(itemIds.size()) + ")",
+                    itemIds.toArray());
+        }
+
+        jdbcTemplate.update(
+                "DELETE FROM trade_review_tasks WHERE order_id IN (SELECT id FROM trade_orders WHERE buyer_user_id = ? OR seller_user_id = ?)",
+                userId, userId);
+        jdbcTemplate.update(
+                "DELETE FROM user_credit_reviews WHERE order_id IN (SELECT id FROM trade_orders WHERE buyer_user_id = ? OR seller_user_id = ?)",
+                userId, userId);
+        jdbcTemplate.update("DELETE FROM trade_orders WHERE buyer_user_id = ? OR seller_user_id = ?", userId, userId);
+
+        if (!itemIds.isEmpty()) {
+            Object[] itemParams = itemIds.toArray();
+            String in = buildInPlaceholders(itemIds.size());
+            jdbcTemplate.update("DELETE FROM item_ops_columns WHERE item_id IN (" + in + ")", itemParams);
+            jdbcTemplate.update("DELETE FROM item_photos WHERE item_id IN (" + in + ")", itemParams);
+            jdbcTemplate.update("DELETE FROM item_details WHERE item_id IN (" + in + ")", itemParams);
+            jdbcTemplate.update("DELETE FROM items WHERE id IN (" + in + ")", itemParams);
+        }
+
+        jdbcTemplate.update("DELETE FROM auth_sessions WHERE user_id = ?", userId);
+        jdbcTemplate.update("DELETE FROM user_profiles WHERE user_id = ?", userId);
+        if (userEmail != null && !userEmail.isBlank()) {
+            jdbcTemplate.update("DELETE FROM email_verification_codes WHERE LOWER(email) = LOWER(?)", userEmail.trim());
+        }
+
+        return jdbcTemplate.update("DELETE FROM users WHERE id = ?", userId);
+    }
+
+    private List<Long> findItemIdsByPublisher(Long userId) {
+        List<Long> ids = jdbcTemplate.query("SELECT id FROM items WHERE publisher_user_id = ?",
+                (rs, rowNum) -> rs.getLong("id"),
+                userId);
+        return new ArrayList<>(new HashSet<>(ids));
+    }
+
+    private String findUserEmailById(Long userId) {
+        List<String> emails = jdbcTemplate.query("SELECT email FROM users WHERE id = ?",
+                (rs, rowNum) -> rs.getString("email"),
+                userId);
+        return emails.isEmpty() ? null : emails.getFirst();
+    }
+
+    private String buildInPlaceholders(int size) {
+        if (size <= 0) {
+            return "";
+        }
+        return String.join(",", Collections.nCopies(size, "?"));
+    }
+
     public List<AdminItemDto> listItems(
             String keyword,
             String title,
@@ -347,7 +449,14 @@ public class AdminRepository {
                     COALESCE(NULLIF(s.username, ''), s.email, '未知卖家') AS seller_name,
                     o.amount,
                     o.status,
-                    %s
+                    %s,
+                    o.created_at,
+                    o.paid_at,
+                    o.pending_confirmation_at,
+                    o.refund_applied_at,
+                    o.cancelled_at,
+                    o.completed_at,
+                    o.updated_at
                 FROM trade_orders o
                 LEFT JOIN users b ON b.id = o.buyer_user_id
                 LEFT JOIN users s ON s.id = o.seller_user_id
@@ -373,7 +482,16 @@ public class AdminRepository {
                 rs.getString("seller_name"),
                 rs.getBigDecimal("amount"),
                 rs.getString("status"),
-                rs.getString("refund_status")),
+                rs.getString("refund_status"),
+                rs.getTimestamp("created_at") == null ? null : rs.getTimestamp("created_at").toLocalDateTime(),
+                rs.getTimestamp("paid_at") == null ? null : rs.getTimestamp("paid_at").toLocalDateTime(),
+                rs.getTimestamp("pending_confirmation_at") == null ? null
+                        : rs.getTimestamp("pending_confirmation_at").toLocalDateTime(),
+                rs.getTimestamp("refund_applied_at") == null ? null
+                        : rs.getTimestamp("refund_applied_at").toLocalDateTime(),
+                rs.getTimestamp("cancelled_at") == null ? null : rs.getTimestamp("cancelled_at").toLocalDateTime(),
+                rs.getTimestamp("completed_at") == null ? null : rs.getTimestamp("completed_at").toLocalDateTime(),
+                rs.getTimestamp("updated_at") == null ? null : rs.getTimestamp("updated_at").toLocalDateTime()),
                 normalizedKeyword,
                 like,
                 like,
@@ -423,12 +541,35 @@ public class AdminRepository {
         String sql = """
                 UPDATE trade_orders
                 SET status = ?,
+                    paid_at = CASE
+                        WHEN ? = 'PENDING_CONFIRMATION' THEN COALESCE(paid_at, ?)
+                        ELSE paid_at
+                    END,
+                    pending_confirmation_at = CASE
+                        WHEN ? = 'PENDING_CONFIRMATION' THEN COALESCE(pending_confirmation_at, ?)
+                        ELSE pending_confirmation_at
+                    END,
+                    cancelled_at = CASE
+                        WHEN ? = 'CANCELLED' THEN COALESCE(cancelled_at, ?)
+                        ELSE cancelled_at
+                    END,
                     completed_at = CASE WHEN ? = 'COMPLETED' THEN COALESCE(completed_at, ?) ELSE NULL END,
                     updated_at = ?
                 WHERE order_no = ?
                 """;
         Timestamp timestamp = Timestamp.valueOf(now);
-        return jdbcTemplate.update(sql, status, status, timestamp, timestamp, orderNo);
+        return jdbcTemplate.update(sql,
+                status,
+                status,
+                timestamp,
+                status,
+                timestamp,
+                status,
+                timestamp,
+                status,
+                timestamp,
+                timestamp,
+                orderNo);
     }
 
     public int updateOrderRefundStatusByOrderNo(String orderNo, String refundStatus, LocalDateTime now) {
@@ -436,11 +577,15 @@ public class AdminRepository {
                 UPDATE trade_orders
                 SET refund_status = ?,
                     refund_type = CASE WHEN ? = 'APPLIED' THEN refund_type ELSE NULL END,
+                    refund_applied_at = CASE
+                        WHEN ? = 'APPLIED' THEN COALESCE(refund_applied_at, ?)
+                        ELSE refund_applied_at
+                    END,
                     updated_at = ?
                 WHERE order_no = ?
                 """;
         Timestamp timestamp = Timestamp.valueOf(now);
-        return jdbcTemplate.update(sql, refundStatus, refundStatus, timestamp, orderNo);
+        return jdbcTemplate.update(sql, refundStatus, refundStatus, refundStatus, timestamp, timestamp, orderNo);
     }
 
     public TradeOrderNotifyRecord findTradeOrderNotifyRecordByOrderNo(String orderNo) {
@@ -481,6 +626,7 @@ public class AdminRepository {
                 SELECT
                     c.id AS conversation_id,
                     c.title,
+                    c.status,
                     c.report_type,
                     c.reporter_user_id,
                     c.item_id,
@@ -511,6 +657,7 @@ public class AdminRepository {
                     id -> new ConversationAccumulator(
                             id,
                             String.valueOf(row.get("title")),
+                            toNullableString(row.get("status")),
                             toNullableString(row.get("report_type")),
                             resolveReporterName(row.get("reporter_username"), row.get("reporter_email")),
                             toNullableLong(row.get("item_id")),
@@ -537,6 +684,7 @@ public class AdminRepository {
                 .map(item -> new AdminSupportConversationDto(
                         item.id(),
                         item.title(),
+                        item.status(),
                         item.reportType(),
                         item.reporterName(),
                         item.itemId(),
@@ -582,6 +730,16 @@ public class AdminRepository {
                 WHERE id = ?
                 """;
         return jdbcTemplate.update(sql, preview, Timestamp.valueOf(now), conversationId);
+    }
+
+    public int updateSupportConversationStatus(Long conversationId, String status, LocalDateTime now) {
+        String sql = """
+                UPDATE admin_support_conversations
+                SET status = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """;
+        return jdbcTemplate.update(sql, status, Timestamp.valueOf(now), conversationId);
     }
 
     public Long findUserIdByEmail(String email) {
@@ -762,6 +920,8 @@ public class AdminRepository {
             case "pending" -> "PENDING_REVIEW";
             case "online" -> "PUBLISHED";
             case "offline" -> "OFF_SHELF";
+            case "admin-offline" -> "FORCED_OFF";
+            case "sold" -> "SOLD_OUT";
             default -> "ALL";
         };
     }
@@ -779,6 +939,7 @@ public class AdminRepository {
     private record ConversationAccumulator(
             Long id,
             String title,
+            String status,
             String reportType,
             String reporterName,
             Long itemId,

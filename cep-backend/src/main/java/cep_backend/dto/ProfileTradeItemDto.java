@@ -13,5 +13,6 @@ public record ProfileTradeItemDto(
                 Boolean buyerConfirmed,
                 Boolean sellerConfirmed,
                 String refundStatus,
-                String refundType) {
+                String refundType,
+                Boolean reviewed) {
 }

@@ -20,8 +20,8 @@
   - `totalUsers`
   - `todayNewItems`
   - `totalItems`
-  - `todayOrders`
-  - `todaySales`
+  - `totalOrders`
+  - `totalSales`
   - `pendingItemCount`
   - `abnormalOrderCount`
   - `pendingConversationCount`

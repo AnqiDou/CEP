@@ -1,14 +1,17 @@
 package cep_backend.service;
+
 import cep_backend.dto.AdminDashboardDto;
 import cep_backend.dto.AdminItemDto;
 import cep_backend.dto.AdminNoticeDto;
 import cep_backend.dto.AdminOrderDto;
 import cep_backend.dto.AdminOrderStateStatDto;
+import cep_backend.dto.AdminSensitiveWordDto;
 import cep_backend.dto.AdminSupportConversationDto;
 import cep_backend.dto.AdminSupportMessageDto;
 import cep_backend.dto.AdminUserDto;
 import cep_backend.dto.AdminUserCreditReviewDto;
 import cep_backend.mapper.AdminRepository;
+import cep_backend.mapper.ReviewSensitiveWordRepository;
 import cep_backend.common.exception.BusinessException;
 import cep_backend.dto.AuthUserDto;
 import cep_backend.dto.MessageConversationDto;
@@ -34,17 +37,20 @@ public class AdminService {
 
     private final AdminRepository adminRepository;
     private final MessageRepository messageRepository;
+    private final ReviewSensitiveWordRepository reviewSensitiveWordRepository;
     private final MessageService messageService;
     private final String adminEmail;
     private final MessageWebSocketNotifier messageWebSocketNotifier;
 
     public AdminService(AdminRepository adminRepository,
             MessageRepository messageRepository,
+            ReviewSensitiveWordRepository reviewSensitiveWordRepository,
             MessageService messageService,
             MessageWebSocketNotifier messageWebSocketNotifier,
             @Value("${app.admin.email:3299166215@qq.com}") String adminEmail) {
         this.adminRepository = adminRepository;
         this.messageRepository = messageRepository;
+        this.reviewSensitiveWordRepository = reviewSensitiveWordRepository;
         this.messageService = messageService;
         this.messageWebSocketNotifier = messageWebSocketNotifier;
         this.adminEmail = adminEmail == null ? "" : adminEmail.trim().toLowerCase();
@@ -65,8 +71,8 @@ public class AdminService {
         int totalUsers = safeInt(adminRepository.countTotalUsers());
         int todayNewItems = safeInt(adminRepository.countTodayNewItems());
         int totalItems = safeInt(adminRepository.countTotalItems());
-        int todayOrders = safeInt(adminRepository.countTodayOrders());
-        BigDecimal todaySales = adminRepository.sumTodaySales();
+        int totalOrders = safeInt(adminRepository.countTotalOrders());
+        BigDecimal totalSales = adminRepository.sumTotalSales();
         int pendingItemCount = safeInt(adminRepository.countPendingItems());
         int abnormalOrderCount = safeInt(adminRepository.countAbnormalOrders());
         int pendingConversationCount = safeInt(adminRepository.countPendingConversations());
@@ -89,8 +95,8 @@ public class AdminService {
                 totalUsers,
                 todayNewItems,
                 totalItems,
-                todayOrders,
-                todaySales == null ? BigDecimal.ZERO : todaySales,
+                totalOrders,
+                totalSales == null ? BigDecimal.ZERO : totalSales,
                 pendingItemCount,
                 abnormalOrderCount,
                 pendingConversationCount,
@@ -151,9 +157,9 @@ public class AdminService {
         if (userId == null || userId <= 0) {
             throw new BusinessException("用户参数无效");
         }
-        int updated = adminRepository.deleteUser(userId, LocalDateTime.now());
+        int updated = adminRepository.purgeUserCompletely(userId);
         if (updated <= 0) {
-            throw new BusinessException("用户不存在或已删除");
+            throw new BusinessException("用户不存在");
         }
     }
 
@@ -182,7 +188,12 @@ public class AdminService {
 
     @Transactional
     public void forceOffline(Long itemId) {
-        mutateItemStatus(itemId, "OFF_SHELF");
+        mutateItemStatus(itemId, "FORCED_OFF");
+    }
+
+    @Transactional
+    public void restoreOnline(Long itemId) {
+        mutateItemStatus(itemId, "PUBLISHED");
     }
 
     @Transactional
@@ -211,7 +222,14 @@ public class AdminService {
                         order.seller(),
                         order.amount(),
                         toOrderStatus(order.status()),
-                        order.refundStatus() == null ? "none" : order.refundStatus().trim().toLowerCase()))
+                        order.refundStatus() == null ? "none" : order.refundStatus().trim().toLowerCase(),
+                        order.createdAt(),
+                        order.paidAt(),
+                        order.pendingConfirmationAt(),
+                        order.refundAppliedAt(),
+                        order.cancelledAt(),
+                        order.completedAt(),
+                        order.updatedAt()))
                 .toList();
     }
 
@@ -272,6 +290,17 @@ public class AdminService {
 
     public List<AdminSupportConversationDto> listConversations() {
         return adminRepository.listSupportConversations();
+    }
+
+    @Transactional
+    public void resolveConversation(Long conversationId) {
+        if (conversationId == null || conversationId <= 0) {
+            throw new BusinessException("会话参数无效");
+        }
+        int updated = adminRepository.updateSupportConversationStatus(conversationId, "RESOLVED", LocalDateTime.now());
+        if (updated <= 0) {
+            throw new BusinessException("会话不存在");
+        }
     }
 
     @Transactional
@@ -456,6 +485,63 @@ public class AdminService {
         return adminRepository.listNotices();
     }
 
+    public List<AdminSensitiveWordDto> listSensitiveWords() {
+        return reviewSensitiveWordRepository.listAllWords();
+    }
+
+    @Transactional
+    public void createSensitiveWord(String category, String word, Boolean enabled) {
+        String normalizedCategory = normalizeWordCategory(category);
+        String normalizedWord = normalizeSensitiveWord(word);
+        boolean normalizedEnabled = enabled == null || enabled;
+        try {
+            int created = reviewSensitiveWordRepository.createWord(
+                    normalizedCategory,
+                    normalizedWord,
+                    normalizedEnabled,
+                    LocalDateTime.now());
+            if (created <= 0) {
+                throw new BusinessException("新增敏感词失败");
+            }
+        } catch (DataAccessException ex) {
+            throw new BusinessException("新增敏感词失败：词条可能已存在");
+        }
+    }
+
+    @Transactional
+    public void updateSensitiveWord(Long id, String category, String word, Boolean enabled) {
+        if (id == null || id <= 0) {
+            throw new BusinessException("敏感词参数无效");
+        }
+        String normalizedCategory = normalizeWordCategory(category);
+        String normalizedWord = normalizeSensitiveWord(word);
+        boolean normalizedEnabled = enabled == null || enabled;
+        try {
+            int updated = reviewSensitiveWordRepository.updateWord(
+                    id,
+                    normalizedCategory,
+                    normalizedWord,
+                    normalizedEnabled,
+                    LocalDateTime.now());
+            if (updated <= 0) {
+                throw new BusinessException("敏感词不存在");
+            }
+        } catch (DataAccessException ex) {
+            throw new BusinessException("更新敏感词失败：词条可能已存在");
+        }
+    }
+
+    @Transactional
+    public void deleteSensitiveWord(Long id) {
+        if (id == null || id <= 0) {
+            throw new BusinessException("敏感词参数无效");
+        }
+        int deleted = reviewSensitiveWordRepository.deleteWord(id);
+        if (deleted <= 0) {
+            throw new BusinessException("敏感词不存在");
+        }
+    }
+
     @Transactional
     public void createNotice(String content) {
         if (content == null || content.trim().isEmpty()) {
@@ -496,6 +582,12 @@ public class AdminService {
         if ("PUBLISHED".equals(status)) {
             return "online";
         }
+        if ("SOLD_OUT".equals(status)) {
+            return "sold";
+        }
+        if ("ADMIN_OFFLINE".equals(status) || "FORCED_OFF".equals(status)) {
+            return "admin-offline";
+        }
         if ("OFF_SHELF".equals(status)) {
             return "offline";
         }
@@ -520,6 +612,25 @@ public class AdminService {
 
     private int safeInt(Integer value) {
         return value == null ? 0 : value;
+    }
+
+    private String normalizeWordCategory(String category) {
+        String normalized = category == null ? "" : category.trim();
+        if (normalized.isEmpty()) {
+            return "OTHER";
+        }
+        return normalized.length() > 50 ? normalized.substring(0, 50) : normalized;
+    }
+
+    private String normalizeSensitiveWord(String word) {
+        String normalized = word == null ? "" : word.trim();
+        if (normalized.isEmpty()) {
+            throw new BusinessException("敏感词不能为空");
+        }
+        if (normalized.length() > 100) {
+            throw new BusinessException("敏感词不能超过100字符");
+        }
+        return normalized;
     }
 
     private void notifyTradeOrderUpdatedByAdmin(

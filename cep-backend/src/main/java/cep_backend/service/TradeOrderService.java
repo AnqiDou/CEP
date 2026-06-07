@@ -1,4 +1,5 @@
 package cep_backend.service;
+
 import cep_backend.common.exception.BusinessException;
 import cep_backend.dto.CreateTradeOrderRequest;
 import cep_backend.dto.TradeOrderDetailDto;
@@ -61,9 +62,6 @@ public class TradeOrderService {
         Integer remainingQuantity = snapshot.remainingQuantity();
         if (remainingQuantity != null && remainingQuantity <= 0) {
             throw new BusinessException("该物品已售罄");
-        }
-        if (tradeOrderRepository.existsPendingOrderForItem(itemId)) {
-            throw new BusinessException("该物品已有待付款订单，请先完成支付或取消后再下单");
         }
         if (snapshot.sellerUserId() == null || snapshot.sellerUserId() <= 0) {
             throw new BusinessException("物品发布者信息缺失，暂不可下单");
@@ -219,7 +217,9 @@ public class TradeOrderService {
             throw new BusinessException("当前订单已申请退款，无法确认交付");
         }
 
-        tradeOrderRepository.markSellerConfirmedDelivery(orderId);
+        if (!Boolean.TRUE.equals(order.sellerConfirmed())) {
+            tradeOrderRepository.markSellerConfirmedDelivery(orderId);
+        }
         tradeOrderRepository.completeOrderWhenBothConfirmed(orderId);
 
         TradeOrderRecord updated = tradeOrderRepository.findOrderById(orderId);
@@ -243,8 +243,10 @@ public class TradeOrderService {
             throw new BusinessException("当前订单已申请退款，无法确认收货");
         }
 
-        tradeOrderRepository.markBuyerConfirmedReceived(orderId);
-        tradeOrderRepository.completeOrderWhenBothConfirmed(orderId);
+        if (!Boolean.TRUE.equals(order.buyerConfirmed())) {
+            tradeOrderRepository.markBuyerConfirmedReceived(orderId);
+        }
+        tradeOrderRepository.completeOrderWhenBuyerConfirmed(orderId);
 
         TradeOrderRecord updated = tradeOrderRepository.findOrderById(orderId);
         if (updated == null) {

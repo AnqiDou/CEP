@@ -1,4 +1,4 @@
-﻿-- Auto generated: SQL Server => MySQL
+-- Auto generated: SQL Server => MySQL
 SET NAMES utf8mb4;
 
 SET FOREIGN_KEY_CHECKS = 0;
@@ -195,17 +195,6 @@ CREATE TABLE `search_keywords` (
     UNIQUE KEY `UQ__search_k__3697F5A218717CD5` (`keyword`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
-DROP TABLE IF EXISTS `system_notices`;
-
-CREATE TABLE `system_notices` (
-    `id` BIGINT AUTO_INCREMENT NOT NULL,
-    `content` VARCHAR(500) NOT NULL,
-    `created_by_user_id` BIGINT NOT NULL,
-    `created_at` DATETIME(6) NOT NULL,
-    `updated_at` DATETIME(6) NOT NULL,
-    PRIMARY KEY (`id`)
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
-
 DROP TABLE IF EXISTS `trade_orders`;
 
 CREATE TABLE `trade_orders` (
@@ -220,34 +209,16 @@ CREATE TABLE `trade_orders` (
     `receiver_address` VARCHAR(200) NOT NULL,
     `status` VARCHAR(30) NOT NULL DEFAULT 'PENDING_PAYMENT',
     `paid_at` DATETIME(6) NULL,
+    `seller_name` VARCHAR(50) NULL,
+    `payment_channel` VARCHAR(20) NULL,
+    `payment_url` VARCHAR(300) NULL,
+    `payment_expire_at` DATETIME(6) NULL,
     `created_at` DATETIME(6) NOT NULL,
     `updated_at` DATETIME(6) NOT NULL,
     `buyer_user_id` BIGINT NULL,
     `seller_user_id` BIGINT NULL,
     PRIMARY KEY (`id`),
     UNIQUE KEY `UQ__trade_or__465C81B87D03678E` (`order_no`)
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
-
-DROP TABLE IF EXISTS `trade_payment_orders`;
-
-CREATE TABLE `trade_payment_orders` (
-    `id` BIGINT AUTO_INCREMENT NOT NULL,
-    `order_no` VARCHAR(40) NOT NULL,
-    `item_id` BIGINT NOT NULL,
-    `buyer_user_id` BIGINT NOT NULL,
-    `seller_user_id` BIGINT NULL,
-    `item_title` VARCHAR(120) NOT NULL,
-    `seller_name` VARCHAR(50) NOT NULL,
-    `amount` DECIMAL(10, 2) NOT NULL,
-    `channel` VARCHAR(20) NOT NULL,
-    `status` VARCHAR(20) NOT NULL,
-    `payment_url` VARCHAR(300) NOT NULL,
-    `expire_at` DATETIME(6) NOT NULL,
-    `paid_at` DATETIME(6) NULL,
-    `created_at` DATETIME(6) NOT NULL,
-    `updated_at` DATETIME(6) NOT NULL,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `UQ__trade_pa__465C81B8832F6220` (`order_no`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 DROP TABLE IF EXISTS `trade_review_tasks`;
@@ -730,14 +701,14 @@ VALUES (
     );
 
 INSERT INTO `item_categories` (`id`, `code`, `name`, `description`, `tags`, `sort_order`, `created_at`, `updated_at`) VALUES
-(1, 'digital', '鏁扮爜浜у搧', '鎵嬫満銆佺數鑴戙€佸钩鏉裤€佽€虫満銆佸厖鐢靛櫒绛?, '鎵嬫満,鐢佃剳,骞虫澘,鑰虫満,鍏呯數鍣?, 1, '2026-03-25 17:32:07.846666', '2026-03-25 17:32:07.846666'),
-(2, 'book', '鍥句功鏁欐潗', '璇炬湰銆佽€冪爺鑰冨叕璧勬枡銆佸皬璇淬€佷笓涓氫功', '璇炬湰,鑰冪爺,鑰冨叕,灏忚,涓撲笟涔?, 2, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
-(3, 'clothes', '鏈嶉グ闉嬪寘', '琛ｆ湇銆侀瀷瀛愩€佸寘鍖呫€侀厤楗?, '琛ｆ湇,闉嬪瓙,鍖呭寘,閰嶉グ', 3, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
-(4, 'beauty', '缇庡鎶よ偆', '鍖栧鍝併€佹姢鑲ゅ搧銆侀姘?, '鍖栧鍝?鎶よ偆鍝?棣欐按', 4, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
-(5, 'sports', '杩愬姩鍣ㄦ潗', '绡悆銆佺窘姣涚悆鎷嶃€佺憸浼藉灚銆佽嚜琛岃溅', '绡悆,缇芥瘺鐞冩媿,鐟滀冀鍨?鑷杞?, 5, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
-(6, 'daily', '鐢熸椿鐢ㄥ搧', '鏀剁撼銆佸皬瀹剁數銆侀攨纰楃摙鐩嗐€佸瘽瀹ょ敤鍝?, '鏀剁撼,灏忓鐢?閿呯鐡㈢泦,瀵濆鐢ㄥ搧', 6, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
-(7, 'stationery', '鏂囧叿鍔炲叕', '绗斻€佹湰銆佽绠楀櫒銆佹枃浠跺す绛?, '绗?鏈?璁＄畻鍣?鏂囦欢澶?, 7, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
-(8, 'other', '鍏朵粬', '鍏朵粬鍒嗙被鍟嗗搧', '鍏朵粬', 8, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000');
+(1, 'digital', '数码产品', '手机、电脑、平板、耳机、充电器�?, '手机,电脑,平板,耳机,充电�?, 1, '2026-03-25 17:32:07.846666', '2026-03-25 17:32:07.846666'),
+(2, 'book', '图书教材', '课本、考研考公资料、小说、专业书', '课本,考研,考公,小说,专业�?, 2, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
+(3, 'clothes', '服饰鞋包', '衣服、鞋子、包包、配�?, '衣服,鞋子,包包,配饰', 3, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
+(4, 'beauty', '美妆护肤', '化妆品、护肤品、香�?, '化妆�?护肤�?香水', 4, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
+(5, 'sports', '运动器材', '篮球、羽毛球拍、瑜伽垫、自行车', '篮球,羽毛球拍,瑜伽�?自行�?, 5, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
+(6, 'daily', '生活用品', '收纳、小家电、锅碗瓢盆、寝室用�?, '收纳,小家�?锅碗瓢盆,寝室用品', 6, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
+(7, 'stationery', '文具办公', '笔、本、计算器、文件夹�?, '�?�?计算�?文件�?, 7, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000'),
+(8, 'other', '其他', '其他分类商品', '其他', 8, '2026-03-25 17:32:07.850000', '2026-03-25 17:32:07.850000');
 
 INSERT INTO `item_details` (`id`, `item_id`, `publisher_user_id`, `purchase_date`, `usage_duration`, `created_at`, `updated_at`) VALUES
 (1, 7, 1, '2026-03-28 00:00:00.000000', '', '2026-03-28 18:38:19.060000', '2026-03-28 18:38:19.060000'),
@@ -770,12 +741,6 @@ INSERT INTO `search_keywords` (`id`, `keyword`, `search_count`, `last_searched_a
 INSERT INTO `trade_orders` (`id`, `order_no`, `item_id`, `item_title`, `amount`, `cover_photo_url`, `receiver_name`, `receiver_phone`, `receiver_address`, `status`, `paid_at`, `created_at`, `updated_at`, `buyer_user_id`, `seller_user_id`) VALUES
 (1, 'CEP20260328162524239699', 11, '5', 5.00, 'https://cep-project-1416369898.cos.ap-beijing.myqcloud.com/publish-images/2026-03-27/ce87ea6d-979b-45cd-ba4c-ed2bde379e76.png', '1', '1', '1', 'PAID', '2026-03-28 16:25:30.648175', '2026-03-28 16:25:24.873333', '2026-03-28 16:25:30.673333', NULL, NULL);
 
-INSERT INTO `trade_payment_orders` (`id`, `order_no`, `item_id`, `buyer_user_id`, `seller_user_id`, `item_title`, `seller_name`, `amount`, `channel`, `status`, `payment_url`, `expire_at`, `paid_at`, `created_at`, `updated_at`) VALUES
-(1, 'CEP20260328155824399383', 11, 1, NULL, '5', '鏍″洯鐢ㄦ埛', 5.00, 'WECHAT_H5', 'PENDING', 'https://pay-mock.cep.local/wechat/h5?orderNo=CEP20260328155824399383', '2026-03-28 16:13:24.592891', NULL, '2026-03-28 15:58:24.592891', '2026-03-28 15:58:24.592891'),
-(2, 'CEP20260328155828718123', 11, 1, NULL, '5', '鏍″洯鐢ㄦ埛', 5.00, 'WECHAT_H5', 'PAID', 'https://pay-mock.cep.local/wechat/h5?orderNo=CEP20260328155828718123', '2026-03-28 16:13:28.730487', '2026-03-28 15:58:34.167421', '2026-03-28 15:58:28.730487', '2026-03-28 15:58:34.167421');
-
-
-
 
 
 INSERT INTO `user_profiles` (`id`, `user_id`, `credit_score`, `note`, `created_at`, `updated_at`, `avatar_url`) VALUES
@@ -783,7 +748,7 @@ INSERT INTO `user_profiles` (`id`, `user_id`, `credit_score`, `note`, `created_a
 (2, 2, NULL, NULL, '2026-03-28 18:21:22.563333', '2026-03-28 18:21:22.563333', NULL);
 
 INSERT INTO `users` (`id`, `email`, `username`, `password_hash`, `status`, `created_at`, `updated_at`, `last_login_at`) VALUES
-(1, 'anqidou@outlook.com', '瀹夌惇', '$2a$10$Mq32x0gxLZs7KXRbuOqkRuLTKw4ArcmMRYQbt6ijlXOuylv2vg7Tm', 'ACTIVE', '2026-03-24 13:42:16.199417', '2026-03-30 14:22:39.716395', '2026-03-30 14:22:39.716395'),
+(1, 'anqidou@outlook.com', '安琪', '$2a$10$Mq32x0gxLZs7KXRbuOqkRuLTKw4ArcmMRYQbt6ijlXOuylv2vg7Tm', 'ACTIVE', '2026-03-24 13:42:16.199417', '2026-03-30 14:22:39.716395', '2026-03-30 14:22:39.716395'),
 (2, '3299166215@qq.com', '', '$2a$10$IYyvw7fLn6YrkhQkcUbJOuCNnCyMjFeLdOS3ypiK/fn1CuoLhni8G', 'ACTIVE', '2026-03-27 13:45:14.976395', '2026-03-31 14:53:28.478509', '2026-03-31 14:53:28.478509');
 
 ALTER TABLE `admin_order_abnormal_records` ADD CONSTRAINT `fk_admin_order_abnormal_records_user` FOREIGN KEY (`handled_by_user_id`) REFERENCES `users` (`id`);
@@ -799,11 +764,7 @@ ALTER TABLE `message_conversations` ADD CONSTRAINT `fk_message_conversations_buy
 ALTER TABLE `message_conversations` ADD CONSTRAINT `fk_message_conversations_seller` FOREIGN KEY (`seller_user_id`) REFERENCES `users` (`id`);
 ALTER TABLE `message_records` ADD CONSTRAINT `fk_message_records_sender` FOREIGN KEY (`sender_user_id`) REFERENCES `users` (`id`);
 ALTER TABLE `message_records` ADD CONSTRAINT `fk_message_records_conversation` FOREIGN KEY (`conversation_id`) REFERENCES `message_conversations` (`id`);
-ALTER TABLE `system_notices` ADD CONSTRAINT `fk_system_notices_creator` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`);
 ALTER TABLE `trade_orders` ADD CONSTRAINT `fk_trade_orders_item` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`);
-ALTER TABLE `trade_payment_orders` ADD CONSTRAINT `fk_trade_payment_orders_seller` FOREIGN KEY (`seller_user_id`) REFERENCES `users` (`id`);
-ALTER TABLE `trade_payment_orders` ADD CONSTRAINT `fk_trade_payment_orders_item` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`);
-ALTER TABLE `trade_payment_orders` ADD CONSTRAINT `fk_trade_payment_orders_buyer` FOREIGN KEY (`buyer_user_id`) REFERENCES `users` (`id`);
 ALTER TABLE `trade_review_tasks` ADD CONSTRAINT `fk_trade_review_tasks_reviewer` FOREIGN KEY (`reviewer_user_id`) REFERENCES `users` (`id`);
 ALTER TABLE `trade_review_tasks` ADD CONSTRAINT `fk_trade_review_tasks_target` FOREIGN KEY (`target_user_id`) REFERENCES `users` (`id`);
 ALTER TABLE `trade_review_tasks` ADD CONSTRAINT `fk_trade_review_tasks_order` FOREIGN KEY (`order_id`) REFERENCES `trade_orders` (`id`);

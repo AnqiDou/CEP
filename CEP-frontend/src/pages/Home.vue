@@ -714,7 +714,6 @@ import {
 } from "../api/common/authSessionService";
 import {
   fetchHomeCategories,
-  fetchHotKeywords,
   fetchHomeItems,
   fetchHomeNotices,
 } from "../api/home/homeApiService";
@@ -836,7 +835,7 @@ const isLoadingMore = ref(false);
 const cardGridRef = ref(null);
 const homeScrollRef = ref(null);
 const showBackToTop = ref(false);
-const hotKeywords = ref([]);
+const hotKeywords = ref(["耳机", "自行车", "计算器", "考研资料", "宿舍收纳"]);
 const unreadMessageCount = ref(0);
 const homeNotices = ref([]);
 const closedHomeNoticeId = ref("");
@@ -1395,22 +1394,7 @@ const loadCategories = async () => {
   ];
 };
 
-const loadHotKeywords = async () => {
-  try {
-    const responseBody = await fetchHotKeywords(6);
-    const words = (responseBody.data || [])
-      .map((item) =>
-        typeof item.keyword === "string" ? item.keyword.trim() : ""
-      )
-      .filter(Boolean)
-      .slice(0, 6);
-    hotKeywords.value = words.length
-      ? words
-      : ["耳机", "自行车", "计算器", "考研资料", "宿舍收纳"];
-  } catch {
-    hotKeywords.value = ["耳机", "自行车", "计算器", "考研资料", "宿舍收纳"];
-  }
-};
+const loadHotKeywords = async () => {};
 
 const loadHomeNotices = async () => {
   try {
@@ -2079,8 +2063,8 @@ const submitLogin = async () => {
     if (email.toLowerCase() === ADMIN_EMAIL) {
       router.push("/admin");
     }
-  } catch (error) {
-    loginError.value = error.message || "登录失败";
+  } catch {
+    loginError.value = "账号或密码错误";
   }
 };
 
@@ -3317,7 +3301,8 @@ watch(
 
 .login-form__error {
   margin: 0;
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 600;
   color: #d95367;
 }
 

@@ -1,4 +1,5 @@
 package cep_backend.mapper;
+
 import cep_backend.entity.po.UserRecord;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -25,6 +26,15 @@ public class UserRepository {
     public Optional<UserRecord> findByEmail(String email) {
         String sql = "SELECT id, email, username, password_hash, status FROM users WHERE email = ?";
         List<UserRecord> result = jdbcTemplate.query(sql, userRowMapper, email);
+        if (result.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(result.getFirst());
+    }
+
+    public Optional<UserRecord> findByUsername(String username) {
+        String sql = "SELECT id, email, username, password_hash, status FROM users WHERE username = ?";
+        List<UserRecord> result = jdbcTemplate.query(sql, userRowMapper, username);
         if (result.isEmpty()) {
             return Optional.empty();
         }

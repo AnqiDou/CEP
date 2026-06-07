@@ -1,4 +1,5 @@
 package cep_backend.mapper;
+
 import cep_backend.entity.po.TradeOrderItemSnapshot;
 import cep_backend.entity.po.TradeOrderRecord;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -111,6 +112,18 @@ public class TradeOrderRepository {
                 """;
         Integer count = jdbcTemplate.queryForObject(sql, Integer.class, itemId);
         return count != null && count > 0;
+    }
+
+    public int cancelTimedOutPendingOrders(int timeoutMinutes) {
+        String sql = """
+                UPDATE trade_orders
+                SET status = 'CANCELLED',
+                    completed_at = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE status = 'PENDING_PAYMENT'
+                  AND created_at < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL ? MINUTE)
+                """;
+        return jdbcTemplate.update(sql, timeoutMinutes);
     }
 
     public TradeOrderRecord findLatestPendingOrderByBuyerAndItem(Long buyerUserId, Long itemId) {
@@ -351,6 +364,30 @@ public class TradeOrderRepository {
         return jdbcTemplate.update(sql, orderId);
     }
 
+    public int completeOrderWhenBuyerConfirmed(Long orderId) {
+        if (!hasBuyerConfirmedColumn) {
+            String sql = """
+                    UPDATE trade_orders
+                    SET status = 'COMPLETED',
+                        completed_at = CURRENT_TIMESTAMP,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                      AND status = 'PENDING_CONFIRMATION'
+                    """;
+            return jdbcTemplate.update(sql, orderId);
+        }
+        String sql = """
+                UPDATE trade_orders
+                SET status = 'COMPLETED',
+                    completed_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                  AND status = 'PENDING_CONFIRMATION'
+                  AND buyer_confirmed = TRUE
+                """;
+        return jdbcTemplate.update(sql, orderId);
+    }
+
     public int applyRefund(Long orderId, String refundType) {
         if (!hasRefundStatusColumn || !hasRefundTypeColumn) {
             return 0;
@@ -391,9 +428,7 @@ public class TradeOrderRepository {
         }
         String sql = """
                 UPDATE trade_orders
-                SET status = 'COMPLETED',
-                    refund_status = 'APPROVED',
-                    completed_at = CURRENT_TIMESTAMP,
+                SET refund_status = 'APPROVED',
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                   AND status = 'PENDING_CONFIRMATION'
@@ -427,7 +462,22 @@ public class TradeOrderRepository {
         }
         String sql = """
                 UPDATE trade_orders
-                SET refund_status = 'REJECTED',
+                SET status = CASE
+                        WHEN refund_type = 'RETURN_AFTER_RECEIPT' THEN 'COMPLETED'
+                        ELSE status
+                    END,
+                    completed_at = CASE
+                        WHEN refund_type = 'RETURN_AFTER_RECEIPT' THEN COALESCE(completed_at, CURRENT_TIMESTAMP)
+                        ELSE completed_at
+                    END,
+                    refund_status = CASE
+                        WHEN refund_type = 'RETURN_AFTER_RECEIPT' THEN 'REJECTED'
+                        ELSE 'NONE'
+                    END,
+                    refund_type = CASE
+                        WHEN refund_type = 'RETURN_AFTER_RECEIPT' THEN refund_type
+                        ELSE NULL
+                    END,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                   AND status = 'PENDING_CONFIRMATION'
@@ -605,7 +655,7 @@ public class TradeOrderRepository {
                 SET sold_quantity = COALESCE(sold_quantity, 0) + 1,
                     status = CASE
                         WHEN quantity_mode = 'UNLIMITED' THEN status
-                        WHEN (COALESCE(sold_quantity, 0) + 1) >= COALESCE(total_quantity, 1) THEN 'OFF_SHELF'
+                        WHEN (COALESCE(sold_quantity, 0) + 1) >= COALESCE(total_quantity, 1) THEN 'SOLD_OUT'
                         ELSE status
                     END,
                     updated_at = CURRENT_TIMESTAMP

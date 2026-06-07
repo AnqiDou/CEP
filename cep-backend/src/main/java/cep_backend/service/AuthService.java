@@ -1,4 +1,5 @@
 package cep_backend.service;
+
 import cep_backend.common.exception.BusinessException;
 import cep_backend.common.exception.UnauthorizedException;
 import cep_backend.dto.AuthSessionDto;
@@ -156,6 +157,7 @@ public class AuthService {
             throw new BusinessException("收货地址不能为空");
         }
         ensureEmailNotRegistered(email);
+        ensureUsernameNotRegistered(username);
 
         VerificationCodeRecord record = findLatestRegisterCode(email);
         if (!record.code().equals(code)) {
@@ -304,6 +306,15 @@ public class AuthService {
     private void ensureEmailRegistered(String email) {
         if (userRepository.findByEmail(email).isEmpty()) {
             throw new BusinessException("该邮箱尚未注册");
+        }
+    }
+
+    private void ensureUsernameNotRegistered(String username) {
+        if (username == null || username.isBlank()) {
+            throw new BusinessException("用户名不能为空");
+        }
+        if (userRepository.findByUsername(username).isPresent()) {
+            throw new BusinessException("用户名已被使用，请更换后重试");
         }
     }
 

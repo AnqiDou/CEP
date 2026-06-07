@@ -368,11 +368,12 @@
                         删除
                       </button>
                       <button
+                        v-if="shouldShowShelfAction(item)"
                         class="published-card__menu-item published-card__menu-item--shelf"
                         type="button"
                         @click.stop="onPublishedActionToggleShelf(item)"
                       >
-                        {{ item.status === "OFF_SHELF" ? "上架" : "下架" }}
+                        {{ getShelfActionText(item) }}
                       </button>
                     </div>
                   </div>
@@ -505,7 +506,6 @@
                     v-if="
                       selectedMenu === 'trade-bought' &&
                       item.status === 'PENDING_CONFIRMATION' &&
-                      !item.buyerConfirmed &&
                       !isRefundAfterSaleOrder(item)
                     "
                     class="section-item__btn section-item__btn--edit"
@@ -522,7 +522,7 @@
                     v-if="
                       selectedMenu === 'trade-bought' &&
                       item.status === 'PENDING_CONFIRMATION' &&
-                      item.refundStatus === 'REJECTED'
+                      item.refundStatus === 'APPLIED'
                     "
                     class="section-item__btn section-item__btn--edit"
                     type="button"
@@ -541,7 +541,7 @@
                     type="button"
                     @click="handleApplyRefund(item, 'NO_RECEIPT')"
                   >
-                    申请退款（未收到货）
+                    仅退款
                   </button>
                   <button
                     v-if="
@@ -554,7 +554,7 @@
                     type="button"
                     @click="handleApplyRefund(item, 'RETURN_AFTER_RECEIPT')"
                   >
-                    申请退款（已收到货）
+                    退货退款
                   </button>
                   <button
                     v-if="
@@ -582,7 +582,19 @@
                     type="button"
                     @click="handleRejectRefund(item)"
                   >
-                    不同意退款
+                    拒绝退款
+                  </button>
+                  <button
+                    v-if="
+                      selectedMenu === 'trade-bought' &&
+                      item.status === 'COMPLETED' &&
+                      !item.reviewed
+                    "
+                    class="section-item__btn section-item__btn--review"
+                    type="button"
+                    @click="goReview(item)"
+                  >
+                    去评价
                   </button>
                   <button
                     v-if="tradeOrderStatusMenuKeys.includes(selectedMenu)"
@@ -648,7 +660,10 @@
       class="profile-edit-dialog"
     >
       <div class="edit-avatar-row">
-        <el-avatar :size="64" :src="editForm.avatar || userInfo.avatar"
+        <el-avatar
+          class="edit-avatar"
+          :size="66"
+          :src="editForm.avatar || userInfo.avatar"
           ><el-icon><UserFilled /></el-icon
         ></el-avatar>
         <input
@@ -658,7 +673,10 @@
           accept="image/*"
           @change="handleAvatarChange"
         />
-        <el-button size="small" @click="triggerAvatarSelect"
+        <el-button
+          size="small"
+          class="edit-avatar-btn"
+          @click="triggerAvatarSelect"
           >更换头像</el-button
         >
       </div>
@@ -690,8 +708,17 @@
       </el-form>
       <p v-if="editError" class="edit-error">{{ editError }}</p>
       <template #footer>
-        <el-button @click="editDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveProfile">保存</el-button>
+        <el-button
+          class="edit-dialog-btn edit-dialog-btn--ghost"
+          @click="editDialogVisible = false"
+          >取消</el-button
+        >
+        <el-button
+          class="edit-dialog-btn edit-dialog-btn--primary"
+          type="primary"
+          @click="saveProfile"
+          >保存</el-button
+        >
       </template>
     </el-dialog>
 
@@ -750,7 +777,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { useRouter } from "vue-router";
 import {
@@ -770,6 +797,7 @@ import {
   fetchBoughtOrderContact,
   fetchBoughtItems,
   fetchFavoriteItems,
+  fetchPendingPaymentTrades,
   fetchFansUsers,
   fetchFollowingUsers,
   fetchProfileOverview,
@@ -816,7 +844,7 @@ const userInfo = reactive({
   passwordUpdatedAt: "2026-03-01",
 });
 const tradeMenus = [
-  { key: "trade-published", label: "发布的订单" },
+  { key: "trade-published", label: "发布的物品" },
   { key: "trade-sold", label: "卖出的订单" },
   { key: "trade-bought", label: "买到的订单" },
 ];
@@ -882,7 +910,7 @@ const tradeOrderStatusTabs = [
   { key: "all", label: "全部" },
   { key: "pending-payment", label: "待付款" },
   { key: "pending-confirmation", label: "待确认" },
-  { key: "refund-after-sale", label: "退款" },
+  { key: "refund-after-sale", label: "退款中" },
   { key: "completed", label: "已完成" },
   { key: "cancelled", label: "已取消" },
 ];
@@ -942,7 +970,13 @@ const isRefundAfterSaleOrder = (item) => {
   const refundStatus = String(item?.refundStatus || "")
     .trim()
     .toUpperCase();
-  return refundStatus === "APPLIED" || refundStatus === "REJECTED";
+  const refundType = String(item?.refundType || "")
+    .trim()
+    .toUpperCase();
+  return (
+    refundStatus === "APPLIED" ||
+    (refundStatus === "APPROVED" && refundType === "RETURN_AFTER_RECEIPT")
+  );
 };
 
 const hasRefundRejectedHistory = (item) =>
@@ -956,12 +990,18 @@ const hasRefundRejectedHistory = (item) =>
 const isRefundRejectedOrder = (item) =>
   String(item?.refundStatus || "")
     .trim()
-    .toUpperCase() === "REJECTED";
+    .toUpperCase() === "REJECTED" &&
+  String(item?.refundType || "")
+    .trim()
+    .toUpperCase() !== "RETURN_AFTER_RECEIPT";
 
 const isRefundApprovedOrder = (item) =>
   String(item?.refundStatus || "")
     .trim()
-    .toUpperCase() === "APPROVED";
+    .toUpperCase() === "APPROVED" &&
+  String(item?.refundType || "")
+    .trim()
+    .toUpperCase() !== "RETURN_AFTER_RECEIPT";
 
 const isReturnAfterReceiptApproved = (item) => {
   const refundStatus = String(item?.refundStatus || "")
@@ -1301,6 +1341,7 @@ const toPrice = (value) => {
 };
 
 const mapTradeItem = (item) => {
+  const nowTs = Date.now();
   const quantityMode = item?.quantityMode || "SINGLE";
   const soldQuantity = Number(item?.soldQuantity ?? 0);
   const totalQuantityRaw = item?.totalQuantity;
@@ -1341,8 +1382,38 @@ const mapTradeItem = (item) => {
     totalQuantity,
     soldQuantity,
     remainingQuantity,
+    cancelCountdownSeconds: Number(item?.cancelCountdownSeconds ?? 0),
+    cancelDeadlineTime: String(item?.cancelDeadlineTime || "").trim(),
+    cancelCountdownFetchedAtMs: nowTs,
     listSource: "published",
+    reviewed: Boolean(item.reviewed),
   };
+};
+
+const countdownNowMs = ref(Date.now());
+let countdownTimer = null;
+
+const formatCountdown = (totalSeconds) => {
+  const safe = Math.max(Number(totalSeconds || 0), 0);
+  const minutes = Math.floor(safe / 60);
+  const seconds = safe % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
+    2,
+    "0"
+  )}`;
+};
+
+const resolvePendingPaymentCountdownText = (item) => {
+  const baseSeconds = Math.max(Number(item?.cancelCountdownSeconds || 0), 0);
+  if (baseSeconds <= 0) {
+    return "待付款";
+  }
+  const fetchedAtMs = Number(
+    item?.cancelCountdownFetchedAtMs || countdownNowMs.value
+  );
+  const tickSeconds = Math.floor((countdownNowMs.value - fetchedAtMs) / 1000);
+  const leftSeconds = Math.max(baseSeconds - Math.max(tickSeconds, 0), 0);
+  return `待付款（剩余 ${formatCountdown(leftSeconds)}）`;
 };
 
 const mapFollowUser = (item) => ({
@@ -1361,10 +1432,10 @@ const mapTradeOrderStatusText = (status, item) => {
     return "退款已拒绝";
   }
   if (isRefundAfterSaleOrder(item)) {
-    return "退款";
+    return "退款中";
   }
   if (status === "PENDING_PAYMENT") {
-    return "待付款";
+    return resolvePendingPaymentCountdownText(item);
   }
   if (status === "PENDING_CONFIRMATION") {
     return "待确认";
@@ -1394,6 +1465,12 @@ const mapStatusText = (item) => {
   }
   if (item?.status === "DELETED") {
     return "已删除";
+  }
+  if (item?.status === "ADMIN_OFFLINE" || item?.status === "FORCED_OFF") {
+    return "违规下架";
+  }
+  if (item?.status === "SOLD_OUT") {
+    return "已售出";
   }
   const isSoldOut =
     item?.quantityMode !== "UNLIMITED" &&
@@ -1520,7 +1597,51 @@ const onPublishedActionDelete = async (item) => {
 
 const onPublishedActionToggleShelf = async (item) => {
   activePublishedActionMenuId.value = null;
+  if (!shouldShowShelfAction(item)) return;
   await togglePublishedItemShelf(item);
+};
+
+const isItemSoldOut = (item) => {
+  if (item?.status === "SOLD_OUT") return true;
+  return (
+    item?.quantityMode !== "UNLIMITED" &&
+    Number(item?.remainingQuantity ?? 0) <= 0
+  );
+};
+
+const isItemAdminOffline = (item) =>
+  item?.status === "ADMIN_OFFLINE" || item?.status === "FORCED_OFF";
+
+const canToggleShelfAction = (item) => {
+  if (!item || item.listSource === "sold") return false;
+  if (isItemAdminOffline(item)) return false;
+  if (item.status === "OFF_SHELF" && isItemSoldOut(item)) return false;
+  return true;
+};
+
+const shouldShowShelfAction = (item) => {
+  if (!item || item.listSource === "sold") return false;
+  if (isItemAdminOffline(item)) return false;
+  if (isItemSoldOut(item)) return false;
+  return true;
+};
+
+const resolveShelfActionDisabledReason = (item) => {
+  if (!item || item.listSource === "sold") return "";
+  if (isItemAdminOffline(item)) {
+    return "该商品因违规被管理员下架，无法自行上架";
+  }
+  if (item.status === "OFF_SHELF" && isItemSoldOut(item)) {
+    return "该商品已售出，无法上架";
+  }
+  return "";
+};
+
+const getShelfActionText = (item) => {
+  if (item?.status === "OFF_SHELF") {
+    return "上架";
+  }
+  return "下架";
 };
 
 const selectedPublishedItems = computed(() => {
@@ -1746,11 +1867,18 @@ const loadMenuData = async (menuKey, force = false) => {
   }
 
   if (menuKey === "trade-bought") {
-    const boughtRes = await fetchBoughtItems(
-      getTradeOrderApiStatus(activeTradeOrderStatusMap["trade-bought"])
+    const activeStatus = getTradeOrderApiStatus(
+      activeTradeOrderStatusMap["trade-bought"]
     );
-    sectionItemMap["trade-bought"] =
-      normalizeListData(boughtRes).map(mapTradeItem);
+    if (activeStatus === "pending-payment") {
+      const pendingRes = await fetchPendingPaymentTrades();
+      sectionItemMap["trade-bought"] =
+        normalizeListData(pendingRes).map(mapTradeItem);
+    } else {
+      const boughtRes = await fetchBoughtItems(activeStatus);
+      sectionItemMap["trade-bought"] =
+        normalizeListData(boughtRes).map(mapTradeItem);
+    }
     loadedMenus["trade-bought"] = true;
     return;
   }
@@ -1973,8 +2101,8 @@ const handleRejectRefund = async (item) => {
           ? "REFUND_REJECTED_RETURN"
           : "REFUND_REJECTED_NO_RECEIPT",
         content: isReturnFlow
-          ? "卖家不同意退款（已收到货）。如有异议，请联系客服协助处理。"
-          : "卖家不同意退款（未收到货）。如有异议，请联系客服协助处理。",
+          ? "卖家已拒绝退款（已收到货）。如有异议，请联系客服协助处理。"
+          : "卖家已拒绝退款（未收到货）。如有异议，请联系客服协助处理。",
         actionText: "查看订单",
         targetMenu: "trade-bought",
       });
@@ -2011,6 +2139,19 @@ const handleWithdrawRejectedRefund = async (item) => {
   } catch (error) {
     ElMessage.error(error.message || "撤销退款申请失败");
   }
+};
+
+const goReview = (item) => {
+  const orderId = getTradeOrderId(item);
+  if (!orderId) {
+    ElMessage.warning("订单信息无效");
+    return;
+  }
+  const resolved = router.resolve({
+    name: "trade-review",
+    query: { orderId: String(orderId) },
+  });
+  window.open(resolved.href, "_blank");
 };
 
 const getTradeOrderId = (item) => item?.orderId || item?.id;
@@ -2069,6 +2210,11 @@ const handleLogout = async () => {
 };
 
 onMounted(async () => {
+  countdownNowMs.value = Date.now();
+  countdownTimer = window.setInterval(() => {
+    countdownNowMs.value = Date.now();
+  }, 1000);
+
   const savedMenu = localStorage.getItem(PROFILE_SELECTED_MENU_KEY) || "idle";
   selectedMenu.value = sectionMap[savedMenu] ? savedMenu : "idle";
   if (!sectionMap[savedMenu]) {
@@ -2088,6 +2234,13 @@ onMounted(async () => {
     await loadMenuData(selectedMenu.value, true);
   } catch (error) {
     ElMessage.error(error.message || "个人中心加载失败");
+  }
+});
+
+onUnmounted(() => {
+  if (countdownTimer) {
+    window.clearInterval(countdownTimer);
+    countdownTimer = null;
   }
 });
 </script>
@@ -2920,6 +3073,10 @@ onMounted(async () => {
   background: #72c8a0;
 }
 
+.section-item__btn--review {
+  background: #f0a500;
+}
+
 .section-item__btn--contact {
   background: #7f72e8;
 }
@@ -2927,11 +3084,32 @@ onMounted(async () => {
 .edit-avatar-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 14px;
+  margin-bottom: 18px;
   padding: 14px;
-  border-radius: 16px;
+  border-radius: 14px;
   background: #f7f4ff;
+  border: 1px solid #e6defc;
+}
+
+.edit-avatar {
+  border: 2px solid #ffffff;
+  box-shadow: 0 10px 20px rgba(128, 107, 206, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.edit-avatar-btn {
+  border-radius: 999px;
+  border: 1px solid #d7ccfb;
+  background: #ffffff;
+  color: #65588f;
+  font-weight: 600;
+}
+
+.edit-avatar-btn:hover {
+  border-color: #c7b9f9;
+  color: #574a84;
+  background: #fdfcff;
 }
 
 .avatar-input {
@@ -2947,6 +3125,87 @@ onMounted(async () => {
 .edit-form-grid {
   margin-top: 14px;
   padding: 8px 2px;
+}
+
+.profile-edit-dialog :deep(.el-dialog) {
+  border-radius: 20px;
+  border: 1px solid #ece8fb;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(127, 114, 232, 0.12);
+}
+
+.profile-edit-dialog :deep(.el-dialog__header) {
+  margin: 0;
+  padding: 18px 20px 12px;
+  border-bottom: 1px solid #f0ecff;
+}
+
+.profile-edit-dialog :deep(.el-dialog__title) {
+  color: #3f3760;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.profile-edit-dialog :deep(.el-dialog__headerbtn .el-dialog__close) {
+  color: #8d83b6;
+}
+
+.profile-edit-dialog :deep(.el-dialog__body) {
+  padding: 16px 20px 8px;
+}
+
+.profile-edit-dialog :deep(.el-form-item__label) {
+  color: #655a89;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.profile-edit-dialog :deep(.el-input__wrapper),
+.profile-edit-dialog :deep(.el-textarea__inner) {
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px #d8ccff;
+  min-height: 48px;
+}
+
+.profile-edit-dialog :deep(.el-input__wrapper.is-focus),
+.profile-edit-dialog :deep(.el-textarea__inner:focus) {
+  box-shadow: inset 0 0 0 1px #bcaaf6, 0 0 0 4px rgba(169, 146, 244, 0.16);
+}
+
+.profile-edit-dialog :deep(.el-input__inner),
+.profile-edit-dialog :deep(.el-textarea__inner) {
+  color: #4e456f;
+  font-size: 15px;
+}
+
+.profile-edit-dialog :deep(.el-input__count) {
+  font-size: 13px;
+}
+
+.profile-edit-dialog :deep(.el-dialog__footer) {
+  padding: 10px 20px 18px;
+}
+
+.edit-dialog-btn {
+  min-width: 98px;
+  border-radius: 14px;
+  height: 44px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.edit-dialog-btn--ghost {
+  border: 1px solid #d8d1ec;
+  background: #ffffff;
+  color: #5e5778;
+}
+
+.edit-dialog-btn--primary {
+  border: 1px solid #5ca3f3;
+  background: #5ca3f3;
+  color: #ffffff;
 }
 
 @media (max-width: 980px) {
